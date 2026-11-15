@@ -1,6 +1,6 @@
 import { $, fill, fmtDate, h } from '../dom';
 import { createStore } from '../data/store';
-import { countOf, currentIndex, newMission, statusFresh, type CounterName, type Data, type LiveData, type Mission } from '../data/types';
+import { countOf, currentIndex, newMission, statusFresh, type Comment, type CounterName, type Data, type LiveData, type Mission } from '../data/types';
 import { safeUrl } from '../dom';
 import { createPicker } from './picker';
 
@@ -32,6 +32,8 @@ const editor = $<HTMLDialogElement>('editor');
 let data: Data;
 let live: LiveData | null = null;
 let settingsOpen = false;
+let comments: Comment[] = [];
+let showHidden = false;
 
 let toastTimer = 0;
 function toast(text: string, bad = false) {
@@ -350,6 +352,51 @@ function nowCard() {
   );
 }
 
+/** תגובות אחרונות מהצופים: הסתרה, מחיקה וחסימה */
+function commentsPanel() {
+  const titleOf = (c: Comment) => {
+    if (c.target_type === 'stop') {
+      const i = data.missions.findIndex((m) => m.id === c.target_id);
+      return i >= 0 ? { label: `עצירה ${i + 1}: ${data.missions[i].title}`, href: `./#m-${i + 1}` } : { label: 'עצירה שנמחקה', href: '' };
+    }
+    const clip = live?.clips.find((x) => x.id === c.target_id);
+    return { label: `קליפ: ${clip?.title || 'קליפ'}`, href: '' };
+  };
+  const list = [...comments].filter((c) => showHidden || !c.hidden).reverse().slice(0, 60);
+  const toggle = h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: showHidden, onchange: (e: Event) => { showHidden = (e.target as HTMLInputElement).checked; render(); } }), h('span', {}, 'להציג גם מוסתרות'));
+  return h(
+    'section',
+    { class: 'panel' },
+    h('div', { class: 'panel-head' }, h('h2', {}, `תגובות אחרונות (${comments.filter((c) => !c.hidden).length})`), toggle),
+    list.length
+      ? h(
+          'ol',
+          { class: 'cmt-mod' },
+          ...list.map((c) => {
+            const t = titleOf(c);
+            return h(
+              'li',
+              { class: c.hidden ? 'is-hidden' : '' },
+              h(
+                'div',
+                { class: 'cmt-mod__main' },
+                h('p', { class: 'cmt-mod__meta' }, h('strong', {}, c.username), h('span', {}, fmtDate(c.created_at)), t.href ? h('a', { href: t.href, target: '_blank' }, t.label) : h('span', {}, t.label)),
+                h('p', { class: 'cmt-mod__body' }, c.body),
+              ),
+              h(
+                'div',
+                { class: 'ops' },
+                h('button', { type: 'button', onclick: () => run(() => store.moderateComment(c.id, c.hidden ? 'show' : 'hide'), c.hidden ? 'התגובה חזרה' : 'התגובה הוסתרה') }, c.hidden ? 'החזרה' : 'הסתרה'),
+                h('button', { type: 'button', class: 'danger', onclick: (e: MouseEvent) => twice(e, () => run(() => store.moderateComment(c.id, 'delete'), 'נמחקה')) }, 'מחיקה'),
+                h('button', { type: 'button', class: 'danger', title: 'חוסם את המשתמש מלהגיב ומסתיר את כל התגובות שלו', onclick: (e: MouseEvent) => twice(e, () => run(() => store.banUser(c.kick_user_id, c.username), `${c.username} נחסם`)) }, 'חסימה'),
+              ),
+            );
+          }),
+        )
+      : h('p', { class: 'empty' }, 'עוד אין תגובות. צופים מגיבים מהפאנל של כל עצירה ומתחת לקליפים, אחרי התחברות עם Kick.'),
+  );
+}
+
 function render() {
   if (location.hash === '#counters') {
     fill(app, countersPanel(true));
@@ -487,6 +534,7 @@ function render() {
       ),
       missions.length ? list : h('p', { class: 'empty' }, 'עדיין אין עצירות. מוסיפים את המשימה הראשונה כשהלייב מתחיל.'),
     ),
+    commentsPanel(),
     (() => {
       // נשאר פתוח גם אחרי שמירה (העמוד נבנה מחדש בכל שינוי)
       const fold = h('details', { class: 'fold', open: settingsOpen }, h('summary', {}, h('span', {}, 'הגדרות האתר'), h('small', {}, 'שם, ערוץ, קטגוריה, מפה וזום')), settingsForm);
@@ -520,6 +568,12 @@ async function start() {
     if (!editor.open) render();
   };
   store.loadLive().then(onLive).catch(() => {});
+  const onComments = (c: Comment[]) => {
+    comments = c;
+    if (!editor.open) render();
+  };
+  store.loadComments(true).then(onComments).catch(() => {});
+  store.subscribeComments(onComments, true);
   store.subscribeLive(onLive);
   addEventListener('hashchange', render);
 }

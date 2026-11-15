@@ -148,3 +148,42 @@ do $$ begin
   alter publication supabase_realtime add table public.counter_events;
   alter publication supabase_realtime add table public.clips;
 exception when duplicate_object then null; end $$;
+
+-- ── תגובות של צופים (מחוברים עם Kick) על עצירות וקליפים (אפשר להריץ שוב בבטחה) ──
+-- כתיבה רק דרך הפונקציה kick-comment (שבודקת את כרטיס ההתחברות, חסימות וקצב); קריאה – לכולם
+create table if not exists public.comments (
+  id uuid primary key default gen_random_uuid(),
+  target_type text not null check (target_type in ('stop', 'clip')),
+  target_id text not null,
+  kick_user_id text not null,
+  username text not null,
+  avatar text,
+  body text not null check (char_length(body) between 1 and 500),
+  hidden boolean not null default false,
+  created_at timestamptz not null default now()
+);
+create index if not exists comments_target on public.comments (target_type, target_id);
+create index if not exists comments_user_time on public.comments (kick_user_id, created_at desc);
+
+create table if not exists public.comment_bans (
+  kick_user_id text primary key,
+  username text,
+  created_at timestamptz not null default now()
+);
+
+alter table public.comments enable row level security;
+alter table public.comment_bans enable row level security;
+drop policy if exists "read comments" on public.comments;
+drop policy if exists "read all comments (mods)" on public.comments;
+drop policy if exists "moderate comments" on public.comments;
+drop policy if exists "delete comments" on public.comments;
+drop policy if exists "mods bans" on public.comment_bans;
+create policy "read comments" on public.comments for select using (hidden = false);
+create policy "read all comments (mods)" on public.comments for select to authenticated using (true);
+create policy "moderate comments" on public.comments for update to authenticated using (true) with check (true);
+create policy "delete comments" on public.comments for delete to authenticated using (true);
+create policy "mods bans" on public.comment_bans for all to authenticated using (true) with check (true);
+
+do $$ begin
+  alter publication supabase_realtime add table public.comments;
+exception when duplicate_object then null; end $$;

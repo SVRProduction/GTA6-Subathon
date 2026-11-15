@@ -252,3 +252,14 @@ dialog form { display: grid; gap: 18px; padding: 22px 22px 0; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition-duration: 1ms !important; }
 }
+
+/* ── תגובות לניהול ── */
+.cmt-mod { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; max-height: 60vh; overflow: auto; }
+.cmt-mod li { display: flex; gap: 12px; align-items: flex-start; flex-wrap: wrap; padding: 12px; border-radius: 14px; background: var(--paper-3); border: 2px solid transparent; }
+.cmt-mod li:hover { border-color: rgba(30, 27, 22, 0.35); }
+.cmt-mod li.is-hidden { opacity: 0.55; border-style: dashed; border-color: rgba(30, 27, 22, 0.35); }
+.cmt-mod__main { flex: 1 1 260px; min-width: 0; display: grid; gap: 4px; }
+.cmt-mod__meta { display: flex; gap: 10px; flex-wrap: wrap; align-items: baseline; font-size: 13px; color: var(--ink-mute); }
+.cmt-mod__meta strong { font: 400 15px/1.2 var(--stamp); color: var(--ink); }
+.cmt-mod__meta a { color: var(--ink-soft); }
+.cmt-mod__body { font-size: 16px; white-space: pre-wrap; overflow-wrap: anywhere; }
