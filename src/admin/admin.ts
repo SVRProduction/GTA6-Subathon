@@ -1,0 +1,472 @@
+import { $, fill, fmtDate, h } from '../dom';
+import { createStore } from '../data/store';
+import { countOf, currentIndex, newMission, statusFresh, type CounterName, type Data, type LiveData, type Mission } from '../data/types';
+import { safeUrl } from '../dom';
+import { createPicker } from './picker';
+
+const DEFAULT_MAP = `${import.meta.env.BASE_URL}map.webp`;
+const mapUrl = () => safeUrl(data.settings.map_image_url) || DEFAULT_MAP;
+// השביל הראשי (רק למפה המקורית)
+let trailRaw: Array<[number, number]> | null = null;
+fetch(`${import.meta.env.BASE_URL}trail.json`)
+  .then((r) => (r.ok ? r.json() : null))
+  .then((t) => (trailRaw = t))
+  .catch(() => {});
+
+/** מקטין תמונה לעד 4096px בצד הארוך (JPEG) – מפה כבדה מדי לא תעבוד בטלפונים */
+async function downscale(file: File, max = 4096): Promise<File> {
+  const bmp = await createImageBitmap(file);
+  const k = Math.min(1, max / Math.max(bmp.width, bmp.height));
+  if (k === 1 && file.size < 8 * 1024 * 1024) return file;
+  const c = document.createElement('canvas');
+  c.width = Math.round(bmp.width * k);
+  c.height = Math.round(bmp.height * k);
+  c.getContext('2d')!.drawImage(bmp, 0, 0, c.width, c.height);
+  const blob = await new Promise<Blob>((res) => c.toBlob((b) => res(b!), 'image/jpeg', 0.9));
+  return new File([blob], 'image.jpg', { type: 'image/jpeg' });
+}
+
+const store = createStore();
+const app = $('app');
+const editor = $<HTMLDialogElement>('editor');
+let data: Data;
+let live: LiveData | null = null;
+
+let toastTimer = 0;
+function toast(text: string, bad = false) {
+  const t = $('toast');
+  t.textContent = text;
+  t.className = `show ${bad ? 'bad' : ''}`;
+  clearTimeout(toastTimer);
+  toastTimer = window.setTimeout(() => (t.className = ''), 4000);
+}
+
+/** מריץ פעולה מול השרת ומציג שגיאה אם נכשלה */
+async function run(action: () => Promise<void>, ok?: string) {
+  try {
+    await action();
+    if (store.mode === 'supabase') data = await store.load();
+    render();
+    if (ok) toast(ok);
+    return true;
+  } catch (e) {
+    toast((e as Error).message || 'הפעולה נכשלה', true);
+    return false;
+  }
+}
+
+/** אישור בשתי לחיצות (בלי חלון confirm, שחסום בחלק מהדפדפנים המוטמעים) */
+function twice(e: MouseEvent, action: () => void) {
+  const btn = e.currentTarget as HTMLButtonElement;
+  if (btn.dataset.armed) {
+    action();
+    return;
+  }
+  const label = btn.textContent;
+  btn.dataset.armed = '1';
+  btn.textContent = 'בטוח? לחצו שוב';
+  setTimeout(() => {
+    delete btn.dataset.armed;
+    btn.textContent = label;
+  }, 3000);
+}
+
+/** "תמונה מהקטע": הדבקת צילום מסך (Ctrl+V), גרירה או בחירת קובץ; מוקטנת ל-1600px לפני העלאה */
+function shotField(input: HTMLInputElement) {
+  const preview = h('div', { class: 'shot__preview' });
+  const show = () => {
+    const u = safeUrl(input.value);
+    preview.replaceChildren(u ? h('img', { src: u, alt: 'תמונה מהקטע' }) : h('span', {}, 'עוד אין תמונה'));
+  };
+  const take = async (f: File | null | undefined) => {
+    if (!f || !f.type.startsWith('image/')) return;
+    toast('מעלה את התמונה…');
+    try {
+      input.value = await store.upload(await downscale(f, store.mode === 'demo' ? 900 : 1600));
+      show();
+      toast('התמונה נוספה');
+    } catch (e) {
+      toast((e as Error).message, true);
+    }
+  };
+  const file = h('input', { type: 'file', accept: 'image/*', class: 'file' });
+  file.onchange = () => take(file.files?.[0]).then(() => (file.value = ''));
+  const zone = h(
+    'div',
+    { class: 'shot', tabIndex: 0 },
+    preview,
+    h('div', { class: 'shot__how' }, h('strong', {}, 'הדביקו צילום מסך מהלייב (Ctrl+V)'), h('span', {}, 'או גררו תמונה לכאן, או '), h('label', { class: 'shot__pick' }, 'בחרו קובץ', file)),
+  );
+  zone.addEventListener('paste', (e) => {
+    const it = [...(e.clipboardData?.items ?? [])].find((x) => x.type.startsWith('image/'));
+    if (it) {
+      e.preventDefault();
+      take(it.getAsFile());
+    }
+  });
+  zone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    zone.classList.add('is-over');
+  });
+  zone.addEventListener('dragleave', () => zone.classList.remove('is-over'));
+  zone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    zone.classList.remove('is-over');
+    take(e.dataTransfer?.files?.[0]);
+  });
+  input.addEventListener('input', show);
+  show();
+  return h(
+    'div',
+    { class: 'field' },
+    h('span', {}, 'תמונה מהקטע'),
+    zone,
+    h('small', {}, 'מופיעה בראש הפאנל, ובמיילסטון גם בתוך הסיכה על המפה. אפשר גם קישור:'),
+    input,
+  );
+}
+
+function field(label: string, input: HTMLElement, hint?: string) {
+  return h('label', { class: 'field' }, h('span', {}, label), input, hint ? h('small', {}, hint) : null);
+}
+
+// ── התחברות ──
+function renderLogin() {
+  const email = h('input', { type: 'email', required: true, autocomplete: 'username' });
+  const pass = h('input', { type: 'password', required: true, autocomplete: 'current-password' });
+  const form = h(
+    'form',
+    { class: 'panel login' },
+    h('h1', {}, 'ניהול המסע'),
+    field('אימייל', email),
+    field('סיסמה', pass),
+    h('button', { class: 'btn primary', type: 'submit' }, 'כניסה'),
+  );
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await store.signIn(email.value, pass.value);
+      await start();
+    } catch {
+      toast('אימייל או סיסמה שגויים', true);
+    }
+  };
+  app.replaceChildren(form);
+}
+
+// ── עורך נקודה ──
+function openEditor(m: Mission, isNew: boolean) {
+  const title = h('input', { value: m.title, required: true, maxLength: 80 });
+  const summary = h('textarea', { value: m.summary, rows: 2, maxLength: 200 });
+  const body = h('textarea', { value: m.body, rows: 5 });
+  const kind = h('select', {}, h('option', { value: 'mission' }, 'משימה'), h('option', { value: 'moment' }, 'קטע חשוב'));
+  kind.value = m.kind;
+  const milestone = h('input', { type: 'checkbox', checked: m.is_milestone });
+  const day = h('input', { type: 'number', min: '1', value: m.stream_day ? String(m.stream_day) : '' });
+  const when = h('input', { type: 'datetime-local', value: m.happened_at ? toLocal(m.happened_at) : '' });
+  const recap = h('input', { type: 'url', value: m.recap_url ?? '', placeholder: 'https://kick.com/…/clips/…', dir: 'ltr' });
+  const download = h('input', { type: 'url', value: m.download_url ?? '', placeholder: 'https://…', dir: 'ltr' });
+  const image = h('input', { type: 'url', value: m.image_url ?? '', placeholder: 'https://…', dir: 'ltr' });
+  const chapter = h('input', { value: m.chapter ?? '', placeholder: 'למשל: פרק 2 · הביצות', maxLength: 40 });
+  const quote = h('textarea', { value: m.quote ?? '', rows: 2, maxLength: 220 });
+  const quoteBy = h('input', { value: m.quote_by ?? '', placeholder: 'למשל: הצ׳אט', maxLength: 40 });
+  const others = data.missions.some((x) => x.id === m.id) ? data.missions : [...data.missions, m];
+  const picker = createPicker({
+    trail: data.settings.map_image_url ? null : trailRaw,
+    mapUrl: mapUrl(),
+    missions: others,
+    editingId: m.id,
+    value: m.map_x != null && m.map_y != null ? { x: m.map_x, y: m.map_y } : null,
+  });
+
+  const uploader = (target: HTMLInputElement, accept: string) => {
+    const file = h('input', { type: 'file', accept, class: 'file' });
+    file.onchange = async () => {
+      if (!file.files?.[0]) return;
+      toast('מעלה…');
+      try {
+        target.value = await store.upload(file.files[0]);
+        toast('הקובץ הועלה');
+      } catch (e) {
+        toast((e as Error).message, true);
+      }
+      file.value = '';
+    };
+    return file;
+  };
+
+  const form = h(
+    'form',
+    {},
+    h('h2', {}, isNew ? 'נקודה חדשה על המפה' : 'עריכה'),
+    field('שם', title),
+    h('div', { class: 'field' }, h('span', {}, 'איפה זה קרה על המפה?'), picker.el),
+    field('תקציר קצר (מופיע בכרטיס ליד הסיכה)', summary),
+    h('div', { class: 'row' }, field('סוג', kind), field('יום בסאבתון', day), field('מתי קרה', when)),
+    h('label', { class: 'check' }, milestone, h('span', {}, '★ מיילסטון – סיכה גדולה עם תמונה, וריקאפ מלא')),
+    field('פרק בעלילה', chapter, 'מקבץ את הסיכות בפס הפרקים בצד. ריק = לפי יום'),
+    field('ריקאפ מלא (מה קרה ולמה זה חשוב)', body),
+    field('קישור לקטע מהלייב', recap, 'קליפ או VOD של Kick, YouTube, או קובץ וידאו ישיר (mp4) שיתנגן בתוך האתר'),
+    field('קישור להורדה', download),
+    h('div', { class: 'upload' }, h('span', {}, 'או העלאת קובץ להורדה:'), uploader(download, 'video/*,audio/*,image/*')),
+    shotField(image),
+    h('div', { class: 'row' }, field('ציטוט (אופציונלי)', quote), field('מי אמר', quoteBy)),
+    h(
+      'div',
+      { class: 'actions' },
+      h('button', { class: 'btn primary', type: 'submit' }, 'שמירה'),
+      h('button', { class: 'btn', type: 'button', onclick: () => editor.close() }, 'ביטול'),
+    ),
+  );
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const next: Mission = {
+      ...m,
+      title: title.value.trim(),
+      summary: summary.value.trim(),
+      body: body.value.trim(),
+      kind: kind.value as Mission['kind'],
+      is_milestone: milestone.checked,
+      stream_day: day.value ? Number(day.value) : null,
+      happened_at: when.value ? new Date(when.value).toISOString() : null,
+      recap_url: recap.value.trim() || null,
+      download_url: download.value.trim() || null,
+      image_url: image.value.trim() || null,
+      chapter: chapter.value.trim() || null,
+      quote: quote.value.trim() || null,
+      quote_by: quoteBy.value.trim() || null,
+      map_x: picker.get()?.x ?? null,
+      map_y: picker.get()?.y ?? null,
+    };
+    const save = async () => {
+      await store.saveMission(next);
+      // נקודה חדשה היא בדרך כלל "איפה שאנחנו עכשיו" – חוסך לחיצה באמצע לייב
+      if (isNew) await store.saveSettings({ ...data.settings, current_mission_id: next.id });
+    };
+    if (await run(save, 'נשמר – הצופים כבר רואים את זה')) editor.close();
+  };
+  // הדבקת תמונה בכל מקום בעורך (כשלא מקלידים בשדה טקסט) נכנסת כתמונה מהקטע
+  form.addEventListener('paste', (e) => {
+    const t = e.target as HTMLElement;
+    if (t.closest('.shot') || ['TEXTAREA'].includes(t.tagName) || (t.tagName === 'INPUT' && (t as HTMLInputElement).type !== 'url')) return;
+    const it = [...(e.clipboardData?.items ?? [])].find((x) => x.type.startsWith('image/'));
+    if (!it) return;
+    e.preventDefault();
+    form.querySelector<HTMLElement>('.shot')?.dispatchEvent(new ClipboardEvent('paste', { clipboardData: e.clipboardData, bubbles: false }));
+  });
+  editor.replaceChildren(form);
+  editor.showModal();
+}
+
+function toLocal(iso: string) {
+  const d = new Date(iso);
+  return new Date(+d - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+}
+
+// ── מסך ראשי ──
+/** כפתורי הספירה: גדולים, לטלפון שליד המחשב בזמן הלייב */
+function countersPanel(compact: boolean) {
+  const cur = data.missions[currentIndex(data)];
+  const box = (c: CounterName, icon: string, label: string) => {
+    const n = live ? countOf(live, c) : 0;
+    const here = live && cur ? countOf(live, c, cur.id) : 0;
+    const plus = h('button', { class: `big big--${c}`, type: 'button', ariaLabel: `${label} +1` }, h('span', { class: 'big__icon' }, icon), h('span', { class: 'big__label' }, label), h('b', { class: 'big__n' }, n.toLocaleString('he-IL')));
+    plus.onclick = async () => {
+      plus.classList.remove('is-hit');
+      void plus.offsetWidth;
+      plus.classList.add('is-hit');
+      navigator.vibrate?.(30);
+      try {
+        await store.bump(c, 1, cur?.id ?? null);
+      } catch (e) {
+        toast((e as Error).message, true);
+      }
+    };
+    const undo = h('button', { class: 'btn undo', type: 'button', disabled: n <= 0 }, `↶ ביטול ${label}`);
+    undo.onclick = () => store.bump(c, -1, cur?.id ?? null).then(() => toast('בוטל'), (e) => toast((e as Error).message, true));
+    return h('div', { class: 'counter' }, plus, h('div', { class: 'counter__foot' }, h('small', {}, cur ? `במשימה הנוכחית: ${here}` : ''), undo));
+  };
+  const st = live?.status;
+  const fresh = statusFresh(st ?? null);
+  const status = fresh
+    ? st!.is_live
+      ? st!.on_category
+        ? '🔴 בלייב על GTA 6: זמן המשחק נספר'
+        : `🟡 בלייב, אבל לא על GTA 6 (${st!.category ?? 'קטגוריה לא ידועה'}): זמן המשחק לא נספר`
+      : '⚫ לא בלייב'
+    : store.mode === 'demo'
+      ? '⚪ מצב דמו'
+      : '⚪ הבדיקה האוטומטית מול Kick לא פעילה (ראה README: kick-sync)';
+  return h(
+    'section',
+    { class: `panel counters ${compact ? 'counters--full' : ''}` },
+    h('div', { class: 'panel-head' }, h('h2', {}, 'ספירות'), compact ? h('a', { class: 'btn', href: '#' }, 'לכל הניהול') : h('a', { class: 'btn', href: '#counters' }, 'מסך ספירות מלא')),
+    h('p', { class: 'live-line' }, status),
+    h('div', { class: 'counters__row' }, box('deaths', '💀', 'מוות'), box('cats', '🐈', 'חתול')),
+    h('small', { class: 'counters__hint' }, cur ? `נספר על: ${cur.title || 'המשימה הנוכחית'}. מודרטורים יכולים גם לכתוב בצ'אט !מוות או !חתול (אחרי חיבור האפליקציה של Kick).` : ''),
+  );
+}
+
+function render() {
+  if (location.hash === '#counters') {
+    fill(app, countersPanel(true));
+    return;
+  }
+  const { missions, settings } = data;
+  const cur = currentIndex(data);
+
+  const sTitle = h('input', { value: settings.title });
+  const sKick = h('input', { value: settings.kick_channel, placeholder: 'odedsvr', dir: 'ltr' });
+  const sCat = h('input', { value: settings.kick_category, placeholder: 'grand-theft-auto-vi', dir: 'ltr' });
+  const sStart = h('input', { type: 'datetime-local', value: settings.started_at ? toLocal(settings.started_at) : '' });
+  const sLive = h('input', { type: 'checkbox', checked: settings.is_live });
+  const sZoom = h('input', { type: 'range', min: '1.5', max: '6', step: '0.25', value: String(settings.map_zoom || 3) });
+  const mapFile = h('input', { type: 'file', accept: 'image/*', class: 'file' });
+  mapFile.onchange = async () => {
+    const f = mapFile.files?.[0];
+    if (!f) return;
+    toast('מעלה את המפה…');
+    try {
+      const url = await store.upload(await downscale(f, store.mode === 'demo' ? 1600 : 4096));
+      await run(() => store.saveSettings({ ...data.settings, map_image_url: url }), 'המפה הוחלפה – הצופים כבר רואים אותה');
+    } catch (e) {
+      toast((e as Error).message, true);
+    }
+    mapFile.value = '';
+  };
+  const mapBox = h(
+    'div',
+    { class: 'mapbox' },
+    h('img', { src: mapUrl(), alt: 'המפה הנוכחית' }),
+    h(
+      'div',
+      { class: 'mapbox__side' },
+      h('strong', {}, settings.map_image_url ? 'המפה שהעלית' : 'המפה המקורית של האתר'),
+      h('small', {}, 'המפה מוצגת בדיוק כמו שהיא, בלי שינויים. כדאי תמונה חדה ברזולוציה גבוהה (2000px ומעלה). תמונות גדולות מ-4096px מוקטנות אוטומטית.'),
+      h('label', { class: 'btn' }, 'העלאת מפה', mapFile),
+      settings.map_image_url
+        ? h('button', { class: 'btn', type: 'button', onclick: (e: MouseEvent) => twice(e, () => run(() => store.saveSettings({ ...settings, map_image_url: null }), 'חזרנו למפה המקורית')) }, 'חזרה למפה המקורית')
+        : null,
+    ),
+  );
+  const settingsForm = h(
+    'form',
+    { class: 'panel' },
+    h('h2', {}, 'הגדרות'),
+    h('div', { class: 'row' }, field('כותרת הסאבתון', sTitle), field('ערוץ Kick', sKick), field('תחילת הסאבתון', sStart)),
+    field('קטגוריה ב-Kick', sCat, 'הכתובת של הקטגוריה (מה שאחרי kick.com/category/). רק הזמן בקטגוריה הזו נספר, ורק הקליפים ממנה מופיעים.'),
+    h('label', { class: 'check' }, sLive, h('span', {}, 'אני בלייב עכשיו (גיבוי ידני: משמש רק כשהבדיקה האוטומטית מול Kick לא פעילה)')),
+    field('המפה', mapBox),
+    field('כמה קרוב המצלמה במסע', sZoom, 'שמאלה = רואים יותר מהמפה, ימינה = קרוב יותר'),
+    h('button', { class: 'btn', type: 'submit' }, 'שמירת הגדרות'),
+  );
+  settingsForm.onsubmit = (e) => {
+    e.preventDefault();
+    run(
+      () =>
+        store.saveSettings({
+          ...settings,
+          title: sTitle.value.trim(),
+          kick_channel: sKick.value.trim(),
+          kick_category: sCat.value.trim().replace(/^.*\/category\//, '') || 'grand-theft-auto-vi',
+          started_at: sStart.value ? new Date(sStart.value).toISOString() : null,
+          is_live: sLive.checked,
+          map_zoom: Number(sZoom.value),
+        }),
+      'ההגדרות נשמרו',
+    );
+  };
+
+  const nextOrder = missions.length ? Math.max(...missions.map((m) => m.order_index)) + 1 : 0;
+  const list = h(
+    'ol',
+    { class: 'list' },
+    ...missions.map((m, i) =>
+      h(
+        'li',
+        { class: i === cur ? 'now' : '' },
+        h('span', { class: 'num' }, String(i + 1)),
+        h(
+          'div',
+          { class: 'info' },
+          h('strong', {}, (m.is_milestone ? '★ ' : '') + (m.title || '(ללא שם)')),
+          h('small', {}, [m.kind === 'moment' ? 'קטע' : 'משימה', m.stream_day ? `יום ${m.stream_day}` : '', fmtDate(m.happened_at), i === cur ? '📍 נוכחית' : ''].filter(Boolean).join(' · ')),
+        ),
+        h(
+          'div',
+          { class: 'ops' },
+          h('button', { type: 'button', title: 'סמן כנוכחית', ariaLabel: 'סמן כנוכחית', disabled: i === cur, onclick: () => run(() => store.saveSettings({ ...settings, current_mission_id: m.id }), 'סומנה כמשימה הנוכחית') }, '📍'),
+          h('button', { type: 'button', title: 'למעלה', ariaLabel: 'הזז למעלה', disabled: i === 0, onclick: () => run(() => store.swap(m, missions[i - 1])) }, '↑'),
+          h('button', { type: 'button', title: 'למטה', ariaLabel: 'הזז למטה', disabled: i === missions.length - 1, onclick: () => run(() => store.swap(m, missions[i + 1])) }, '↓'),
+          h('button', { type: 'button', onclick: () => openEditor(m, false) }, 'עריכה'),
+          h('button', {
+            type: 'button',
+            class: 'danger',
+            onclick: (e: MouseEvent) => twice(e, () => run(() => store.deleteMission(m.id), 'נמחק')),
+          }, 'מחיקה'),
+        ),
+      ),
+    ),
+  );
+
+  fill(
+    app,
+    h(
+      'header',
+      { class: 'top' },
+      h('h1', {}, 'ניהול המסע'),
+      h('a', { class: 'btn', href: './', target: '_blank' }, 'צפייה באתר ↗'),
+      store.mode === 'supabase'
+        ? h('button', { class: 'btn', type: 'button', onclick: async () => { await store.signOut(); renderLogin(); } }, 'יציאה')
+        : null,
+    ),
+    store.mode === 'demo'
+      ? h('p', { class: 'banner' }, 'מצב דמו: השינויים נשמרים רק בדפדפן הזה. אחרי חיבור Supabase (ראה README) הם יגיעו לכל הצופים בזמן אמת.')
+      : null,
+    countersPanel(false),
+    h(
+      'section',
+      { class: 'panel' },
+      h(
+        'div',
+        { class: 'panel-head' },
+        h('h2', {}, `העצירות (${missions.length})`),
+        h('button', {
+          class: 'btn primary',
+          type: 'button',
+          onclick: () => {
+            // ממשיכים את הפרק והיום של הנקודה האחרונה – באמצע לייב רק שם ומיקום
+            const last = missions[missions.length - 1];
+            openEditor({ ...newMission(nextOrder), chapter: last?.chapter ?? null, stream_day: last?.stream_day ?? null }, true);
+          },
+        }, '+ נקודה חדשה'),
+      ),
+      missions.length ? list : h('p', { class: 'empty' }, 'עדיין אין נקודות. הוסף את המשימה הראשונה כשהלייב מתחיל.'),
+    ),
+    settingsForm,
+  );
+}
+
+async function start() {
+  if (!(await store.isAuthed())) return renderLogin();
+  try {
+    data = await store.load();
+  } catch (e) {
+    app.replaceChildren(h('p', { class: 'banner bad' }, `טעינת הנתונים נכשלה: ${(e as Error).message}`));
+    return;
+  }
+  render();
+  // עדכון ממוד אחר – לא מרעננים בזמן שעורך פתוח כדי לא לאבד הקלדה
+  store.subscribe((d) => {
+    data = d;
+    if (!editor.open) render();
+  });
+  const onLive = (l: LiveData) => {
+    live = l;
+    if (!editor.open) render();
+  };
+  store.loadLive().then(onLive).catch(() => {});
+  store.subscribeLive(onLive);
+  addEventListener('hashchange', render);
+}
+start();
