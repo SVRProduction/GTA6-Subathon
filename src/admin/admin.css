@@ -108,3 +108,16 @@ input[type='range'] { width: 100%; accent-color: var(--pink); }
 .counters--full .big { min-height: 38svh; }
 .counters--full .big__icon { font-size: 64px; }
 .counters--full .big__n { font-size: 52px; }
+
+/* הפלטה של גרסת העיצוב שנבחרה באתר (A = הכהה שלמעלה) */
+[data-theme='a'] { --pink: #ff5f8f; --gold: #f6c81e; }
+[data-theme='b'] { --bg: #eef2f4; --panel: #ffffff; --line: rgba(20, 33, 43, 0.12); --ink: #14212b; --dim: #5a6874; --pink: #0a7c78; --gold: #0a7c78; --teal: #0a7c78; }
+[data-theme='b'] input:not([type='checkbox']):not([type='file']), [data-theme='b'] select, [data-theme='b'] textarea, [data-theme='b'] .list li, [data-theme='b'] .picker, [data-theme='b'] .shot__preview { background: #f7f9fa; }
+[data-theme='b'] .btn.primary { color: #fff; }
+[data-theme='b'] .big { background: #f7f9fa; }
+[data-theme='b'] .banner, [data-theme='b'] #toast { background: #fff; }
+[data-theme='c'] { --bg: #f2ecdf; --panel: #fbf8f1; --line: rgba(29, 38, 51, 0.18); --ink: #1d2633; --dim: #5e6875; --pink: #2b59a8; --gold: #2b59a8; --teal: #2b59a8; }
+[data-theme='c'] input:not([type='checkbox']):not([type='file']), [data-theme='c'] select, [data-theme='c'] textarea, [data-theme='c'] .list li, [data-theme='c'] .picker, [data-theme='c'] .shot__preview { background: #f6f1e6; }
+[data-theme='c'] .btn.primary { color: #fff; }
+[data-theme='c'] .big { background: #f6f1e6; }
+[data-theme='c'] .banner, [data-theme='c'] #toast { background: #fbf8f1; }

@@ -416,7 +416,7 @@ details[open] .log__chev { transform: rotate(-90deg); }
 /* ── לייב: תג "משחק עכשיו" ── */
 .onair {
   position: absolute; z-index: 6; top: max(16px, env(safe-area-inset-top, 0px)); left: 50%; translate: -50% 0;
-  display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 18px 0 16px;
+  display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 18px 0 16px; white-space: nowrap;
   background: var(--paper-2); border: var(--line); border-radius: 999px; box-shadow: var(--shadow-sm);
   font: 400 14px/1 var(--stamp); color: var(--ink); cursor: pointer;
 }

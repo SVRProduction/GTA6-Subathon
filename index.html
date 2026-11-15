@@ -8,8 +8,13 @@
     <meta name="theme-color" content="#1386a0" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@400;500;700;900&family=Suez+One&family=Amatic+SC:wght@700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700;800&family=Frank+Ruhl+Libre:wght@400;500;700;900&family=Karantina:wght@700&family=Rubik:wght@400;500;600;700&family=Suez+One&family=Amatic+SC:wght@700&display=swap" rel="stylesheet" />
+    <script>
+      // הגרסה נקבעת לפני הציור הראשון (בלי הבהוב). ‎?v=a|b|c, אחרת הבחירה האחרונה, אחרת A
+      (function () { var v = new URLSearchParams(location.search).get('v'), s; try { s = localStorage.getItem('journey-theme'); } catch (e) {} v = /^[abc]$/i.test(v || '') ? v.toLowerCase() : /^[abc]$/.test(s || '') ? s : 'a'; document.documentElement.dataset.theme = v; })();
+    </script>
     <link rel="stylesheet" href="/src/styles.css" />
+    <link rel="stylesheet" href="/src/themes.css" />
   </head>
   <body>
     <main class="journey" aria-labelledby="journey-title">

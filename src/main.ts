@@ -9,6 +9,7 @@ import { createWorld } from './journey/world';
 import { createWater, type Water } from './journey/water';
 import { createLife, type Life } from './journey/life';
 import { createLive, fmtHours } from './live';
+import { applyTheme, currentTheme, themeSwitcher } from './theme';
 import { clipCard, clipsView, clipStop, playClip } from './clips';
 import { countOf, kickSlug, playMs, type Clip, type LiveData } from './data/types';
 
@@ -231,6 +232,10 @@ function renderHud() {
   kickChannel = liveUi.isLive() ? kickSlug(s.kick_channel) : '';
 }
 let kickChannel = '';
+
+// ── גרסת עיצוב (זמני: A/B/C לבחירה) ──
+applyTheme(currentTheme());
+themeSwitcher(stage, () => frame(true));
 
 // ── לייב: תג, זמן משחק, מונים, קליפים ──
 const liveUi = createLive(stage, {
