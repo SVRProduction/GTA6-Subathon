@@ -30,11 +30,12 @@ html.ap-root, html.ap-root body { height: 100%; overflow: hidden; }
 .ap-bar__brand { display: inline-flex; align-items: center; gap: 8px; color: var(--m-txt); text-decoration: none; font: 700 30px/1 var(--m-display); letter-spacing: 0.01em; }
 .ap-bar__logo { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: var(--m-gold); color: var(--m-gold-ink); font: 700 20px/1 var(--m-display); }
 .ap-bar__end { display: flex; gap: 6px; margin-inline-start: auto; }
-.ap-bar__end > * {
+.ap-bar__live {
+  margin-inline-start: auto;
   display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--m-edge);
   background: rgba(255, 255, 255, 0.06); color: var(--m-txt); font: 600 13px/1 var(--m-body); text-decoration: none; cursor: pointer;
 }
-.ap-bar__end > [hidden] { display: none; }
+.ap-bar__live[hidden] { display: none; }
 .ap-bar__live { background: var(--m-pink) !important; border-color: transparent !important; color: #1b0710 !important; }
 .ap-bar__live::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: #1b0710; animation: livepulse 1.6s ease-out infinite; }
 .ap-bar__install { background: var(--m-gold) !important; color: var(--m-gold-ink) !important; border-color: transparent !important; }
@@ -74,6 +75,7 @@ html.ap-root, html.ap-root body { height: 100%; overflow: hidden; }
 .ap-ring.is-official:not(.is-seen) .ap-ring__face { background: var(--m-gold); }
 .ap-ring__today { font: 700 22px/1 var(--m-display); color: var(--m-gold-ink); background: var(--m-gold) !important; }
 .ap-ring__name { width: 100%; font: 500 12px/1.2 var(--m-body); color: var(--m-txt-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
+.ap-ring__badge { position: absolute; top: 60px; left: 50%; translate: -50% 0; padding: 2px 8px; border-radius: 999px; background: var(--m-pink); color: #1b0710; font: 800 11px/1.2 var(--m-body); border: 2px solid var(--m-bg); }
 .ap-ring__new { position: absolute; top: 52px; left: 50%; translate: -50% 0; padding: 2px 7px; border-radius: 999px; background: var(--m-pink); color: #1b0710; font: 700 10px/1.2 var(--m-body); border: 2px solid var(--m-bg); }
 .ap-ring--add .ap-ring__face { background: rgba(255, 255, 255, 0.08); outline: 1.5px dashed rgba(246, 200, 30, 0.6); outline-offset: -2px; padding: 0; }
 .ap-ring--add .ap-ring__face .ic { width: 28px; height: 28px; border: 0; background: none; color: var(--m-gold); border-radius: 0; }
@@ -145,14 +147,28 @@ html.ap-root, html.ap-root body { height: 100%; overflow: hidden; }
 .ap-chat__meta strong { font: 600 14px/1.2 var(--m-body); color: var(--m-txt); }
 .ap-chat__body { margin: 0; font-size: 15px; line-height: 1.45; overflow-wrap: anywhere; }
 
-/* מספרים (statsView של האתר, בעמודה צרה) */
+/* מספרים – אותו מבנה כמו בגרסה 4 */
+.ap-sx-status { display: flex; align-items: center; gap: 8px; margin: 4px 0 0; font: 600 13px/1.2 var(--m-body); color: var(--m-txt-3); }
+.ap-sx-status.is-live { color: var(--m-pink); }
+.ap-sx-status.is-live::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--m-pink); animation: livepulse 1.6s ease-out infinite; }
+.ap-sx-title { margin-top: 2px; }
 .ap-stats { display: grid; gap: 12px; }
-.ap-stats .sx-tiles { grid-template-columns: repeat(2, 1fr); }
-.ap-stats .sx-tile, .ap-stats .sx-tiles .sx-tile:nth-child(n + 7) { grid-column: span 1; min-height: 84px; }
-.ap-stats .sx-tile--play, .ap-stats .sx-tile--deaths { grid-column: span 2; min-height: 110px; }
-.ap-stats .sx-tile--play b, .ap-stats .sx-tile--deaths b { font-size: 64px; }
-.ap-stats .sx-split { grid-template-columns: 1fr; }
-.ap-stats .sx-rates dl { grid-template-columns: 1fr 1fr; }
+.ap-stats .sx-tiles { grid-template-columns: repeat(6, 1fr); gap: 10px; }
+.ap-stats .sx-tile { grid-column: span 3; min-height: 100px; }
+.ap-stats .sx-tile--play { grid-column: span 6; min-height: 110px; }
+.ap-stats .sx-tile--play b { font-size: 64px; }
+.ap-stats .sx-tile--deaths b, .ap-stats .sx-tile--cats b { font-size: 52px; }
+.ap-stats .sx-tile--cats { background: linear-gradient(140deg, rgba(246, 200, 30, 0.1), rgba(255, 255, 255, 0.03)); }
+.ap-stats .sx-tiles .sx-tile:nth-child(n + 4) { grid-column: span 2; min-height: 0; padding: 10px 12px; }
+.ap-stats .sx-tiles .sx-tile:nth-child(n + 4) b { font-size: 34px; }
+.ap-stats .sx-tiles .sx-tile:nth-child(n + 4) span { font-size: 12px; }
+.ap-stats .sx-card { padding: 16px; display: grid; gap: 12px; }
+.ap-stats .sx-rates dl { margin: 0; display: grid; grid-template-columns: 1fr; gap: 10px; }
+.ap-stats .sx-rates dl > div { padding-top: 10px; border-top: 1px solid var(--m-edge); }
+.ap-stats .sx-rates dd { margin: 0; }
+.ap-stats .sx-clips { grid-template-columns: 1fr; margin: 0; }
+.ap-stats .sx-card > .btn { justify-self: start; }
+.ap-stats .sx-foot { text-align: center; font-size: 13px; color: var(--m-txt-3); }
 
 /* ── פיד הקליפים (אנכי, אחד במסך) ── */
 .ap-feed { height: 100%; overflow-y: auto; scroll-snap-type: y mandatory; overscroll-behavior: contain; scrollbar-width: none; }
@@ -172,7 +188,7 @@ html.ap-root, html.ap-root body { height: 100%; overflow: hidden; }
 .ap-reel__info small { color: var(--m-txt-2); font-size: 13px; }
 
 /* ── טאב-בר תחתון + "＋" באמצע ── */
-.ap-tabs { position: relative; z-index: 4; display: grid; grid-template-columns: 1fr 1fr 76px 1fr 1fr; align-items: center; padding: 6px 8px calc(6px + var(--safe-b)); background: rgba(7, 11, 20, 0.94); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); border-top: 1px solid var(--m-edge); }
+.ap-tabs { position: relative; z-index: 4; display: grid; grid-template-columns: repeat(4, 1fr); align-items: center; padding: 6px 8px calc(6px + var(--safe-b)); background: rgba(7, 11, 20, 0.94); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); border-top: 1px solid var(--m-edge); }
 .ap-tab { position: relative; display: grid; justify-items: center; gap: 2px; min-height: 52px; padding: 6px 0 2px; border: 0; background: none; color: var(--m-txt-3); font: 600 11px/1 var(--m-body); text-decoration: none; cursor: pointer; }
 .ap-tab[aria-current] { color: var(--m-gold); }
 .ap-tab[aria-current]::before { content: ''; position: absolute; top: -7px; width: 28px; height: 3px; border-radius: 0 0 3px 3px; background: var(--m-gold); }
@@ -229,3 +245,5 @@ html.ap-root, html.ap-root body { height: 100%; overflow: hidden; }
 /* בלי פס גלילה בכל העמוד (הגלילה עצמה נשארת): נראה כמו אפליקציה */
 html.ap-root, html.ap-root *, .ap-view, .ap-sheet__body, .ap-feed { scrollbar-width: none; -ms-overflow-style: none; }
 html.ap-root ::-webkit-scrollbar { display: none; width: 0; height: 0; }
+.ap-stats .sx-hard__name { text-decoration: none; color: var(--m-txt); }
+.ap-stats .sx-rates dd a { font: 600 17px/1.3 var(--m-body); color: var(--m-txt); text-underline-offset: 4px; }

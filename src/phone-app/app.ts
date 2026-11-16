@@ -1,11 +1,11 @@
 // phone.html – "הטלפון" כאפליקציה: המבנה של גרסה 4 (בית עם סטוריז, מפה, פיד קליפים, מספרים)
 // בעיצוב של האתר (גרסה 6). אפשר להתקין כ-WebApp. ‎#home / #map / #clips / #stats / #m-N / #story-… / #clip-…
 import { getViewer, login, loginError, logout, onViewer } from '../auth';
-import { playClip } from '../clips';
+import { clipCard, playClip } from '../clips';
 import { commentCount, commentsBox, initComments } from '../comments';
 import { svg } from '../control/icons';
 import { pollCard } from '../control/polls';
-import { statsView } from '../control/stats';
+import { bars, perDay } from '../control/stats';
 import { createStoryViewer, seenSet, type StoryItem } from '../control/stories';
 import { createStore } from '../data/store';
 import { countOf, currentIndex, kickSlug, liveStories, playMs, pollOpen, statusFresh, type Clip, type Comment, type Data, type Extras, type LiveData, type Mission } from '../data/types';
@@ -208,10 +208,9 @@ function rings(): Ring[] {
   if (today.length) {
     const sl = today.slice(-12).map((x) => official(x.i));
     const last = today[today.length - 1].i;
-    out.push({ key: `today-${now.toDateString()}-${sl.length}`, title: 'היום', items: sl, today: true, face: () => h('span', { class: 'ap-ring__today' }, 'היום') });
-    void last;
+    out.push({ key: `today-${now.toDateString()}-${sl.length}`, title: 'היום', items: sl, today: true, face: () => stopBg(last, 200, 200, 0.12) ?? h('b', {}, String(last + 1)) });
   }
-  const viewerS: StoryItem[] = liveStories(ex?.stories ?? []).map((s) => ({ kind: 'viewer', key: `s-${s.id}`, s, t: Date.parse(s.created_at) }));
+  const viewerS: StoryItem[] = [];
   const officialS: StoryItem[] = ms.map((m, i) => ({ m, i })).filter((x) => x.m.is_milestone).map((x) => official(x.i));
   const all = [...viewerS, ...officialS].sort((a, b) => b.t - a.t);
   for (const it of all) {
@@ -404,10 +403,9 @@ function renderHome() {
   const ringRow = h(
     'div',
     { class: 'ap-rings', role: 'list', ariaLabel: 'סטוריז' },
-    btn('ap-ring ap-ring--add', [h('span', { class: 'ap-ring__face' }, svg('plus', 26)), h('span', { class: 'ap-ring__name' }, 'הסטורי שלך')], openUpload, 'להעלות סטורי'),
     ...rs.map((r, k) => {
       const unseen = r.items.some((it) => !seen.has(it.key));
-      const b = btn(`ap-ring ${unseen ? '' : 'is-seen'} ${r.today ? 'is-today' : ''} ${r.items[0].kind === 'official' && !r.today ? 'is-official' : ''}`, [h('span', { class: 'ap-ring__face' }, r.face()), h('span', { class: 'ap-ring__name' }, r.title), r.fresh ? h('span', { class: 'ap-ring__new' }, 'חדש') : h('span')], () => openRing(k), `סטורי: ${r.title}`);
+      const b = btn(`ap-ring ${unseen ? '' : 'is-seen'} ${r.today ? 'is-today' : ''} ${r.items[0].kind === 'official' && !r.today ? 'is-official' : ''}`, [h('span', { class: 'ap-ring__face' }, r.face()), h('span', { class: 'ap-ring__name' }, r.title), r.today ? h('span', { class: 'ap-ring__badge' }, 'היום') : h('span'), r.fresh ? h('span', { class: 'ap-ring__new' }, 'חדש') : h('span')], () => openRing(k), `סטורי: ${r.title}`);
       b.setAttribute('role', 'listitem');
       return b;
     }),
@@ -416,7 +414,7 @@ function renderHome() {
   const liveNow = isLive();
   const s = live?.status;
   const liveCard = liveNow
-    ? btn('ap-card ap-live-card', [h('span', { class: 'ap-live-card__dot', ariaHidden: 'true' }), h('span', { class: 'ap-live-card__txt' }, h('strong', {}, onGame() ? 'משחק GTA 6 עכשיו' : 'בלייב עכשיו'), h('small', {}, [s?.title, statusFresh(s ?? null) && s?.viewers ? `${num(s.viewers)} צופים` : ''].filter(Boolean).join('  |  '))), h('span', { class: 'ap-live-card__go' }, svg('play', 16), 'לצפייה')], watchLive)
+    ? btn('ap-card ap-live-card', [h('span', { class: 'ap-live-card__dot', ariaHidden: 'true' }), h('span', { class: 'ap-live-card__txt' }, h('strong', {}, onGame() ? 'משחק GTA 6 עכשיו' : 'בלייב עכשיו'), h('small', {}, [s?.title, statusFresh(s ?? null) && s?.viewers ? `${num(s.viewers)} צופים` : ''].filter(Boolean).join('  |  '))), h('span', { class: 'ap-live-card__go' }, 'לצפייה')], watchLive)
     : h('a', { class: 'ap-card ap-off-card', href: `https://kick.com/${kickSlug(d.settings.kick_channel)}`, target: '_blank', rel: 'noopener' }, h('span', {}, h('strong', {}, 'לא בלייב כרגע'), h('small', {}, 'עוקבים ב-Kick כדי לקבל התראה כשמתחילים')), svg('external', 20));
 
   const m = ms[cur];
@@ -432,7 +430,7 @@ function renderHome() {
           h('p', { class: 'ap-kicker' }, 'אנחנו עכשיו ב'),
           h('h2', {}, m.title || `עצירה ${cur + 1}`),
           h('p', { class: 'ap-muted' }, [`עצירה ${cur + 1}`, m.chapter, m.stream_day ? `יום ${m.stream_day}` : ''].filter(Boolean).join('  |  ')),
-          h('div', { class: 'ap-row' }, h('a', { class: 'pill pill--solid', href: `#m-${cur + 1}` }, svg('pin', 18), 'במפה'), btn('pill', [svg('chat', 18), nC ? `${nC} תגובות` : 'להגיב'], () => openComments('stop', m.id, m.title)), m.recap_url ? btn('pill pill--icon', [svg('play', 18)], () => watch(m), 'לצפייה בקטע') : null),
+          h('div', { class: 'ap-row' }, h('a', { class: 'pill pill--solid', href: `#m-${cur + 1}` }, svg('pin', 18), 'במפה'), btn('pill', [svg('chat', 18), nC ? `${nC} תגובות` : 'להגיב'], () => openComments('stop', m.id, m.title))),
         ),
       )
     : null;
@@ -442,19 +440,8 @@ function renderHome() {
     'a',
     { class: 'ap-quick', href: '#stats', ariaLabel: 'לכל המספרים' },
     h('span', { class: 'ap-quick__item ap-quick__item--play' }, h('b', {}, l ? fmtPlay(playMs(l)) : '–'), h('small', {}, 'שעות משחק')),
-    h('span', { class: 'ap-quick__item' }, h('b', {}, l ? num(countOf(l, 'deaths')) : '–'), h('small', {}, 'מיתות')),
-    h('span', { class: 'ap-quick__item' }, h('b', {}, num(ms.length)), h('small', {}, 'עצירות')),
-  );
-
-  const poll = (ex?.polls ?? []).find((p) => pollOpen(p));
-  const pollBlock = poll ? h('section', { class: 'ap-block' }, h('div', { class: 'ap-block__head' }, h('h3', {}, 'הצ׳אט מחליט')), pollCard(poll, { store, toast, voting: true, onLocate: poll.x != null ? () => (location.hash = '#map') : undefined })) : null;
-
-  const recentC = [...comments].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at)).slice(0, 3);
-  const chatBlock = h(
-    'section',
-    { class: 'ap-block' },
-    h('div', { class: 'ap-block__head' }, h('h3', {}, 'מהצ׳אט של האתר'), comments.length ? btn('ap-link', 'הכול', openChat) : null),
-    recentC.length ? chatList(recentC) : h('p', { class: 'ap-muted' }, 'עוד אין תגובות. פותחים עצירה או סטורי ומגיבים שם.'),
+    h('span', { class: 'ap-quick__item' }, h('b', {}, l ? num(countOf(l, 'deaths')) : '–'), h('small', {}, '💀 מיתות')),
+    h('span', { class: 'ap-quick__item' }, h('b', {}, l ? num(countOf(l, 'cats')) : '–'), h('small', {}, '🐈 חתולים')),
   );
 
   const clips = (l?.clips ?? []).slice(0, 8);
@@ -491,7 +478,7 @@ function renderHome() {
     ),
   );
 
-  fill(home, h('h1', { class: 'ap-hello' }, d.settings.title || 'סאבתון GTA 6'), ringRow, liveCard, nowCard, quick, pollBlock, chatBlock, clipRow, recentList, h('p', { class: 'ap-foot' }, 'אתר מעריצים לא רשמי. אינו קשור ל-Rockstar Games.'));
+  fill(home, h('h1', { class: 'ap-hello' }, d.settings.title || 'סאבתון GTA 6'), ringRow, liveCard, nowCard, quick, clipRow, recentList, h('p', { class: 'ap-foot' }, 'אתר מעריצים לא רשמי. אינו קשור ל-Rockstar Games.'));
   home.querySelector<HTMLElement>('.ap-rings')!.scrollLeft = keep;
   home.scrollTop = keepY;
   // הבר העליון: "בלייב"
@@ -499,17 +486,122 @@ function renderHome() {
   lb.hidden = !liveNow;
   lb.textContent = onGame() ? 'GTA 6 בלייב' : 'בלייב';
   lb.onclick = watchLive;
-  // נקודה על "בית" כשיש סקר פתוח
-  document.querySelector('[data-tab="home"]')?.classList.toggle('has-dot', !!poll && tab !== 'home');
 }
 
 // ══════════════ מספרים ══════════════
+// כמו דף המספרים של גרסה 4: סטטוס, כותרת, שישה מספרים, קצב, שעות לפי יום, המשימות הקשות והקליפים הנצפים
+let statsStop: (() => void) | null = null;
+function statsPage(d: Data, l: LiveData | null): HTMLElement[] {
+  const s = l?.status ?? null;
+  const fresh = statusFresh(s);
+  const playing = !!(fresh && s?.on_category);
+  const status = h('p', { class: `ap-sx-status ${playing ? 'is-live' : ''}` }, playing ? `משחק GTA 6 עכשיו${s?.viewers ? `, ${num(s.viewers)} צופים` : ''}` : fresh && s?.is_live ? 'בלייב עכשיו, לא על GTA 6' : 'לא בלייב כרגע');
+  const title = h('h1', { class: 'ap-hello ap-sx-title' }, `${d.settings.title || 'סאבתון GTA 6'} במספרים`);
+  if (!l) return [status, title, h('p', { class: 'sx-empty' }, 'טוען את המספרים…')];
+  const ms = playMs(l);
+  const hrs = ms / 3600_000;
+  const deaths = countOf(l, 'deaths');
+  const cats = countOf(l, 'cats');
+  const missions = d.missions;
+  const milestones = missions.filter((m) => m.is_milestone).length;
+  const hardest = missions
+    .map((m, i) => ({ m, i, n: countOf(l, 'deaths', m.id), c: countOf(l, 'cats', m.id) }))
+    .filter((x) => x.n > 0)
+    .sort((a, b) => b.n - a.n || b.i - a.i)
+    .slice(0, 5);
+  const topClips = [...l.clips].sort((a, b) => b.views - a.views).slice(0, 6);
+  const cur = currentIndex(d);
+  const n1 = (v: number, dg: number) => v.toLocaleString('he-IL', { maximumFractionDigits: dg, minimumFractionDigits: dg });
+  const tile = (value: string, label: string, cls = '', lv = false) => h('div', { class: `sx-tile ${cls}` }, h('b', { class: lv ? 'is-live' : '' }, value), h('span', {}, label));
+  statsStop?.();
+  statsStop = null;
+  const checked = s?.checked_at ? Date.now() - Date.parse(s.checked_at) : 0;
+  return [
+    status,
+    title,
+    h(
+      'div',
+      { class: 'ap-stats' },
+      h(
+        'section',
+        { class: 'sx-tiles', ariaLabel: 'המספרים הגדולים' },
+        tile(fmtPlay(ms), 'שעות משחק ב-GTA 6', 'sx-tile--play', playing),
+        tile(num(deaths), '💀 מיתות', 'sx-tile--deaths'),
+        tile(num(cats), '🐈 חתולים שנדרסו', 'sx-tile--cats'),
+        tile(num(missions.length), 'עצירות על המפה'),
+        tile(num(milestones), 'מיילסטונים'),
+        tile(num(l.clips.length), 'קליפים מ-GTA 6'),
+      ),
+      h(
+        'section',
+        { class: 'sx-card sx-rates' },
+        h('h2', {}, 'הקצב'),
+        h(
+          'dl',
+          {},
+          h('div', {}, h('dt', {}, 'מיתות לשעת משחק'), h('dd', {}, hrs > 0.05 ? n1(deaths / hrs, 1) : '–')),
+          h('div', {}, h('dt', {}, 'חתולים לשעת משחק'), h('dd', {}, hrs > 0.05 ? n1(cats / hrs, 2) : '–')),
+          h('div', {}, h('dt', {}, 'מיתות למשימה בממוצע'), h('dd', {}, missions.length ? n1(deaths / missions.length, 1) : '–')),
+          h('div', {}, h('dt', {}, 'אנחנו עכשיו ב'), h('dd', {}, missions[cur] ? h('a', { href: `#m-${cur + 1}` }, `עצירה ${cur + 1}: ${missions[cur].title}`) : '–')),
+        ),
+      ),
+      h('section', { class: 'sx-card' }, h('h2', {}, 'שעות משחק לפי יום'), bars(perDay(l))),
+      h(
+        'section',
+        { class: 'sx-card' },
+        h('h2', {}, 'המשימות הקשות ביותר'),
+        hardest.length
+          ? h(
+              'ol',
+              { class: 'sx-hard' },
+              ...hardest.map((x, k) =>
+                h(
+                  'li',
+                  {},
+                  h('span', { class: 'sx-hard__rank' }, String(k + 1)),
+                  h('a', { class: 'sx-hard__name', href: `#m-${x.i + 1}` }, h('strong', {}, x.m.title || `עצירה ${x.i + 1}`), h('small', {}, `עצירה ${x.i + 1}${x.m.chapter ? `, ${x.m.chapter}` : ''}`)),
+                  h('span', { class: 'sx-hard__n' }, `💀 ${num(x.n)}`, x.c ? h('small', {}, ` 🐈 ${num(x.c)}`) : ''),
+                ),
+              ),
+            )
+          : h('p', { class: 'sx-empty' }, 'עוד לא מת אף פעם. מרשים.'),
+      ),
+      h(
+        'section',
+        { class: 'sx-card' },
+        h('h2', {}, 'הקליפים הנצפים ביותר'),
+        l.demoClips ? h('p', { class: 'clips__note' }, 'תצוגה מקדימה: קליפים מהערוץ מכל המשחקים. מ-19.11 יופיעו כאן רק קליפים מ-GTA 6.') : '',
+        topClips.length
+          ? h(
+              'div',
+              { class: 'clips sx-clips' },
+              ...topClips.map((c: Clip) => {
+                const card = clipCard(c, {
+                  onPlay: (cl, el) => {
+                    statsStop?.();
+                    el.classList.add('is-playing');
+                    statsStop = playClip(el, cl);
+                  },
+                });
+                const n = commentCount('clip', c.id);
+                card.append(h('div', { class: 'clip__talk' }, btn('btn btn--quiet clip__talk-btn', n ? `💬 ${n} תגובות` : '💬 להגיב', () => openComments('clip', c.id, c.title))));
+                return card;
+              }),
+            )
+          : h('p', { class: 'sx-empty' }, 'עוד אין קליפים מ-GTA 6.'),
+        h('a', { class: 'btn', href: `https://kick.com/${kickSlug(d.settings.kick_channel)}/clips`, target: '_blank', rel: 'noopener' }, 'כל הקליפים ב-Kick'),
+      ),
+      h('p', { class: 'sx-foot' }, `${checked ? `עודכן ${ago(new Date(Date.now() - checked).toISOString())}. ` : ''}זמן המשחק נספר רק כשהלייב בקטגוריה של GTA 6.`),
+    ),
+  ];
+}
+
 const statsEl = $('#view-stats');
 function renderStats() {
   if (!data || tab !== 'stats') return;
   if (statsEl.querySelector('.is-playing')) return;
   const keep = statsEl.scrollTop;
-  fill(statsEl, h('h1', { class: 'ap-hello' }, 'המספרים'), h('div', { class: 'ap-stats' }, ...statsView(data, live, ex, { openStop: (i) => (location.hash = `#m-${i + 1}`), openMarker: () => (location.hash = '#map') })));
+  fill(statsEl, ...statsPage(data, live));
   statsEl.scrollTop = keep;
 }
 
@@ -615,32 +707,6 @@ function reel(c: Clip, k: number) {
   return art;
 }
 
-// ══════════════ כותרת: התקנה (PWA) ══════════════
-let deferred: (Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> }) | null = null;
-const standalone = matchMedia('(display-mode: standalone)').matches || (navigator as unknown as { standalone?: boolean }).standalone === true;
-const ios = /iphone|ipad|ipod/i.test(navigator.userAgent) && !/crios|fxios/i.test(navigator.userAgent);
-const install = $<HTMLButtonElement>('[data-install]');
-install.hidden = !(ios && !standalone);
-addEventListener('beforeinstallprompt', (e) => {
-  e.preventDefault();
-  deferred = e as typeof deferred;
-  install.hidden = standalone;
-});
-addEventListener('appinstalled', () => {
-  install.hidden = true;
-  toast('הותקן. הסאבתון מחכה לך במסך הבית.');
-});
-install.onclick = async () => {
-  if (deferred) {
-    await deferred.prompt();
-    const { outcome } = await deferred.userChoice;
-    if (outcome === 'accepted') install.hidden = true;
-    deferred = null;
-    return;
-  }
-  openSheet('התקנה באייפון', h('ol', { class: 'ap-ios' }, h('li', {}, 'לוחצים על כפתור השיתוף של Safari (הריבוע עם החץ, למטה).'), h('li', {}, 'בוחרים "הוספה למסך הבית".'), h('li', {}, 'לוחצים "הוספה". האייקון של הסאבתון מופיע במסך הבית ונפתח כמו אפליקציה.')));
-};
-$<HTMLButtonElement>('[data-upload]').onclick = openUpload;
 onViewer(() => {
   // התחברות / התנתקות בזמן שגיליון ההעלאה פתוח – בונים אותו מחדש
   const head = sheetWrap.querySelector('.ap-sheet__head h3');

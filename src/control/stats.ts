@@ -8,7 +8,7 @@ import { markerIcon } from './icons';
 const num = (n: number, digits = 0) => n.toLocaleString('he-IL', { maximumFractionDigits: digits, minimumFractionDigits: digits });
 
 /** שעות משחק לכל יום (לפי שעון מקומי), מפוצל בחצות */
-function perDay(l: LiveData) {
+export function perDay(l: LiveData) {
   const days = new Map<string, number>();
   const now = Date.now();
   const live = l.status?.on_category && statusFresh(l.status);
@@ -28,7 +28,7 @@ function perDay(l: LiveData) {
   return [...days.entries()].slice(-14);
 }
 
-function bars(rows: Array<[string, number]>) {
+export function bars(rows: Array<[string, number]>) {
   if (!rows.length) return h('p', { class: 'sx-empty' }, 'זמן המשחק יופיע כאן מהרגע שהלייב על GTA 6 מתחיל.');
   const max = Math.max(...rows.map((r) => r[1]), 3600_000);
   return h(
