@@ -1,9 +1,41 @@
 import { createClient } from '@supabase/supabase-js';
 import { STORAGE_BUCKET } from '../config';
-import { DEFAULT_SETTINGS, type Clip, type Comment, type CounterEvent, type Data, type Extras, type LiveData, type LiveStatus, type Marker, type Mission, type Poll, type Segment, type Settings, type Store, type Story, type Viewer } from './types';
+import { DEFAULT_OWNERS, getModSession, kickName, setModSession, type ModSession } from './modSession';
+import { DEFAULT_SETTINGS, type Clip, type Comment, type CounterEvent, type Data, type Extras, type LiveData, type LiveStatus, type Marker, type Mission, type Poll, type Segment, type Settings, type Store, type Story, type Viewer, type ModEntry } from './types';
 
 export function createSupabaseStore(url: string, key: string): Store {
-  const sb = createClient(url, key);
+  // פעולות מוד נשלחות עם הטוקן מ-kick-mod; בלי טוקן – כמו צופה (anon)
+  const sb = createClient(url, key, { accessToken: async () => getModSession()?.token ?? null });
+  const fnUrl = (name: string) => `${url}/functions/v1/${name}`;
+  let refreshing: Promise<ModSession> | null = null;
+  async function modLogin(viewer: Viewer): Promise<ModSession> {
+    const r = await fetch(fnUrl('kick-mod'), { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: key }, body: JSON.stringify({ token: viewer.token }) });
+    const j = await r.json().catch(() => null);
+    if (!r.ok) {
+      if (r.status === 403 || r.status === 401) setModSession(null);
+      throw new Error(j?.error ?? 'הבדיקה מול רשימת המודים נכשלה. נסו שוב.');
+    }
+    const s: ModSession = { token: j.token, exp: j.exp, name: j.name, owner: !!j.owner };
+    setModSession(s);
+    sb.realtime.setAuth(s.token);
+    return s;
+  }
+  /** הטוקן תקף 12 שעות: מתחדש לבד עם כרטיס ה-Kick כשנשארה פחות משעה */
+  function keepFresh() {
+    const s = getModSession();
+    if (!s || s.exp * 1000 - Date.now() > 3600_000 || refreshing) return;
+    let v: Viewer | null = null;
+    try {
+      v = JSON.parse(localStorage.getItem('kick-viewer') ?? 'null');
+    } catch {
+      v = null;
+    }
+    if (!v?.token) return;
+    refreshing = modLogin(v).finally(() => (refreshing = null));
+    refreshing.catch(() => {});
+  }
+  setInterval(keepFresh, 5 * 60_000);
+  keepFresh();
 
   const check = <T extends { error: { message: string } | null }>(r: T): T => {
     if (r.error) throw new Error(r.error.message);
@@ -259,13 +291,29 @@ export function createSupabaseStore(url: string, key: string): Store {
       return sb.storage.from(STORAGE_BUCKET).getPublicUrl(path).data.publicUrl;
     },
     async isAuthed() {
-      return !!(await sb.auth.getSession()).data.session;
+      return !!getModSession();
     },
-    async signIn(email, password) {
-      check(await sb.auth.signInWithPassword({ email, password }));
-    },
+    modLogin,
     async signOut() {
-      await sb.auth.signOut();
+      setModSession(null);
+      sb.realtime.setAuth(null);
+    },
+    async listMods() {
+      const [st, m] = await Promise.all([sb.from('settings').select('kick_channel, owners').eq('id', 1).maybeSingle(), sb.from('mods').select('kick_username, added_at, last_login').order('added_at')]);
+      check(m);
+      const owners = [...new Set([...((st.data?.owners as string[] | null) ?? DEFAULT_OWNERS).map(kickName), kickName(st.data?.kick_channel) || 'odedsvr'].filter(Boolean))];
+      return [
+        ...owners.map((n): ModEntry => ({ kick_username: n, owner: true, added_at: null, last_login: null })),
+        ...((m.data ?? []) as ModEntry[]).filter((x) => !owners.includes(x.kick_username)).map((x) => ({ ...x, owner: false })),
+      ];
+    },
+    async addMod(name) {
+      const n = kickName(name);
+      if (!n) throw new Error('שם משתמש לא תקין');
+      check(await sb.from('mods').upsert({ kick_username: n }, { onConflict: 'kick_username', ignoreDuplicates: true }));
+    },
+    async removeMod(name) {
+      check(await sb.from('mods').delete().eq('kick_username', kickName(name)));
     },
   };
 }

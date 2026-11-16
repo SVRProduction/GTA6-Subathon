@@ -2,6 +2,7 @@
 // ההתחברות עצמה קורית בשרת (supabase/functions/kick-auth), שמחזיר לדף כרטיס חתום ב-‎#kick_session=…
 // הכרטיס נשמר בדפדפן ונשלח עם כל תגובה; השרת בודק את החתימה. הטוקן של Kick עצמו לא מגיע לכאן.
 import type { Store, Viewer } from './data/types';
+import { setModSession } from './data/modSession';
 
 const KEY = 'kick-viewer';
 const listeners = new Set<(v: Viewer | null) => void>();
@@ -55,16 +56,17 @@ export const onViewer = (f: (v: Viewer | null) => void) => {
   return () => listeners.delete(f);
 };
 
-/** מעבר להתחברות עם Kick; בדמו – משתמש דמו מיידי */
-export function login(store: Store) {
+/** מעבר להתחברות עם Kick; בדמו – משתמש דמו מיידי (באדמין: הבעלים odedsvr) */
+export function login(store: Store, demoName = 'צופה_דמו') {
   const url = store.kickLoginUrl(location.href.split('#')[0] + (location.hash || ''));
   if (url) {
     location.href = url;
     return;
   }
-  save({ token: 'demo', kick_user_id: 'demo-me', username: 'צופה_דמו', avatar: null });
+  save({ token: 'demo', kick_user_id: `demo-${demoName}`, username: demoName, avatar: null });
 }
 
 export function logout() {
+  setModSession(null);
   save(null);
 }

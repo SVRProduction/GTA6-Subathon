@@ -6,6 +6,8 @@ import { currentIndex, kickSlug, MARKER_TYPES, pollOpen, type Clip, type Comment
 import { fill, h, safeUrl } from '../dom';
 import type { World } from '../journey/world';
 import { kindLabel, metaText } from '../journey/content';
+import { getViewer, onViewer } from '../auth';
+import { onModChange } from '../data/modSession';
 import { createEditor } from './edit';
 import { ago, feedEvents, feedView, missedSummary, type FeedEv } from './feed';
 import { guideSeen, openGuide } from './guide';
@@ -45,7 +47,7 @@ export function createControl(o: {
   let unread = 0;
   let mod = false;
 
-  // ── מוד? (Supabase: מחובר בעמוד הניהול; דמו: ‎?mod או ביקור בעמוד הניהול) ──
+  // ── מוד? מי שהתחבר עם Kick ונמצא ברשימת המודים (או בעלים). בדמו גם ‎?mod ──
   const qs = new URLSearchParams(location.search);
   try {
     if (qs.get('mod') === '0') localStorage.removeItem(MOD_KEY);
@@ -53,18 +55,57 @@ export function createControl(o: {
   } catch {
     /* חסום */
   }
-  const modReady = (store.mode === 'supabase' ? store.isAuthed() : Promise.resolve((() => {
+  const demoMod = () => {
+    if (store.mode === 'supabase') return false;
     try {
       return !!localStorage.getItem(MOD_KEY);
     } catch {
       return false;
     }
-  })())).then((v) => {
+  };
+  const isModNow = async () => demoMod() || (await store.isAuthed());
+  let unsubExtras: (() => void) | null = null;
+  function applyMod(v: boolean, first = false) {
+    if (!first && v === mod) return;
     mod = v;
     document.body.classList.toggle('is-mod', v);
+    if (!v && editor.isOn()) editor.setOn(false);
     renderToolbar();
     if (v && !guideSeen()) setTimeout(() => !popupKey() && openGuide(), 1400);
-    return v;
+    // מוד רואה גם פריטים מוסתרים – טוענים ונרשמים מחדש לפי ההרשאה
+    unsubExtras?.();
+    store.loadExtras(v).then(setExtras).catch(console.error);
+    unsubExtras = store.subscribeExtras(setExtras, v);
+  }
+  // אחרי התחברות Kick: בודקים בשקט אם זה מוד. תשובה שלילית נשמרת לשיחה הזו, כדי לא לשאול שוב בכל טעינה
+  const NOT_MOD = 'kick-not-mod';
+  async function tryModLogin() {
+    const v = getViewer();
+    if (!v || (await store.isAuthed())) return;
+    try {
+      if (sessionStorage.getItem(NOT_MOD) === v.kick_user_id) return;
+    } catch {
+      /* חסום */
+    }
+    try {
+      await store.modLogin(v);
+    } catch {
+      try {
+        sessionStorage.setItem(NOT_MOD, v.kick_user_id);
+      } catch {
+        /* חסום */
+      }
+    }
+  }
+  const modReady = tryModLogin()
+    .then(isModNow)
+    .then((v) => {
+      applyMod(v, true);
+      return v;
+    });
+  onModChange(() => modReady.then(() => isModNow().then((v) => applyMod(v))));
+  onViewer((v) => {
+    if (v) tryModLogin();
   });
 
   // ── שכבת המרקרים ──
@@ -482,10 +523,6 @@ export function createControl(o: {
     }
   }
 
-  modReady.then((m) => {
-    store.loadExtras(m).then(setExtras).catch(console.error);
-    store.subscribeExtras(setExtras, m);
-  });
   function setExtras(e: Extras) {
     ex = e;
     layer.set(e.markers, activePoll());

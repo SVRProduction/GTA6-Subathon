@@ -1,4 +1,5 @@
-import { DEFAULT_SETTINGS, kickSlug, type Clip, type Comment, type CounterEvent, type Data, type Extras, type LiveData, type Marker, type Mission, type Poll, type Store, type Story } from './types';
+import { DEFAULT_SETTINGS, kickSlug, type Clip, type Comment, type CounterEvent, type Data, type Extras, type LiveData, type Marker, type Mission, type Poll, type Store, type Story, type ModEntry } from './types';
+import { DEFAULT_OWNERS, getModSession, kickName, setModSession } from './modSession';
 
 const KEY = 'journey-demo-v9';
 const MAX_INLINE_FILE = 2 * 1024 * 1024;
@@ -143,6 +144,32 @@ function readComments(d: Data): Comment[] {
 }
 
 // ── מרקרים, סטוריז וסקרים בדמו ──
+const MODS_KEY = `${KEY}-mods`;
+function readMods(): ModEntry[] {
+  try {
+    return JSON.parse(localStorage.getItem(MODS_KEY) ?? '[]') as ModEntry[];
+  } catch {
+    return [];
+  }
+}
+function writeMods(m: ModEntry[]) {
+  try {
+    localStorage.setItem(MODS_KEY, JSON.stringify(m));
+  } catch {
+    /* חסום */
+  }
+}
+/** בעלים בדמו: הרשימה הקבועה + בעל הערוץ מההגדרות */
+function demoOwners() {
+  let ch = '';
+  try {
+    ch = (JSON.parse(localStorage.getItem(KEY) ?? 'null') as Data | null)?.settings?.kick_channel ?? '';
+  } catch {
+    ch = '';
+  }
+  return [...new Set([...DEFAULT_OWNERS, kickName(ch) || 'odedsvr'])];
+}
+
 const EXTRAS_KEY = `${KEY}-extras`;
 const B = import.meta.env.BASE_URL;
 interface DemoExtras extends Extras {
@@ -471,9 +498,37 @@ export function createDemoStore(): Store {
       });
     },
     async isAuthed() {
-      return true;
+      return !!getModSession();
     },
-    async signIn() {},
-    async signOut() {},
+    async modLogin(viewer) {
+      const n = kickName(viewer.username);
+      const owner = demoOwners().includes(n);
+      if (!owner && !readMods().some((m) => m.kick_username === n)) {
+        setModSession(null);
+        throw new Error('אין לך הרשאת מוד. בקשו מהבעלים להוסיף אתכם ברשימת המודים.');
+      }
+      if (!owner) writeMods(readMods().map((m) => (m.kick_username === n ? { ...m, last_login: new Date().toISOString() } : m)));
+      const s = { token: 'demo', exp: Math.floor(Date.now() / 1000) + 12 * 3600, name: viewer.username, owner };
+      setModSession(s);
+      return s;
+    },
+    async signOut() {
+      setModSession(null);
+    },
+    async listMods() {
+      const owners = demoOwners();
+      return [...owners.map((n): ModEntry => ({ kick_username: n, owner: true, added_at: null, last_login: null })), ...readMods().filter((m) => !owners.includes(m.kick_username))];
+    },
+    async addMod(name) {
+      const n = kickName(name);
+      if (!n) throw new Error('שם משתמש לא תקין');
+      if (!getModSession()?.owner) throw new Error('רק הבעלים מנהלים את רשימת המודים');
+      const all = readMods();
+      if (!all.some((m) => m.kick_username === n)) writeMods([...all, { kick_username: n, owner: false, added_at: new Date().toISOString(), last_login: null }]);
+    },
+    async removeMod(name) {
+      if (!getModSession()?.owner) throw new Error('רק הבעלים מנהלים את רשימת המודים');
+      writeMods(readMods().filter((m) => m.kick_username !== kickName(name)));
+    },
   };
 }

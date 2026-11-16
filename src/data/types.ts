@@ -1,3 +1,4 @@
+import type { ModSession } from './modSession';
 export type Kind = 'mission' | 'moment';
 
 export interface Mission {
@@ -34,6 +35,8 @@ export interface Settings {
   map_zoom: number;
   /** הקטגוריה ב-Kick שנספרת כזמן משחק ושממנה נלקחים קליפים */
   kick_category: string;
+  /** בעלים (שמות Kick): תמיד מודים ומנהלים את רשימת המודים. בעל הערוץ תמיד נכלל */
+  owners?: string[];
 }
 
 /** הסטטוס האחרון שנבדק מול Kick (כל 2 דקות) */
@@ -191,9 +194,15 @@ export interface Store {
   swap(a: Mission, b: Mission): Promise<void>;
   saveSettings(s: Settings): Promise<void>;
   upload(file: File): Promise<string>;
+  /** מוד מחובר (התחבר עם Kick ונמצא ברשימת המודים / בעלים) */
   isAuthed(): Promise<boolean>;
-  signIn(email: string, password: string): Promise<void>;
+  /** מוד: בדיקת הרשאה מול הרשימה עם כרטיס ה-Kick (נכשל עם הודעה אם המשתמש לא ברשימה) */
+  modLogin(viewer: Viewer): Promise<ModSession>;
   signOut(): Promise<void>;
+  /** רשימת המודים: הבעלים (קבועים) ואז המודים. רק בעלים יכולים להוסיף ולהסיר */
+  listMods(): Promise<ModEntry[]>;
+  addMod(name: string): Promise<void>;
+  removeMod(name: string): Promise<void>;
   /** לייב, זמן משחק, ספירות וקליפים */
   loadLive(): Promise<LiveData>;
   subscribeLive(cb: (d: LiveData) => void): () => void;
@@ -225,6 +234,13 @@ export interface Store {
   deletePoll(id: string): Promise<void>;
   /** צופה: הצבעה (אפשר לשנות; הקול האחרון קובע) */
   vote(viewer: Viewer, pollId: string, option: number): Promise<void>;
+}
+
+export interface ModEntry {
+  kick_username: string;
+  owner: boolean;
+  added_at: string | null;
+  last_login: string | null;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
