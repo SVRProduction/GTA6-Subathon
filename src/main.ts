@@ -34,6 +34,9 @@ const logEl = q('[data-log]');
 
 const DEFAULT_MAP = `${import.meta.env.BASE_URL}map.webp`;
 const flat = new URLSearchParams(location.search).has('2d');
+// ‎?embed: המפה בתוך טאב "מפה" של אפליקציית הטלפון – בלי מסך פתיחה, בלי כפתור הטלפון, מתחילים בעצירה הנוכחית
+const embed = new URLSearchParams(location.search).has('embed');
+if (embed) document.documentElement.classList.add('is-embed');
 const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
 document.body.classList.toggle('flat', flat);
 document.documentElement.classList.toggle('flat-root', flat);
@@ -162,6 +165,8 @@ function rebuild() {
         class: `pin pin--${state} ${m.is_milestone ? 'pin--ms' : 'pin--dot'} ${clipsByStop.has(i) ? 'pin--clip' : ''}`,
         ariaLabel: `${kindLabel(m)} ${i + 1}: ${m.title}`,
         onclick: () => {
+          // מצב עריכה (מודים): לחיצה על עצירה פותחת ישר את טופס העריכה – שמירה, הזזה ומחיקה
+          if (control.isEditing()) return control.editStop(data.missions[i]);
           goTo(i);
           openPanel(i);
         },
@@ -480,6 +485,8 @@ function openList() {
 }
 // ── Mission Control: סרגל, חלונות קופצים, מרקרים, טלפון, סקרים, עריכה ──
 const control = createControl({
+  // עצירה שנמחקה בזמן שהתפריט שלה פתוח – סוגרים אותו
+  onStopDeleted: () => closePanel(),
   store,
   stage,
   world,
@@ -1040,7 +1047,17 @@ store
       };
       if (flat) open();
       else onMapReady = open;
-    }
+    } else if (embed && !flat) onMapReady = () => goTo(currentIndex(data));
+    // באפליקציה: מעבר לעצירה אחרת בלי טעינה מחדש (‎#m-N)
+    if (embed)
+      addEventListener('hashchange', () => {
+        const m = location.hash.match(/^#m-(\d+)$/);
+        const i = m ? +m[1] - 1 : -1;
+        if (data.missions[i]) {
+          goTo(i);
+          openPanel(i);
+        }
+      });
     setMap();
     control.setData(data);
     store.loadLive().then(onLive).catch(console.error);

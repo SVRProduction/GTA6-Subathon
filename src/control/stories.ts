@@ -43,6 +43,8 @@ export function createStoryViewer(opts: {
   /** רקע לסטורי רשמי (תמונת העצירה או צילום המפה במקום) */
   stopBg: (i: number) => HTMLElement | null;
   goStop: (i: number) => void;
+  /** צפייה בקטע של עצירה (אם יש קישור) – באפליקציית הטלפון */
+  watch?: (m: Mission) => void;
 }) {
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const root = h('div', { class: 'story', hidden: true, role: 'dialog', ariaModal: 'true', ariaLabel: 'סטורי' });
@@ -129,7 +131,7 @@ export function createStoryViewer(opts: {
     const actions = h('div', { class: 'st-actions' });
     if (it.kind === 'official') {
       bg = opts.stopBg(it.stop);
-      head = [`מיילסטון ${it.stop + 1}`, [it.m.stream_day ? `יום ${it.m.stream_day}` : '', it.m.happened_at ? ago(Date.now() - Date.parse(it.m.happened_at)) : ''].filter(Boolean).join('  |  ')];
+      head = [`${it.m.is_milestone ? 'מיילסטון' : 'עצירה'} ${it.stop + 1}`, [it.m.stream_day ? `יום ${it.m.stream_day}` : '', it.m.happened_at ? ago(Date.now() - Date.parse(it.m.happened_at)) : ''].filter(Boolean).join('  |  ')];
       title = it.m.title;
       caption = it.m.summary;
       ring = String(it.stop + 1);
@@ -141,6 +143,12 @@ export function createStoryViewer(opts: {
         close();
         opts.goStop(it.stop);
       };
+      if (opts.watch && it.m.recap_url) {
+        const w = h('button', { class: 'pill pill--solid', type: 'button' }, svg('play', 18), 'לצפייה בקטע');
+        w.onclick = () => opts.watch!(it.m);
+        go.classList.remove('pill--solid');
+        actions.append(w);
+      }
       actions.append(go, c);
     } else {
       const s = it.s;

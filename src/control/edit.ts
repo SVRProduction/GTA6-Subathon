@@ -32,6 +32,8 @@ export function createEditor(opts: {
   data: () => Data | null;
   /** אחרי שמירת עצירה חדשה: מזיזים את המסע אליה */
   onStopSaved: (m: Mission) => void;
+  /** אחרי מחיקת עצירה (לסגור את התפריט שלה אם פתוח) */
+  onStopDeleted?: (id: string) => void;
 }) {
   let on = false;
   let tool: Tool = null;
@@ -65,6 +67,7 @@ export function createEditor(opts: {
     tool = t;
     tray.querySelectorAll<HTMLElement>('.ed-tool').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.tool === t)));
     opts.stage.classList.toggle('is-placing', !!t || !!picking);
+    opts.stage.classList.toggle('is-picking', !!picking);
     setHint();
   }
   function setOn(v: boolean) {
@@ -359,9 +362,20 @@ export function createEditor(opts: {
           }, 3000);
           return;
         }
-        await opts.store.deleteMission(m.id);
-        closePopup();
-        opts.toast('העצירה נמחקה');
+        // אם מוחקים את העצירה הנוכחית – "אנחנו כאן" עובר לעצירה שלפניה
+        const idx = d.missions.findIndex((x) => x.id === m.id);
+        const wasCurrent = idx >= 0 && currentIndex(d) === idx;
+        del.disabled = true;
+        try {
+          await opts.store.deleteMission(m.id);
+          if (wasCurrent && idx > 0) await opts.store.saveSettings({ ...d.settings, current_mission_id: d.missions[idx - 1].id });
+          closePopup();
+          opts.onStopDeleted?.(m.id);
+          opts.toast('העצירה נמחקה');
+        } catch (e) {
+          del.disabled = false;
+          opts.toast((e as Error).message || 'המחיקה נכשלה');
+        }
       };
     }
     form.onsubmit = async (e) => {
@@ -399,7 +413,7 @@ export function createEditor(opts: {
     if (!on) setOn(true);
     picking = cb;
     setTool(null);
-    opts.stage.classList.add('is-placing');
+    opts.stage.classList.add('is-placing', 'is-picking');
     setHint();
   }
 

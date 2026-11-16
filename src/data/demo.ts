@@ -170,7 +170,8 @@ function demoOwners() {
   return [...new Set([...DEFAULT_OWNERS, kickName(ch) || 'odedsvr'])];
 }
 
-const EXTRAS_KEY = `${KEY}-extras`;
+// v2: איפוס המרקרים לכל מי שכבר ביקר (תחילת הסאבתון)
+const EXTRAS_KEY = `${KEY}-extras-v2`;
 const B = import.meta.env.BASE_URL;
 interface DemoExtras extends Extras {
   /** pollId → kick_user_id → אפשרות */
@@ -182,18 +183,8 @@ function seedExtras(d: Data): DemoExtras {
   const at = (i: number, min = 5) => new Date(Date.parse(d.missions[Math.min(i, d.missions.length - 1)]?.happened_at ?? new Date().toISOString()) + min * 60_000).toISOString();
   const mid = (i: number) => d.missions[Math.min(i, d.missions.length - 1)]?.id ?? null;
   const mk = (id: string, type: Marker['type'], x: number, y: number, title: string, i: number, extra: Partial<Marker> = {}): Marker => ({ id, type, x, y, title, body: '', emoji: null, image_url: null, mission_id: mid(i), created_at: at(i), ...extra });
-  const markers: Marker[] = [
-    mk('dm-1', 'death', 0.27, 0.905, 'נפל מהגשר', 3),
-    mk('dm-2', 'death', 0.6, 0.66, 'תאונה בכביש המהיר', 22),
-    mk('dm-3', 'death', 0.67, 0.42, 'קרב יריות במרכז העיר', 31),
-    mk('dm-4', 'car', 0.47, 0.86, 'הרכב הראשון: Infernus אדום', 9, { body: 'נגנב מהחניון של המלון, אחרי שלושה ניסיונות.' }),
-    mk('dm-5', 'weapon', 0.73, 0.55, 'רובה ציד מהחנות', 27),
-    mk('dm-6', 'property', 0.2, 0.33, 'בית על הצוק', 60, { body: 'הבית הראשון. נקנה בכל הכסף מהשוד.' }),
-    mk('dm-7', 'heist', 0.64, 0.5, 'השוד הגדול הראשון', 24),
-    mk('dm-8', 'chase', 0.58, 0.18, 'מרדף לשדה התעופה', 45),
-    mk('dm-9', 'custom', 0.82, 0.62, 'ים, שקיעה ויאכטה', 35, { emoji: '🛥️' }),
-    mk('dm-10', 'decision', 0.38, 0.27, 'הצ׳אט החליט: עולים להר', 52, { body: 'סקר: "לאן עכשיו?" – "ההר" ניצח עם 61% מהקולות.' }),
-  ];
+  // הסאבתון התחיל: בלי מרקרים מהדמו. כל מרקר מתווסף במצב עריכה
+  const markers: Marker[] = [];
   const now = Date.now();
   const st = (id: string, user: string, img: string, caption: string, i: number, hoursAgo: number, likes: number, status: Story['status'] = 'approved'): Story => ({
     id, kick_user_id: `demo-${user}`, username: user, avatar: null, image_url: `${B}demo/${img}`, caption, mission_id: mid(i), x: null, y: null, status, likes,

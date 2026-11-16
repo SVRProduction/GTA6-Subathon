@@ -1,0 +1,231 @@
+/*
+  phone.html – אפליקציית הטלפון. המבנה של גרסה 4 (בית / מפה / קליפים / מספרים, סטוריז, פיד קליפים),
+  בשפה של האתר הנוכחי: זכוכית כהה, Karantina + Rubik, צהוב משימה לפעולה, ורוד ל"עכשיו".
+  הטוקנים מגיעים מ-src/mission.css (--m-*).
+*/
+html.ap-root, html.ap-root body { height: 100%; overflow: hidden; }
+.ap-body {
+  margin: 0; color: var(--m-txt); font: 400 16px/1.55 var(--m-body);
+  background: #070b14 url('/map-original.webp') center / cover no-repeat fixed;
+}
+.ap-body::before { content: ''; position: fixed; inset: 0; background: rgba(5, 9, 18, 0.74); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); }
+
+/* מחשב: האפליקציה במסגרת טלפון במרכז, וטקסט קצר לצידה */
+.ap-desk { display: none; }
+.ap {
+  position: relative; z-index: 1; display: grid; grid-template-rows: auto 1fr auto; height: 100dvh; max-width: 480px; margin: 0 auto;
+  background: var(--m-bg); overflow: hidden; isolation: isolate;
+}
+@media (min-width: 761px) {
+  .ap-body { display: grid; grid-template-columns: minmax(0, 1fr) 420px minmax(0, 1fr); align-items: center; height: 100dvh; }
+  .ap { grid-column: 2; width: 400px; height: min(860px, calc(100dvh - 40px)); border-radius: 44px; box-shadow: 0 0 0 2px #2a2f3a, 0 0 0 10px #0e1118, 0 0 0 11px #3a3f4a, 0 40px 90px rgba(0, 0, 0, 0.7); }
+  .ap-desk { display: grid; gap: 10px; grid-column: 3; grid-row: 1; padding-inline-start: 56px; max-width: 360px; position: relative; z-index: 1; }
+  .ap-desk__kicker { margin: 0; font: 600 14px/1 var(--m-body); color: var(--m-gold); }
+  .ap-desk__title { margin: 0; font: 700 72px/0.9 var(--m-display); color: var(--m-txt); }
+  .ap-desk__sub { margin: 0; color: var(--m-txt-2); font-size: 16px; }
+}
+
+/* ── בר עליון ── */
+.ap-bar { display: flex; align-items: center; gap: 10px; padding: calc(10px + var(--safe-t)) 16px 10px; background: linear-gradient(var(--m-bg) 60%, rgba(7, 11, 20, 0)); z-index: 3; }
+.ap-bar__brand { display: inline-flex; align-items: center; gap: 8px; color: var(--m-txt); text-decoration: none; font: 700 30px/1 var(--m-display); letter-spacing: 0.01em; }
+.ap-bar__logo { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: var(--m-gold); color: var(--m-gold-ink); font: 700 20px/1 var(--m-display); }
+.ap-bar__end { display: flex; gap: 6px; margin-inline-start: auto; }
+.ap-bar__end > * {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--m-edge);
+  background: rgba(255, 255, 255, 0.06); color: var(--m-txt); font: 600 13px/1 var(--m-body); text-decoration: none; cursor: pointer;
+}
+.ap-bar__end > [hidden] { display: none; }
+.ap-bar__live { background: var(--m-pink) !important; border-color: transparent !important; color: #1b0710 !important; }
+.ap-bar__live::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: #1b0710; animation: livepulse 1.6s ease-out infinite; }
+.ap-bar__install { background: var(--m-gold) !important; color: var(--m-gold-ink) !important; border-color: transparent !important; }
+
+/* ── תצוגות ── */
+.ap-views { position: relative; min-height: 0; }
+.ap-view { position: absolute; inset: 0; overflow-y: auto; overscroll-behavior: contain; padding: 4px 16px 24px; -webkit-overflow-scrolling: touch; }
+.ap-view[hidden] { display: none; }
+.ap-view--map { padding: 0; overflow: hidden; }
+.ap-view--clips { padding: 0; }
+.ap-frame { display: block; width: 100%; height: 100%; border: 0; background: #0b2f4a; }
+.ap-hello { margin: 6px 0 14px; font: 700 44px/0.9 var(--m-display); letter-spacing: 0.01em; text-wrap: balance; }
+.ap-kicker { margin: 0; font: 600 13px/1.2 var(--m-body); color: var(--m-gold); }
+.ap-muted { margin: 0; color: var(--m-txt-3); font-size: 14px; }
+.ap-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.ap-link { padding: 0; border: 0; background: none; color: var(--m-gold); font: 600 14px/1 var(--m-body); text-decoration: none; cursor: pointer; min-height: 32px; display: inline-flex; align-items: center; }
+.ap-foot { margin: 22px 0 8px; text-align: center; color: var(--m-txt-3); font-size: 12px; }
+.ap-empty { display: grid; justify-items: center; gap: 12px; padding: 40px 16px; text-align: center; color: var(--m-txt-2); }
+.ap-empty .ic { color: var(--m-gold); }
+.ap-empty .btn { justify-self: center; }
+.ap-empty.is-done .ic { color: var(--c-ok, #53d18a); }
+
+/* ── טבעות הסטוריז ── */
+.ap-rings { display: flex; gap: 12px; overflow-x: auto; margin: 0 -16px 16px; padding: 4px 16px 8px; scrollbar-width: none; scroll-snap-type: x proximity; }
+.ap-rings::-webkit-scrollbar { display: none; }
+.ap-ring { flex: none; position: relative; display: grid; justify-items: center; gap: 6px; width: 76px; padding: 0; border: 0; background: none; color: var(--m-txt); cursor: pointer; scroll-snap-align: start; }
+.ap-ring__face {
+  position: relative; display: grid; place-items: center; width: 70px; height: 70px; border-radius: 50%; overflow: hidden;
+  padding: 3px; background: conic-gradient(from 210deg, var(--m-gold), var(--m-pink), #ff9a5a, var(--m-gold));
+}
+.ap-ring__face > * { width: 100%; height: 100%; border-radius: 50%; border: 3px solid var(--m-bg); object-fit: cover; background: #0b2f4a; display: grid; place-items: center; overflow: hidden; }
+.ap-ring__face .st-crop, .ap-ring__face .st-img { width: 100%; height: 100%; }
+.ap-ring__face .st-crop canvas { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ap-ring__face .st-pin { display: none; }
+.ap-ring__face b { font: 700 28px/1 var(--m-display); color: var(--m-gold); background: #0d1424; }
+.ap-ring.is-seen .ap-ring__face { background: rgba(255, 255, 255, 0.18); }
+.ap-ring.is-official:not(.is-seen) .ap-ring__face { background: var(--m-gold); }
+.ap-ring__today { font: 700 22px/1 var(--m-display); color: var(--m-gold-ink); background: var(--m-gold) !important; }
+.ap-ring__name { width: 100%; font: 500 12px/1.2 var(--m-body); color: var(--m-txt-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
+.ap-ring__new { position: absolute; top: 52px; left: 50%; translate: -50% 0; padding: 2px 7px; border-radius: 999px; background: var(--m-pink); color: #1b0710; font: 700 10px/1.2 var(--m-body); border: 2px solid var(--m-bg); }
+.ap-ring--add .ap-ring__face { background: rgba(255, 255, 255, 0.08); outline: 1.5px dashed rgba(246, 200, 30, 0.6); outline-offset: -2px; padding: 0; }
+.ap-ring--add .ap-ring__face .ic { width: 28px; height: 28px; border: 0; background: none; color: var(--m-gold); border-radius: 0; }
+
+/* ── כרטיסים ── */
+.ap-card {
+  display: grid; width: 100%; margin-bottom: 12px; padding: 0; border: 1px solid var(--m-edge); border-radius: 18px; overflow: hidden;
+  background: var(--m-glass-2); color: var(--m-txt); text-align: start; text-decoration: none; box-shadow: var(--m-hi);
+}
+.ap-live-card { grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; padding: 14px 16px; cursor: pointer; border-color: rgba(255, 95, 143, 0.45); background: linear-gradient(110deg, rgba(255, 95, 143, 0.22), rgba(255, 154, 90, 0.1) 60%, var(--m-glass-2)); }
+.ap-live-card__dot { width: 12px; height: 12px; border-radius: 50%; background: var(--m-pink); box-shadow: 0 0 0 0 rgba(255, 95, 143, 0.6); animation: livepulse 1.6s ease-out infinite; }
+.ap-live-card__txt, .ap-off-card > span { display: grid; gap: 2px; min-width: 0; }
+.ap-live-card__txt strong, .ap-off-card strong { font: 700 26px/1 var(--m-display); letter-spacing: 0.01em; }
+.ap-live-card__txt small, .ap-off-card small { color: var(--m-txt-2); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ap-live-card__go { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 14px; border-radius: 999px; background: var(--m-gold); color: var(--m-gold-ink); font: 700 14px/1 var(--m-body); }
+.ap-off-card { grid-template-columns: 1fr auto; align-items: center; gap: 10px; padding: 14px 16px; }
+.ap-off-card .ic { color: var(--m-txt-3); }
+.ap-now__map { position: relative; height: 150px; background: #0b2f4a; }
+.ap-now__map > * { width: 100%; height: 100%; }
+.ap-now__map canvas, .ap-now__map img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ap-now__map::after { content: ''; position: absolute; inset: 0; background: linear-gradient(transparent 50%, rgba(7, 11, 20, 0.85)); pointer-events: none; }
+.ap-now__body { display: grid; gap: 6px; padding: 12px 16px 16px; }
+.ap-now__body h2 { margin: 0; font: 700 38px/0.92 var(--m-display); letter-spacing: 0.01em; overflow-wrap: anywhere; }
+.ap-now .pill, .ap-block .pill { min-height: 44px; background: rgba(255, 255, 255, 0.1); }
+.ap-now .pill--solid { flex: 0 1 auto; background: var(--m-gold); color: var(--m-gold-ink); }
+
+/* מספרים מהירים */
+.ap-quick { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 8px; margin-bottom: 18px; color: inherit; text-decoration: none; }
+.ap-quick__item { display: grid; gap: 4px; align-content: end; min-height: 84px; padding: 12px 14px; border-radius: 16px; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--m-edge); }
+.ap-quick__item b { font: 700 36px/0.85 var(--m-display); letter-spacing: 0.02em; font-variant-numeric: tabular-nums; }
+.ap-quick__item small { color: var(--m-txt-3); font-size: 12px; }
+.ap-quick__item--play { background: linear-gradient(140deg, rgba(246, 200, 30, 0.2), rgba(246, 200, 30, 0.03)); border-color: rgba(246, 200, 30, 0.4); }
+.ap-quick__item--play b { color: var(--m-gold); font-size: 44px; }
+
+/* בלוקים */
+.ap-block { margin-bottom: 20px; }
+.ap-block__head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 8px; }
+.ap-block__head h3 { margin: 0; font: 700 28px/1 var(--m-display); letter-spacing: 0.01em; }
+.ap-mini-clips { display: flex; gap: 10px; overflow-x: auto; margin: 0 -16px; padding: 0 16px 4px; scrollbar-width: none; }
+.ap-mini-clips::-webkit-scrollbar { display: none; }
+.ap-mini-clip { position: relative; flex: none; width: 148px; aspect-ratio: 9 / 13; border-radius: 14px; overflow: hidden; background: #0d1424; border: 1px solid var(--m-edge); color: #fff; text-decoration: none; }
+.ap-mini-clip img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ap-mini-clip::after { content: ''; position: absolute; inset: 0; background: linear-gradient(transparent 45%, rgba(0, 0, 0, 0.85)); }
+.ap-mini-clip__play { position: absolute; z-index: 1; top: 8px; inset-inline-start: 8px; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--m-gold); color: var(--m-gold-ink); }
+.ap-mini-clip__t { position: absolute; z-index: 1; inset: auto 8px 8px; font: 600 13px/1.25 var(--m-body); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.ap-stops { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.ap-stop { display: grid; grid-template-columns: 36px 1fr auto; gap: 12px; align-items: center; min-height: 56px; padding: 8px 12px; border-radius: 14px; background: rgba(255, 255, 255, 0.04); border: 1px solid transparent; color: var(--m-txt); text-decoration: none; }
+.ap-stop:hover { border-color: var(--m-edge-2); }
+.ap-stop.is-now { border-color: rgba(255, 95, 143, 0.5); background: rgba(255, 95, 143, 0.08); }
+.ap-stop.is-fresh { animation: apfresh 1.6s var(--ease); }
+@keyframes apfresh { 0% { background: rgba(246, 200, 30, 0.3); } }
+.ap-stop__no { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: #0d1424; border: 1.5px solid #f3f0ea; font: 700 18px/1 var(--m-display); }
+.ap-stop__no.is-ms { background: var(--m-gold); color: var(--m-gold-ink); border-color: #0a101c; }
+.ap-stop.is-now .ap-stop__no { background: var(--m-pink); color: #1b0710; border-color: transparent; }
+.ap-stop__txt { display: grid; gap: 1px; min-width: 0; }
+.ap-stop__txt strong { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ap-stop__txt small { color: var(--m-txt-3); font-size: 12px; }
+.ap-stop.is-now .ap-stop__txt small { color: var(--m-pink); }
+.ap-stop__c { display: inline-flex; align-items: center; gap: 4px; color: var(--m-txt-3); font-size: 12px; }
+
+/* צ׳אט */
+.ap-chat { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.ap-chat__go { display: block; width: 100%; padding: 0; border: 0; background: none; color: inherit; text-align: start; cursor: pointer; border-radius: 14px; }
+.ap-chat__msg { display: grid; grid-template-columns: 34px 1fr; gap: 10px; padding: 10px 12px; border-radius: 14px; background: rgba(255, 255, 255, 0.04); }
+.ap-chat__go:hover .ap-chat__msg { background: rgba(255, 255, 255, 0.08); }
+.ap-chat__pic { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--m-gold); color: var(--m-gold-ink); font: 700 18px/1 var(--m-display); }
+.ap-chat__main { min-width: 0; display: grid; gap: 2px; }
+.ap-chat__meta { margin: 0; display: flex; gap: 8px; align-items: baseline; font-size: 12px; color: var(--m-txt-3); }
+.ap-chat__meta strong { font: 600 14px/1.2 var(--m-body); color: var(--m-txt); }
+.ap-chat__body { margin: 0; font-size: 15px; line-height: 1.45; overflow-wrap: anywhere; }
+
+/* מספרים (statsView של האתר, בעמודה צרה) */
+.ap-stats { display: grid; gap: 12px; }
+.ap-stats .sx-tiles { grid-template-columns: repeat(2, 1fr); }
+.ap-stats .sx-tile, .ap-stats .sx-tiles .sx-tile:nth-child(n + 7) { grid-column: span 1; min-height: 84px; }
+.ap-stats .sx-tile--play, .ap-stats .sx-tile--deaths { grid-column: span 2; min-height: 110px; }
+.ap-stats .sx-tile--play b, .ap-stats .sx-tile--deaths b { font-size: 64px; }
+.ap-stats .sx-split { grid-template-columns: 1fr; }
+.ap-stats .sx-rates dl { grid-template-columns: 1fr 1fr; }
+
+/* ── פיד הקליפים (אנכי, אחד במסך) ── */
+.ap-feed { height: 100%; overflow-y: auto; scroll-snap-type: y mandatory; overscroll-behavior: contain; scrollbar-width: none; }
+.ap-feed::-webkit-scrollbar { display: none; }
+.ap-feed__note { position: sticky; top: 8px; z-index: 3; width: fit-content; margin: 8px auto -36px; padding: 6px 12px; border-radius: 999px; background: rgba(0, 0, 0, 0.6); color: var(--m-txt-2); font-size: 12px; }
+.ap-reel { position: relative; height: 100%; scroll-snap-align: start; scroll-snap-stop: always; background: #000; overflow: hidden; }
+.ap-reel__media { position: absolute; inset: 0; display: grid; place-items: center; cursor: pointer; }
+.ap-reel__bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: blur(26px) brightness(0.55); transform: scale(1.2); }
+.ap-reel__poster, .ap-reel__video { position: relative; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; }
+.ap-reel__video { position: absolute; inset: auto 0; }
+.ap-reel__video video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ap-reel__side { position: absolute; z-index: 2; left: 10px; bottom: 110px; display: grid; gap: 14px; }
+.ap-reel__btn { display: grid; justify-items: center; gap: 2px; width: 52px; min-height: 52px; padding: 0; border: 0; background: none; color: #fff; font: 600 12px/1 var(--m-body); text-decoration: none; cursor: pointer; filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.7)); }
+.ap-reel__btn .ic { width: 30px; height: 30px; padding: 10px; box-sizing: content-box; border-radius: 50%; background: rgba(8, 12, 22, 0.55); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+.ap-reel__info { position: absolute; z-index: 2; inset: auto 76px 22px 16px; display: grid; gap: 4px; text-shadow: 0 1px 6px rgba(0, 0, 0, 0.8); }
+.ap-reel__info strong { font: 700 30px/0.95 var(--m-display); letter-spacing: 0.01em; }
+.ap-reel__info small { color: var(--m-txt-2); font-size: 13px; }
+
+/* ── טאב-בר תחתון + "＋" באמצע ── */
+.ap-tabs { position: relative; z-index: 4; display: grid; grid-template-columns: 1fr 1fr 76px 1fr 1fr; align-items: center; padding: 6px 8px calc(6px + var(--safe-b)); background: rgba(7, 11, 20, 0.94); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); border-top: 1px solid var(--m-edge); }
+.ap-tab { position: relative; display: grid; justify-items: center; gap: 2px; min-height: 52px; padding: 6px 0 2px; border: 0; background: none; color: var(--m-txt-3); font: 600 11px/1 var(--m-body); text-decoration: none; cursor: pointer; }
+.ap-tab[aria-current] { color: var(--m-gold); }
+.ap-tab[aria-current]::before { content: ''; position: absolute; top: -7px; width: 28px; height: 3px; border-radius: 0 0 3px 3px; background: var(--m-gold); }
+.ap-tab.has-dot::after { content: ''; position: absolute; top: 6px; inset-inline-end: calc(50% - 18px); width: 8px; height: 8px; border-radius: 50%; background: var(--m-pink); }
+.ap-tab--add { align-self: start; margin-top: -22px; }
+.ap-tab__plus { display: grid; place-items: center; width: 60px; height: 60px; border-radius: 50%; background: var(--m-gold); color: var(--m-gold-ink); border: 4px solid var(--m-bg); box-shadow: 0 8px 22px rgba(246, 200, 30, 0.35); transition: transform 0.2s var(--ease); }
+.ap-tab--add:hover .ap-tab__plus { transform: translateY(-2px); }
+.ap-tab--add:active .ap-tab__plus { transform: scale(0.94); }
+
+/* ── גיליון תחתון ── */
+.ap-sheet-wrap { position: fixed; inset: 0; z-index: 60; }
+.ap-sheet-wrap[hidden] { display: none; }
+.ap-sheet__dim { position: absolute; inset: 0; background: rgba(2, 4, 8, 0.6); opacity: 0; transition: opacity 0.22s; }
+.ap-sheet-wrap.is-open .ap-sheet__dim { opacity: 1; }
+.ap-sheet {
+  position: absolute; inset: auto 0 0; margin: 0 auto; max-width: 480px; max-height: 88dvh; display: grid; grid-template-rows: auto auto 1fr;
+  border-radius: 22px 22px 0 0; background: #0d1424; border: 1px solid var(--m-edge); border-bottom: 0; color: var(--m-txt);
+  transform: translateY(100%); transition: transform 0.32s cubic-bezier(0.2, 0.9, 0.3, 1); padding-bottom: var(--safe-b);
+}
+.ap-sheet--tall { height: 80dvh; }
+.ap-sheet-wrap.is-open .ap-sheet { transform: none; }
+.ap-sheet__grip { height: 22px; display: grid; place-items: center; touch-action: none; }
+.ap-sheet__grip::before { content: ''; width: 44px; height: 5px; border-radius: 5px; background: rgba(255, 255, 255, 0.25); }
+.ap-sheet__head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 16px 8px; touch-action: none; }
+.ap-sheet__head h3 { margin: 0; font: 700 30px/1 var(--m-display); letter-spacing: 0.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ap-sheet__close { flex: none; display: grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: 50%; background: rgba(255, 255, 255, 0.08); color: var(--m-txt); cursor: pointer; }
+.ap-sheet__body { overflow-y: auto; padding: 4px 16px 20px; overscroll-behavior: contain; }
+.ap-sheet .cmts { margin-top: 0; padding-top: 0; border-top: 0; }
+.ap-player { aspect-ratio: 16 / 9; border-radius: 14px; overflow: hidden; background: #000; }
+.ap-player iframe, .ap-player video { width: 100%; height: 100%; border: 0; display: block; }
+.ap-live { display: grid; gap: 12px; justify-items: start; }
+.ap-live .pill { background: rgba(255, 255, 255, 0.1); min-height: 44px; }
+.ap-ios { margin: 0; padding-inline-start: 20px; display: grid; gap: 8px; color: var(--m-txt-2); }
+
+/* העלאת סטורי */
+.ap-up { display: grid; gap: 12px; }
+.ap-up__pick { position: relative; display: block; cursor: pointer; }
+.ap-up__file { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.ap-up__preview { display: grid; place-items: center; gap: 6px; aspect-ratio: 9 / 12; max-height: 44dvh; width: 100%; border-radius: 18px; border: 1.5px dashed rgba(246, 200, 30, 0.5); background: rgba(246, 200, 30, 0.05); color: var(--m-txt-2); overflow: hidden; text-align: center; }
+.ap-up__preview .ic { color: var(--m-gold); }
+.ap-up__preview small { color: var(--m-txt-3); }
+.ap-up__preview img { width: 100%; height: 100%; object-fit: cover; }
+.ap-up .btn--primary { min-height: 50px; }
+
+/* הסטורי במסך מלא (מ-control.css) – בתוך האפליקציה בטלפון ממלא את המסך */
+@media (max-width: 760px) {
+  .ap { max-width: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ap-sheet, .ap-sheet__dim, .ap-tab__plus { transition: none !important; }
+  .ap-live-card__dot, .ap-bar__live::before, .ap-stop.is-fresh { animation: none !important; }
+}
+
+/* בלי פס גלילה בכל העמוד (הגלילה עצמה נשארת): נראה כמו אפליקציה */
+html.ap-root, html.ap-root *, .ap-view, .ap-sheet__body, .ap-feed { scrollbar-width: none; -ms-overflow-style: none; }
+html.ap-root ::-webkit-scrollbar { display: none; width: 0; height: 0; }

@@ -37,6 +37,7 @@ export function createControl(o: {
   flyTo: (x: number, y: number) => void;
   mapImage: HTMLImageElement;
   clipComments: (c: Clip) => HTMLElement;
+  onStopDeleted?: (id: string) => void;
 }) {
   const { store, stage, toast } = o;
   let ex: Extras | null = null;
@@ -122,6 +123,7 @@ export function createControl(o: {
     layer,
     toast,
     data: o.data,
+    onStopDeleted: (id) => o.onStopDeleted?.(id),
     onStopSaved: () => {
       const d = o.data();
       if (d) setTimeout(() => o.goStop(currentIndex(d)), 400);
@@ -322,7 +324,36 @@ export function createControl(o: {
           .map(({ m, i }) => {
             const b = h('button', { type: 'button', class: `list__row ${m.is_milestone ? 'is-ms' : ''} ${i === cur ? 'is-now' : ''}` }, h('span', { class: 'list__no' }, String(i + 1)), h('span', { class: 'list__name' }, h('strong', {}, m.title), h('span', {}, i === cur ? 'כאן אנחנו עכשיו' : [kindLabel(m), metaText(m)].filter(Boolean).join('  |  '))));
             b.onclick = () => (closePopup(), o.openStop(i));
-            return h('li', {}, b);
+            if (!mod) return h('li', {}, b);
+            // מודים: עריכה ומחיקה ישר מהרשימה (מחיקה בשתי לחיצות)
+            const ed = h('button', { type: 'button', class: 'list__op', title: 'עריכה', ariaLabel: `עריכת ${m.title}` }, svg('edit', 18));
+            ed.onclick = () => editor.stopForm(m);
+            const del = h('button', { type: 'button', class: 'list__op list__op--danger', title: 'מחיקה', ariaLabel: `מחיקת ${m.title}` }, svg('trash', 18));
+            del.onclick = async () => {
+              if (!del.dataset.armed) {
+                del.dataset.armed = '1';
+                del.replaceChildren('בטוח?');
+                setTimeout(() => {
+                  if (!del.isConnected) return;
+                  delete del.dataset.armed;
+                  del.replaceChildren(svg('trash', 18));
+                }, 3000);
+                return;
+              }
+              del.disabled = true;
+              try {
+                const wasCurrent = i === cur;
+                await store.deleteMission(m.id);
+                if (wasCurrent && i > 0) await store.saveSettings({ ...d.settings, current_mission_id: d.missions[i - 1].id });
+                o.onStopDeleted?.(m.id);
+                toast('העצירה נמחקה');
+                refreshPopup('stops', stopsBody());
+              } catch (e) {
+                del.disabled = false;
+                toast((e as Error).message || 'המחיקה נכשלה');
+              }
+            };
+            return h('li', { class: 'list__item--mod' }, b, h('div', { class: 'list__ops' }, ed, del));
           }),
       );
     };
@@ -555,6 +586,7 @@ export function createControl(o: {
     place: () => layer.place(),
     isMod: () => mod,
     editStop: (m: Mission) => editor.stopForm(m),
+    isEditing: () => editor.isOn(),
     open,
     commentCount,
   };
