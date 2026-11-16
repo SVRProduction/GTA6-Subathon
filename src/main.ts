@@ -10,6 +10,8 @@ import { createWater, type Water } from './journey/water';
 import { createLife, type Life } from './journey/life';
 import { createLive, fmtHours } from './live';
 import { clipCard, clipsView, clipStop, playClip } from './clips';
+import { commentCount, commentsBox, initComments } from './comments';
+import { loginError } from './auth';
 import { countOf, kickSlug, playMs, type Clip, type LiveData } from './data/types';
 
 const store = createStore();
@@ -259,7 +261,7 @@ function onLive(l: LiveData) {
   }
   if (active === -3) openClips(true);
   // פאנל של עצירה שכבר פתוח: מוסיפים את הנתונים והקליפים, בלי לקפוץ לראש הפאנל ובלי לעצור קליפ שמתנגן
-  else if (active >= 0 && !panelBody.querySelector('.is-playing, iframe')) {
+  else if (active >= 0 && !panelBody.querySelector('.is-playing, iframe') && ![...panelBody.querySelectorAll('textarea')].some((t) => t.value.trim())) {
     const keep = panelBody.scrollTop;
     openPanel(active, true);
     panelBody.scrollTop = keep;
@@ -282,6 +284,7 @@ function openClips(refresh = false) {
         goTo(i);
         openPanel(i);
       },
+      comments: clipComments,
     }),
   );
   panelBody.classList.remove('has-media');
@@ -291,6 +294,21 @@ function openClips(refresh = false) {
   q<HTMLButtonElement>('[data-panel-prev]').disabled = true;
   q<HTMLButtonElement>('[data-panel-next]').disabled = true;
   pins.forEach((p) => p.classList.remove('pin--active'));
+}
+
+/** תגובות על קליפ: כפתור "💬 N" שפותח את השרשור מתחת לקליפ */
+function clipComments(c: Clip) {
+  const wrap = h('div', { class: 'clip__talk' });
+  const n = commentCount('clip', c.id);
+  const btn = h('button', { class: 'btn btn--quiet clip__talk-btn', type: 'button', ariaExpanded: 'false' }, n ? `💬 ${n} תגובות` : '💬 להגיב');
+  btn.onclick = () => {
+    const open = btn.getAttribute('aria-expanded') !== 'true';
+    btn.setAttribute('aria-expanded', String(open));
+    wrap.querySelector('.cmts')?.remove();
+    if (open) wrap.append(commentsBox(store, 'clip', c.id, { toast, title: false }));
+  };
+  wrap.append(btn);
+  return wrap;
 }
 
 /** שורת הנתונים של עצירה: מוות, חתולים, וכמה שעות שיחק עד אליה */
@@ -456,6 +474,13 @@ function openList() {
 }
 q('[data-list]').onclick = openList;
 q('[data-clips]').onclick = () => openClips();
+// תגובות: נטענות פעם אחת; עצירה עם תגובות מקבלת סימן קטן בסיכה
+initComments(store, (list) => {
+  if (!data) return;
+  const talked = new Set(list.filter((c) => c.target_type === 'stop').map((c) => c.target_id));
+  pins.forEach((p, i) => p.classList.toggle('pin--talk', talked.has(data.missions[i]?.id)));
+});
+if (loginError) setTimeout(() => toast('ההתחברות עם Kick לא הצליחה. נסו שוב.'), 600);
 
 // ── פאנל הצד: פתיחה וסגירה באותו מסלול, וניתן לעצור באמצע ──
 function openPanel(i: number, auto = false) {
@@ -480,6 +505,7 @@ function openPanel(i: number, auto = false) {
     stopStats(i),
     ...rest,
     stopClips(i),
+    commentsBox(store, 'stop', m.id, { toast }),
     i === cur && kickChannel ? livePlayer(kickChannel) : null,
   );
   panelBody.classList.toggle('has-media', !!media);

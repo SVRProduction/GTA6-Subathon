@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { STORAGE_BUCKET } from '../config';
-import { DEFAULT_SETTINGS, type Clip, type CounterEvent, type Data, type LiveData, type LiveStatus, type Mission, type Segment, type Settings, type Store } from './types';
+import { DEFAULT_SETTINGS, type Clip, type Comment, type CounterEvent, type Data, type LiveData, type LiveStatus, type Mission, type Segment, type Settings, type Store } from './types';
 
 export function createSupabaseStore(url: string, key: string): Store {
   const sb = createClient(url, key);
@@ -46,8 +46,47 @@ export function createSupabaseStore(url: string, key: string): Store {
     return { ...live };
   }
 
+  const fn = (name: string) => `${url}/functions/v1/${name}`;
+  async function loadComments(includeHidden = false): Promise<Comment[]> {
+    let q = sb.from('comments').select('*').order('created_at', { ascending: true }).limit(2000);
+    if (!includeHidden) q = q.eq('hidden', false);
+    return ((await q).data ?? []) as Comment[];
+  }
+
   return {
     mode: 'supabase',
+    loadComments,
+    subscribeComments(cb, includeHidden = false) {
+      let timer: number | undefined;
+      const refresh = () => {
+        clearTimeout(timer);
+        timer = window.setTimeout(() => loadComments(includeHidden).then(cb).catch(console.error), 150 + Math.random() * 600);
+      };
+      const ch = sb.channel(`comments-${includeHidden ? 'all' : 'pub'}`).on('postgres_changes', { event: '*', schema: 'public', table: 'comments' }, refresh).subscribe();
+      return () => {
+        clearTimeout(timer);
+        sb.removeChannel(ch);
+      };
+    },
+    async postComment(viewer, target, targetId, body) {
+      const r = await fetch(fn('kick-comment'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', apikey: key },
+        body: JSON.stringify({ token: viewer.token, target_type: target, target_id: targetId, body }),
+      });
+      if (!r.ok) throw new Error((await r.json().catch(() => null))?.error ?? 'התגובה לא נשלחה. נסו שוב.');
+    },
+    async moderateComment(id, action) {
+      if (action === 'delete') check(await sb.from('comments').delete().eq('id', id));
+      else check(await sb.from('comments').update({ hidden: action === 'hide' }).eq('id', id));
+    },
+    async banUser(kickUserId, username) {
+      check(await sb.from('comment_bans').upsert({ kick_user_id: kickUserId, username }));
+      check(await sb.from('comments').update({ hidden: true }).eq('kick_user_id', kickUserId));
+    },
+    kickLoginUrl(returnTo) {
+      return `${fn('kick-auth')}?return=${encodeURIComponent(returnTo)}`;
+    },
     loadLive,
     subscribeLive(cb) {
       const timers = new Map<string, number>();
