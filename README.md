@@ -49,7 +49,7 @@ npm run dev
 2. מעתיקים את ה-JWT secret: **Project Settings → JWT Keys → Legacy JWT secret** (בפרויקטים ישנים: **API → JWT Secret**).
 3. מגדירים ופורסים:
    ```bash
-   supabase secrets set SUPABASE_JWT_SECRET=<ה-JWT secret>
+   supabase secrets set MOD_JWT_SECRET=<ה-JWT secret>
    supabase functions deploy kick-mod --no-verify-jwt
    ```
 `kick-mod` מקבלת את הכרטיס החתום של Kick, בודקת שהמשתמש בעלים או ברשימה, ומחזירה טוקן Supabase למודים בלבד (תקף 12 שעות, מתחדש לבד).

@@ -4,7 +4,7 @@
 // מחזיר { token, exp, owner, name } – JWT עם role=authenticated ו-kick_name, תקף 12 שעות.
 // ההרשאות במסד (public.is_mod) בודקות את השם מול הרשימה בכל בקשה, כך שהסרה מהרשימה תופסת מיד.
 //
-// סודות: SESSION_SECRET (כמו kick-auth), SUPABASE_JWT_SECRET (Project Settings → JWT Keys → Legacy JWT secret)
+// סודות: SESSION_SECRET (כמו kick-auth), MOD_JWT_SECRET (Project Settings → JWT Keys → Legacy JWT secret) – לא SUPABASE_JWT_SECRET: Supabase חוסם סודות שמתחילים ב-SUPABASE_
 // פריסה: supabase functions deploy kick-mod --no-verify-jwt
 import { createClient } from 'npm:@supabase/supabase-js@2.45.4';
 import { verify } from '../_shared/session.ts';
@@ -46,8 +46,8 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: CORS });
   if (req.method !== 'POST') return fail('method', 405);
   const session = Deno.env.get('SESSION_SECRET');
-  const jwtSecret = Deno.env.get('SUPABASE_JWT_SECRET');
-  if (!session || !jwtSecret) return fail('השרת לא מוגדר (SESSION_SECRET / SUPABASE_JWT_SECRET)', 500);
+  const jwtSecret = Deno.env.get('MOD_JWT_SECRET') ?? Deno.env.get('SUPABASE_JWT_SECRET');
+  if (!session || !jwtSecret) return fail('השרת לא מוגדר (SESSION_SECRET / MOD_JWT_SECRET)', 500);
 
   let input: { token?: string };
   try {
