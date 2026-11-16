@@ -4,6 +4,7 @@ import { h, safeUrl } from '../dom';
 import { placeAll, loadTrail } from './geo';
 import { createPlayer, playable } from './player';
 import { on, state } from './state';
+import { kickUrl } from './dash';
 import { createTalk } from './talk';
 import { asset, bdi, dur, ico, num, whenText, ago } from './ui';
 
@@ -49,7 +50,7 @@ function show() {
     document.documentElement.classList.add('has-sheet');
   }
   panel.scrollTop = 0;
-  panel.querySelector<HTMLElement>('.sheet__close')?.focus({ preventScroll: true });
+  panel.querySelector<HTMLElement>('.sheet__close')?.focus({ preventScroll: true, focusVisible: false } as FocusOptions);
 }
 
 export function closeSheet() {
@@ -69,7 +70,7 @@ function paint(...nodes: Array<Node | null>) {
   if (a && a !== document.body && panel.contains(a)) {
     a.focus({ preventScroll: true });
     if (sel && a instanceof HTMLTextAreaElement) a.setSelectionRange(sel[0], sel[1]);
-  } else if (!panel.contains(document.activeElement)) panel.querySelector<HTMLElement>('.sheet__close')?.focus({ preventScroll: true });
+  } else if (!panel.contains(document.activeElement)) panel.querySelector<HTMLElement>('.sheet__close')?.focus({ preventScroll: true, focusVisible: false } as FocusOptions);
 }
 
 function closeBtn() {
@@ -246,7 +247,7 @@ function refreshClip() {
     return;
   }
   teardown();
-  const kick = `https://kick.com/${state.data.settings.kick_channel || 'odedsvr'}/clips/${c.id}`;
+  const kick = `${kickUrl()}/clips/${encodeURIComponent(c.id)}`;
   const p = playable(c.video_url);
   let media: HTMLElement;
   if (p) {

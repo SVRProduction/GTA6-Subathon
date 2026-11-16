@@ -67,7 +67,12 @@ let tab: Tab = 'road';
 let pushedModal = false;
 
 function parse() {
-  const raw = decodeURIComponent(location.hash.replace(/^#\/?/, ''));
+  let raw = location.hash.replace(/^#\/?/, '');
+  try {
+    raw = decodeURIComponent(raw);
+  } catch {
+    /* קישור שבור – משתמשים בו כמו שהוא */
+  }
   const [path, query] = raw.split('?');
   const [a, ...rest] = path.split('/');
   const id = rest.join('/');

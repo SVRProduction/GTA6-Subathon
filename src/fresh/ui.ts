@@ -106,6 +106,9 @@ export function toast(text: string, action?: { label: string; run: () => void })
     document.body.append(toastEl);
   }
   const t = toastEl;
+  // חלונית פתוחה (dialog מודאלי) מכסה את כל השאר – הטוסט עובר לתוכה כדי להיראות וללחיצה
+  const host = document.querySelector('dialog[open]') ?? document.body;
+  if (t.parentElement !== host) host.append(t);
   t.replaceChildren(h('span', {}, text));
   if (action) {
     t.append(

@@ -131,6 +131,7 @@ export function createRoad() {
   const root = h('section', { class: 'road', id: 'road', ariaLabel: 'הדרך' }, head, tools, list, foot);
 
   let known = new Set<string>();
+  const fresh = new Map<string, number>();
   let first = true;
 
   function render() {
@@ -178,8 +179,11 @@ export function createRoad() {
     }
 
     // עצירה חדשה שנוספה בזמן שהדף פתוח – מסמנים אותה
-    if (!first) {
-      for (const m of ms) if (!known.has(m.id)) document.getElementById(`s-${m.id}`)?.classList.add('is-new');
+    // (האדמין שומר פעמיים ברצף – עצירה ואז הגדרות – אז זוכרים את החדשות כמה שניות)
+    if (!first) for (const m of ms) if (!known.has(m.id)) fresh.set(m.id, Date.now());
+    for (const [id, t] of fresh) {
+      if (Date.now() - t > 4000) fresh.delete(id);
+      else document.getElementById(`s-${id}`)?.classList.add('is-new');
     }
     known = new Set(ms.map((m) => m.id));
     first = false;
