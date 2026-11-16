@@ -1,6 +1,8 @@
 import { $, fill, fmtDate, h } from '../dom';
 import { createStore } from '../data/store';
-import { countOf, currentIndex, newMission, statusFresh, type Comment, type CounterName, type Data, type Extras, type LiveData, type Mission } from '../data/types';
+import { countOf, currentIndex, newMission, statusFresh, type Comment, type CounterName, type Data, type Extras, type LiveData, type Mission, type ModEntry } from '../data/types';
+import { getViewer, login, loginError, logout } from '../auth';
+import { getModSession, kickName, onModChange } from '../data/modSession';
 import { safeUrl } from '../dom';
 import { createPicker } from './picker';
 import { markersPanel, pollsPanel, storiesPanel } from './extras';
@@ -36,6 +38,7 @@ let settingsOpen = false;
 let comments: Comment[] = [];
 let showHidden = false;
 let ex: Extras = { markers: [], stories: [], polls: [] };
+let mods: ModEntry[] = [];
 
 let toastTimer = 0;
 function toast(text: string, bad = false) {
@@ -52,6 +55,7 @@ async function run(action: () => Promise<void>, ok?: string) {
     await action();
     if (store.mode === 'supabase') data = await store.load();
     ex = await store.loadExtras(true).catch(() => ex);
+    if (getModSession()?.owner) mods = await store.listMods().catch(() => mods);
     render();
     if (ok) toast(ok);
     return true;
@@ -136,30 +140,60 @@ function field(label: string, input: HTMLElement, hint?: string) {
   return h('label', { class: 'field' }, h('span', {}, label), input, hint ? h('small', {}, hint) : null);
 }
 
-// ── התחברות ──
-function renderLogin() {
-  const email = h('input', { type: 'email', required: true, autocomplete: 'username' });
-  const pass = h('input', { type: 'password', required: true, autocomplete: 'current-password' });
-  const form = h(
-    'form',
-    { class: 'panel login' },
-    h('p', { class: 'stamp' }, 'חדר הבקרה'),
-    h('h1', {}, 'ניהול המסע'),
-    h('p', { class: 'muted' }, 'כניסה למי שמעדכן את המפה בזמן הלייב.'),
-    field('אימייל', email),
-    field('סיסמה', pass),
-    h('button', { class: 'btn primary', type: 'submit' }, 'כניסה'),
-  );
-  form.onsubmit = async (e) => {
-    e.preventDefault();
-    try {
-      await store.signIn(email.value, pass.value);
-      await start();
-    } catch {
-      toast('אימייל או סיסמה שגויים', true);
-    }
+// ── התחברות: רק עם Kick. ההרשאה לפי רשימת המודים (או בעלים) ──
+function renderLogin(error?: string) {
+  const v = getViewer();
+  const btn = h('button', { class: 'btn primary', type: 'button' }, v ? 'התחברות עם משתמש Kick אחר' : 'התחברות עם Kick');
+  btn.onclick = () => {
+    if (v) logout();
+    // בדמו: נכנסים מיד כבעלים (odedsvr)
+    login(store, 'odedsvr');
+    if (store.mode === 'demo') start();
   };
-  app.replaceChildren(form);
+  app.replaceChildren(
+    h(
+      'div',
+      { class: 'panel login' },
+      h('p', { class: 'stamp' }, 'חדר הבקרה'),
+      h('h1', {}, 'ניהול המסע'),
+      h('p', { class: 'muted' }, 'כניסה למודים שמעדכנים את המפה בזמן הלייב. מתחברים עם החשבון ב-Kick.'),
+      error ? h('p', { class: 'banner bad', role: 'alert' }, v ? `מחובר כ-${v.username}. ${error}` : error) : null,
+      btn,
+      store.mode === 'demo' ? h('small', { class: 'muted' }, 'מצב דמו: ההתחברות מכניסה אתכם כבעלים (odedsvr).') : null,
+    ),
+  );
+}
+
+// ── מודים: רק לבעלים ──
+function modsPanel() {
+  const input = h('input', { placeholder: 'שם המשתמש ב-Kick (למשל someone)', autocomplete: 'off', required: true });
+  const form = h('form', { class: 'mods__add' }, input, h('button', { class: 'btn', type: 'submit' }, 'הוספה'));
+  form.onsubmit = (e) => {
+    e.preventDefault();
+    const n = input.value.trim();
+    if (n) run(() => store.addMod(n), `${kickName(n)} נוסף לרשימת המודים`);
+  };
+  return h(
+    'section',
+    { class: 'panel mods' },
+    h('div', { class: 'panel-head' }, h('h2', {}, `מודים (${mods.length})`)),
+    h('p', { class: 'muted' }, 'מי שברשימה מתחבר עם Kick ומקבל את כלי העריכה, באתר ובמפה. הסרה תופסת מיד. הבעלים תמיד מודים, ורק הם מנהלים את הרשימה.'),
+    form,
+    h(
+      'ul',
+      { class: 'mods__list' },
+      ...mods.map((m) =>
+        h(
+          'li',
+          {},
+          h('div', { class: 'info' }, h('strong', { dir: 'ltr' }, m.kick_username), h('small', {}, m.owner ? 'תמיד מוד, מנהל את הרשימה' : m.last_login ? `כניסה אחרונה: ${fmtDate(m.last_login)}` : 'עוד לא התחבר')),
+          m.owner
+            ? h('span', { class: 'mods__tag' }, 'בעלים')
+            : h('div', { class: 'ops' }, h('button', { type: 'button', class: 'danger', onclick: (e: MouseEvent) => twice(e, () => run(() => store.removeMod(m.kick_username), `${m.kick_username} הוסר`)) }, 'הסרה')),
+        ),
+      ),
+    ),
+  );
 }
 
 // ── עורך נקודה ──
@@ -516,10 +550,9 @@ function render() {
       'header',
       { class: 'top' },
       h('div', { class: 'top__title' }, h('p', { class: 'stamp' }, 'חדר הבקרה'), h('h1', {}, settings.title || 'ניהול המסע')),
+      h('span', { class: 'top__who', dir: 'auto' }, `מחובר כ-${getModSession()?.name ?? ''}${getModSession()?.owner ? ' (בעלים)' : ''}`),
       h('a', { class: 'btn', href: './', target: '_blank' }, 'לאתר'),
-      store.mode === 'supabase'
-        ? h('button', { class: 'btn', type: 'button', onclick: async () => { await store.signOut(); renderLogin(); } }, 'יציאה')
-        : null,
+      h('button', { class: 'btn', type: 'button', onclick: async () => { await store.signOut(); logout(); } }, 'יציאה'),
     ),
     store.mode === 'demo'
       ? h('p', { class: 'banner' }, 'מצב דמו: השינויים נשמרים רק בדפדפן הזה. אחרי חיבור Supabase (ראה README) הם יגיעו לכל הצופים בזמן אמת.')
@@ -549,6 +582,7 @@ function render() {
     pollsPanel({ store, ex, data, run, twice }),
     markersPanel({ store, ex, data, run, twice }),
     commentsPanel(),
+    getModSession()?.owner ? modsPanel() : null,
     (() => {
       // נשאר פתוח גם אחרי שמירה (העמוד נבנה מחדש בכל שינוי)
       const fold = h('details', { class: 'fold', open: settingsOpen }, h('summary', {}, h('span', {}, 'הגדרות האתר'), h('small', {}, 'שם, ערוץ, קטגוריה, מפה וזום')), settingsForm);
@@ -563,20 +597,31 @@ function render() {
   if (box && now) box.scrollTop = now.offsetTop - box.offsetTop - box.clientHeight / 2 + now.clientHeight / 2;
 }
 
+let started = false;
 async function start() {
-  if (!(await store.isAuthed())) return renderLogin();
-  // מצב דמו: מי שנכנס לניהול הוא מוד גם במפה (כפתור "עריכה"). ב-Supabase המפה בודקת את ההתחברות עצמה.
-  if (store.mode === 'demo') {
+  if (!(await store.isAuthed())) {
+    const v = getViewer();
+    if (!v) return renderLogin(loginError ? 'ההתחברות ל-Kick לא הושלמה. נסו שוב.' : undefined);
     try {
-      localStorage.setItem('mc-mod', '1');
-    } catch {
-      /* חסום */
+      await store.modLogin(v);
+    } catch (e) {
+      return renderLogin((e as Error).message);
     }
   }
+  if (started) return render();
+  started = true;
+  // יציאה (גם מלשונית אחרת), או טוקן שהשרת דחה / לא חודש → חזרה למסך הכניסה
+  onModChange((s) => {
+    if (!s) location.reload();
+  });
+  if (getModSession()?.owner) mods = await store.listMods().catch(() => []);
   try {
     data = await store.load();
   } catch (e) {
-    app.replaceChildren(h('p', { class: 'banner bad' }, `טעינת הנתונים נכשלה: ${(e as Error).message}`));
+    app.replaceChildren(
+      h('p', { class: 'banner bad' }, `טעינת הנתונים נכשלה: ${(e as Error).message}`),
+      h('button', { class: 'btn', type: 'button', onclick: async () => { await store.signOut(); logout(); } }, 'יציאה והתחברות מחדש'),
+    );
     return;
   }
   render();

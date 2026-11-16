@@ -182,6 +182,14 @@ dialog form { display: grid; gap: 18px; padding: 22px 22px 0; }
 /* ── התחברות ── */
 .login { max-width: 420px; margin: 14vh auto 0; }
 .login .btn { justify-self: stretch; min-height: 50px; }
+.top__who { color: var(--ink-mute); font-size: 14px; }
+
+/* ── מודים ── */
+.mods__add { display: flex; gap: 8px; flex-wrap: wrap; }
+.mods__add input { flex: 1 1 200px; min-width: 0; }
+.mods__list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.mods__list li { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 12px; border-radius: 14px; background: var(--paper-3); }
+.mods__tag { font: 400 13px/1 var(--stamp); padding: 6px 10px; border-radius: 999px; border: 2px solid var(--ink); background: var(--mustard); }
 
 /* ── בוחר מיקום על המפה ── */
 .picker-field { display: grid; gap: 8px; }
@@ -241,6 +249,7 @@ dialog form { display: grid; gap: 18px; padding: 22px 22px 0; }
 @media (max-width: 560px) {
   #app { gap: 14px; }
   .top__title h1 { font-size: 20px; }
+  .top__who { order: 3; flex-basis: 100%; font-size: 13px; }
   .now-card { grid-template-columns: 1fr; padding: 18px; }
   .now-card h2 { font-size: 22px; }
   .panel { padding: 16px; }

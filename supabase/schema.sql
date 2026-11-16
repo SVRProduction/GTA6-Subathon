@@ -26,6 +26,70 @@ create table if not exists public.settings (
 
 insert into public.settings (id) values (1) on conflict do nothing;
 
+-- ── מודים: מתחברים עם Kick, וההרשאה לפי רשימה (אפשר להריץ שוב בבטחה) ──
+-- הבעלים: הערוץ עצמו (kick_channel) + הרשימה settings.owners. הם תמיד מודים, ורק הם מנהלים את רשימת המודים.
+-- הטוקן של מוד מונפק ע"י הפונקציה kick-mod (role=authenticated, kick_name=שם המשתמש ב-Kick).
+alter table public.settings add column if not exists owners text[] not null default '{odedsvr,zswolt}';
+
+create table if not exists public.mods (
+  kick_username text primary key check (kick_username = lower(kick_username) and kick_username <> ''),
+  kick_user_id text,
+  added_at timestamptz not null default now(),
+  last_login timestamptz
+);
+
+-- שם המשתמש ב-Kick מתוך הטוקן (אותיות קטנות; ריק = לא מוד)
+create or replace function public.jwt_kick_name() returns text language sql stable as $$
+  select lower(coalesce(nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'kick_name', ''));
+$$;
+create or replace function public.jwt_role() returns text language sql stable as $$
+  select coalesce(nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'role', '');
+$$;
+-- שם ערוץ נקי (גם אם נשמר קישור מלא)
+create or replace function public.kick_slug(p text) returns text language sql immutable as $$
+  select lower(regexp_replace(regexp_replace(coalesce(p, ''), '^.*kick\.com/', ''), '[^A-Za-z0-9_-]', '', 'g'));
+$$;
+create or replace function public.owner_names() returns text[] language plpgsql stable security definer set search_path = public as $$
+declare s public.settings;
+begin
+  select * into s from public.settings where id = 1;
+  return array(select distinct lower(x) from unnest(coalesce(s.owners, '{}'::text[]) || array[coalesce(nullif(public.kick_slug(s.kick_channel), ''), 'odedsvr')]) x where x <> '');
+end $$;
+create or replace function public.is_owner() returns boolean language plpgsql stable security definer set search_path = public as $$
+declare n text := public.jwt_kick_name();
+begin
+  if public.jwt_role() = 'service_role' then return true; end if;
+  return n <> '' and n = any (public.owner_names());
+end $$;
+create or replace function public.is_mod() returns boolean language plpgsql stable security definer set search_path = public as $$
+declare n text := public.jwt_kick_name();
+begin
+  if public.jwt_role() = 'service_role' then return true; end if;
+  if n = '' then return false; end if;
+  return public.is_owner() or exists (select 1 from public.mods where kick_username = n);
+end $$;
+grant execute on function public.is_mod() to anon, authenticated;
+grant execute on function public.is_owner() to anon, authenticated;
+
+alter table public.mods enable row level security;
+drop policy if exists "mods read" on public.mods;
+drop policy if exists "owners write mods" on public.mods;
+create policy "mods read" on public.mods for select to authenticated using (public.is_mod());
+create policy "owners write mods" on public.mods for all to authenticated using (public.is_owner()) with check (public.is_owner());
+
+-- מוד לא יכול להפוך את עצמו לבעלים: רק בעלים משנים את הערוץ ואת רשימת הבעלים
+create or replace function public.guard_settings() returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  -- בלי טוקן (SQL Editor של Supabase) מותר; דרך האתר – רק בעלים
+  if (new.kick_channel is distinct from old.kick_channel or new.owners is distinct from old.owners) and public.jwt_role() <> '' and not public.is_owner() then
+    raise exception 'רק הבעלים יכולים לשנות את הערוץ ואת רשימת הבעלים';
+  end if;
+  new.owners := array(select distinct lower(x) from unnest(new.owners) x where x <> '');
+  return new;
+end $$;
+drop trigger if exists guard_settings on public.settings;
+create trigger guard_settings before update on public.settings for each row execute function public.guard_settings();
+
 -- הרשאות: כולם קוראים, רק משתמש מחובר (אדמין/מוד) כותב
 alter table public.missions enable row level security;
 alter table public.settings enable row level security;
@@ -33,11 +97,11 @@ alter table public.settings enable row level security;
 drop policy if exists "read missions" on public.missions;
 create policy "read missions" on public.missions for select using (true);
 drop policy if exists "write missions" on public.missions;
-create policy "write missions" on public.missions for all to authenticated using (true) with check (true);
+create policy "write missions" on public.missions for all to authenticated using (public.is_mod()) with check (public.is_mod());
 drop policy if exists "read settings" on public.settings;
 create policy "read settings" on public.settings for select using (true);
 drop policy if exists "write settings" on public.settings;
-create policy "write settings" on public.settings for all to authenticated using (true) with check (true);
+create policy "write settings" on public.settings for all to authenticated using (public.is_mod()) with check (public.is_mod());
 
 -- עדכון חי לצופים
 do $$ begin
@@ -50,7 +114,7 @@ insert into storage.buckets (id, name, public) values ('recaps', 'recaps', true)
 drop policy if exists "read recaps" on storage.objects;
 create policy "read recaps" on storage.objects for select using (bucket_id = 'recaps');
 drop policy if exists "upload recaps" on storage.objects;
-create policy "upload recaps" on storage.objects for insert to authenticated with check (bucket_id = 'recaps');
+create policy "upload recaps" on storage.objects for insert to authenticated with check (bucket_id = 'recaps' and public.is_mod());
 
 -- ── שדרוג: מפה, פרקים וציטוטים (אפשר להריץ שוב בבטחה) ──
 alter table public.missions add column if not exists map_x double precision;
@@ -125,8 +189,8 @@ create policy "read segments" on public.play_segments for select using (true);
 create policy "read counters" on public.counter_events for select using (true);
 create policy "read clips" on public.clips for select using (true);
 -- תיקון ידני מהאדמין (מחיקת מקטע שגוי / קליפ)
-create policy "write segments" on public.play_segments for all to authenticated using (true) with check (true);
-create policy "write clips" on public.clips for all to authenticated using (true) with check (true);
+create policy "write segments" on public.play_segments for all to authenticated using (public.is_mod()) with check (public.is_mod());
+create policy "write clips" on public.clips for all to authenticated using (public.is_mod()) with check (public.is_mod());
 
 -- סיכום הספירות לפי מונה ומשימה (האתר קורא את זה, לא את כל השורות – אחרת זה נעצר במגבלת 1000 שורות)
 create or replace view public.counter_totals with (security_invoker = true) as
@@ -136,9 +200,11 @@ grant select on public.counter_totals to anon, authenticated;
 
 -- ספירה: רק אדמין/מוד מחובר, בפעולה אחת (בלי "לקרוא ולכתוב חזרה")
 create or replace function public.bump(p_counter text, p_delta integer, p_mission uuid)
-returns void language sql security definer set search_path = public as $$
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_mod() then raise exception 'רק מודים יכולים לספור'; end if;
   insert into public.counter_events (counter, delta, mission_id, source) values (p_counter, p_delta, p_mission, 'button');
-$$;
+end $$;
 revoke all on function public.bump(text, integer, uuid) from public, anon;
 grant execute on function public.bump(text, integer, uuid) to authenticated;
 
@@ -179,10 +245,10 @@ drop policy if exists "moderate comments" on public.comments;
 drop policy if exists "delete comments" on public.comments;
 drop policy if exists "mods bans" on public.comment_bans;
 create policy "read comments" on public.comments for select using (hidden = false);
-create policy "read all comments (mods)" on public.comments for select to authenticated using (true);
-create policy "moderate comments" on public.comments for update to authenticated using (true) with check (true);
-create policy "delete comments" on public.comments for delete to authenticated using (true);
-create policy "mods bans" on public.comment_bans for all to authenticated using (true) with check (true);
+create policy "read all comments (mods)" on public.comments for select to authenticated using (public.is_mod());
+create policy "moderate comments" on public.comments for update to authenticated using (public.is_mod()) with check (public.is_mod());
+create policy "delete comments" on public.comments for delete to authenticated using (public.is_mod());
+create policy "mods bans" on public.comment_bans for all to authenticated using (public.is_mod()) with check (public.is_mod());
 
 do $$ begin
   alter publication supabase_realtime add table public.comments;
@@ -269,11 +335,11 @@ drop policy if exists "mods stories" on public.stories;
 drop policy if exists "read polls" on public.polls;
 drop policy if exists "mods polls" on public.polls;
 create policy "read markers" on public.markers for select using (true);
-create policy "mods markers" on public.markers for all to authenticated using (true) with check (true);
+create policy "mods markers" on public.markers for all to authenticated using (public.is_mod()) with check (public.is_mod());
 create policy "read approved stories" on public.stories for select using (status = 'approved' and expires_at > now());
-create policy "mods stories" on public.stories for all to authenticated using (true) with check (true);
+create policy "mods stories" on public.stories for all to authenticated using (public.is_mod()) with check (public.is_mod());
 create policy "read polls" on public.polls for select using (true);
-create policy "mods polls" on public.polls for all to authenticated using (true) with check (true);
+create policy "mods polls" on public.polls for all to authenticated using (public.is_mod()) with check (public.is_mod());
 -- poll_votes ו-story_likes: אין מדיניות קריאה/כתיבה לציבור – רק הפונקציות (service role) והתצוגה
 
 -- פתיחת סקר (מוד): סקר פתוח קודם נסגר קודם
@@ -281,6 +347,7 @@ create or replace function public.open_poll(p_question text, p_options text[], p
 returns uuid language plpgsql security definer set search_path = public as $$
 declare v_id uuid; r record;
 begin
+  if not public.is_mod() then raise exception 'רק מודים יכולים לפתוח סקר'; end if;
   for r in select id from public.polls where status = 'open' loop perform public.close_poll(r.id); end loop;
   insert into public.polls (question, options, x, y, ends_at)
     values (p_question, p_options, p_x, p_y, now() + make_interval(mins => greatest(1, least(p_minutes, 180))))
@@ -293,6 +360,8 @@ create or replace function public.close_poll(p_id uuid)
 returns void language plpgsql security definer set search_path = public as $$
 declare p public.polls; v_win integer; v_best integer; v_total integer; v_mission uuid;
 begin
+  -- מוד, או השרת (kick-sync סוגר סקרים שנגמר להם הזמן)
+  if not public.is_mod() then raise exception 'רק מודים יכולים לסגור סקר'; end if;
   select * into p from public.polls where id = p_id for update;
   if not found or p.status = 'closed' then return; end if;
   select option, n into v_win, v_best from public.poll_results where poll_id = p_id order by n desc, option asc limit 1;

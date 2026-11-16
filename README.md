@@ -24,14 +24,36 @@ npm run dev
 
 1. פתח פרויקט חינמי ב‑[supabase.com](https://supabase.com).
 2. ב‑**SQL Editor** הדבק את התוכן של `supabase/schema.sql` ולחץ Run.
-3. ב‑**Authentication → Users → Add user** צור משתמש (אימייל + סיסמה) לעצמך ולכל מוד. מי שיש לו משתמש יכול לערוך.
-   מומלץ לכבות הרשמה חופשית: **Authentication → Sign In / Providers → Allow new users to sign up = off**.
+3. מודים מתחברים **רק עם Kick** (ראו "מודים" למטה). אין משתמשי אימייל.
+   כבו הרשמה חופשית: **Authentication → Sign In / Providers → Allow new users to sign up = off**.
 4. ב‑**Project Settings → API** העתק את ה‑Project URL ואת ה‑anon public key.
 5. ב‑GitHub: **Settings → Secrets and variables → Actions → Variables** הוסף
    `VITE_SUPABASE_URL` ו‑`VITE_SUPABASE_ANON_KEY`.
    (להרצה מקומית: קובץ `.env.local` עם אותם שני משתנים.)
 
-ה‑anon key הוא מפתח ציבורי – ההגנה היא ב‑RLS שבסכמה: כולם קוראים, רק משתמש מחובר כותב.
+ה‑anon key הוא מפתח ציבורי – ההגנה היא ב‑RLS שבסכמה: כולם קוראים, רק מודים (`public.is_mod()`) כותבים.
+
+## מודים (התחברות עם Kick + רשימה)
+
+- **מי מוד:** הבעלים, ומי שהבעלים הוסיפו לרשימה באדמין ← "מודים" (לפי **שם המשתמש** ב-Kick כמו שמופיע בצ'אט, בלי הבדל בין אותיות גדולות לקטנות).
+- **בעלים:** `odedsvr` ו-`ZSWolt` (העמודה `settings.owners`), ובעל הערוץ שמוגדר ב-"ערוץ Kick". הבעלים תמיד מודים, ורק הם מוסיפים ומסירים מודים, משנים את הערוץ ואת רשימת הבעלים. את רשימת הבעלים משנים ב-SQL Editor:
+  ```sql
+  update public.settings set owners = '{odedsvr,zswolt}' where id = 1;
+  ```
+- **התחברות:** "התחברות עם Kick" באדמין או באתר. אם השם ברשימה, כלי העריכה מופיעים (גם במפה). אם לא – נשארים צופים רגילים.
+- **הסרה תופסת מיד:** כל בקשת עריכה נבדקת מול הרשימה במסד, גם אם הטוקן עוד תקף.
+- **שם שהתחלף:** בכניסה הראשונה נשמר מזהה ה-Kick של המוד. אם השם עובר לחשבון אחר, הוא לא יקבל הרשאה עד שהבעלים יסירו ויוסיפו אותו מחדש.
+
+הפעלה (אחרי ש-`kick-auth` עובד, ראו "תגובות"):
+1. מריצים שוב את `supabase/schema.sql`.
+2. מעתיקים את ה-JWT secret: **Project Settings → JWT Keys → Legacy JWT secret** (בפרויקטים ישנים: **API → JWT Secret**).
+3. מגדירים ופורסים:
+   ```bash
+   supabase secrets set MOD_JWT_SECRET=<ה-JWT secret>
+   supabase functions deploy kick-mod --no-verify-jwt
+   ```
+`kick-mod` מקבלת את הכרטיס החתום של Kick, בודקת שהמשתמש בעלים או ברשימה, ומחזירה טוקן Supabase למודים בלבד (תקף 12 שעות, מתחדש לבד).
+
 
 ## לייב, זמן משחק, קליפים וספירות (Kick)
 
