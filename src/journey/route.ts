@@ -194,6 +194,12 @@ export function buildCurve(pts: Placed[], w: number, h: number, trail?: Trail | 
   } else if (n === 1) {
     P.push({ x: P[0].x, y: P[0].y + h * 0.06 });
   }
+  // עוד אין אף עצירה (פרויקט חדש וריק): קו קצר מנקודת ההתחלה, כדי שהמפה תעבוד עד שנוספת העצירה הראשונה
+  if (!n) {
+    const start = trail ? { ...trail.at(0), s: 0 } : { x: w * 0.5, y: h * 0.85 };
+    const next = trail ? { ...trail.at(Math.min(trail.total, ext)), s: Math.min(trail.total, ext) } : { x: start.x, y: start.y - h * 0.06 };
+    P.push(start, next);
+  }
   const line: Pt[] = [];
   const stopAt: number[] = []; // אינדקס בקו לכל עצירה
   for (let i = 0; i < P.length - 1; i++) {
