@@ -5,7 +5,13 @@ import { DEFAULT_SETTINGS, type Clip, type Comment, type CounterEvent, type Data
 
 export function createSupabaseStore(url: string, key: string): Store {
   // פעולות מוד נשלחות עם הטוקן מ-kick-mod; בלי טוקן – כמו צופה (anon)
-  const sb = createClient(url, key, { accessToken: async () => getModSession()?.token ?? null });
+  // טוקן שלא נראה כמו JWT (למשל מהדמו באותו דומיין) לא נשלח, אחרת כל הבקשות ייכשלו
+  const jwt = () => {
+    const t = getModSession()?.token;
+    return t && t.split('.').length === 3 ? t : null;
+  };
+  if (getModSession() && !jwt()) setModSession(null);
+  const sb = createClient(url, key, { accessToken: async () => jwt() });
   const fnUrl = (name: string) => `${url}/functions/v1/${name}`;
   let refreshing: Promise<ModSession> | null = null;
   async function modLogin(viewer: Viewer): Promise<ModSession> {
@@ -13,7 +19,7 @@ export function createSupabaseStore(url: string, key: string): Store {
     const j = await r.json().catch(() => null);
     if (!r.ok) {
       if (r.status === 403 || r.status === 401) setModSession(null);
-      throw new Error(j?.error ?? 'הבדיקה מול רשימת המודים נכשלה. נסו שוב.');
+      throw Object.assign(new Error(j?.error ?? 'הבדיקה מול רשימת המודים נכשלה. נסו שוב.'), { status: r.status });
     }
     const s: ModSession = { token: j.token, exp: j.exp, name: j.name, owner: !!j.owner };
     setModSession(s);
@@ -38,7 +44,11 @@ export function createSupabaseStore(url: string, key: string): Store {
   keepFresh();
 
   const check = <T extends { error: { message: string } | null }>(r: T): T => {
-    if (r.error) throw new Error(r.error.message);
+    if (r.error) {
+      // טוקן מוד שהשרת לא מקבל (סוד JWT שגוי / פג) – מתנתקים כדי שהאתר ימשיך לעבוד כצופה
+      if (jwt() && /jwt|JWS|signature/i.test(r.error.message)) setModSession(null);
+      throw new Error(r.error.message);
+    }
     return r;
   };
 

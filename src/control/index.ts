@@ -77,21 +77,24 @@ export function createControl(o: {
     store.loadExtras(v).then(setExtras).catch(console.error);
     unsubExtras = store.subscribeExtras(setExtras, v);
   }
-  // אחרי התחברות Kick: בודקים בשקט אם זה מוד. תשובה שלילית נשמרת לשיחה הזו, כדי לא לשאול שוב בכל טעינה
+  // אחרי התחברות Kick: בודקים בשקט אם זה מוד. "לא ברשימה" נזכר ל-5 דקות בלבד,
+  // כך שמוד שהבעלים הוסיף עכשיו מקבל את הכלים ברענון של כמה דקות (או מיד אחרי התחברות מחדש)
   const NOT_MOD = 'kick-not-mod';
-  async function tryModLogin() {
+  async function tryModLogin(fresh = false) {
     const v = getViewer();
     if (!v || (await store.isAuthed())) return;
     try {
-      if (sessionStorage.getItem(NOT_MOD) === v.kick_user_id) return;
+      const [uid, t] = (sessionStorage.getItem(NOT_MOD) ?? '').split('|');
+      if (!fresh && uid === v.kick_user_id && Date.now() - Number(t) < 5 * 60_000) return;
     } catch {
       /* חסום */
     }
     try {
       await store.modLogin(v);
-    } catch {
+    } catch (e) {
+      if ((e as { status?: number }).status !== 403) return;
       try {
-        sessionStorage.setItem(NOT_MOD, v.kick_user_id);
+        sessionStorage.setItem(NOT_MOD, `${v.kick_user_id}|${Date.now()}`);
       } catch {
         /* חסום */
       }
@@ -105,7 +108,7 @@ export function createControl(o: {
     });
   onModChange(() => modReady.then(() => isModNow().then((v) => applyMod(v))));
   onViewer((v) => {
-    if (v) tryModLogin();
+    if (v) tryModLogin(true);
   });
 
   // ── שכבת המרקרים ──

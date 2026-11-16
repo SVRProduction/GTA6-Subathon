@@ -505,7 +505,7 @@ export function createDemoStore(): Store {
       const owner = demoOwners().includes(n);
       if (!owner && !readMods().some((m) => m.kick_username === n)) {
         setModSession(null);
-        throw new Error('אין לך הרשאת מוד. בקשו מהבעלים להוסיף אתכם ברשימת המודים.');
+        throw Object.assign(new Error('אין לך הרשאת מוד. בקשו מהבעלים להוסיף אתכם ברשימת המודים.'), { status: 403 });
       }
       if (!owner) writeMods(readMods().map((m) => (m.kick_username === n ? { ...m, last_login: new Date().toISOString() } : m)));
       const s = { token: 'demo', exp: Math.floor(Date.now() / 1000) + 12 * 3600, name: viewer.username, owner };

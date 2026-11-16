@@ -249,6 +249,7 @@ dialog form { display: grid; gap: 18px; padding: 22px 22px 0; }
 @media (max-width: 560px) {
   #app { gap: 14px; }
   .top__title h1 { font-size: 20px; }
+  .top__who { order: 3; flex-basis: 100%; font-size: 13px; }
   .now-card { grid-template-columns: 1fr; padding: 18px; }
   .now-card h2 { font-size: 22px; }
   .panel { padding: 16px; }

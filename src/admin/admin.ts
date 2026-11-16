@@ -610,7 +610,7 @@ async function start() {
   }
   if (started) return render();
   started = true;
-  // יציאה (גם מלשונית אחרת) או הסרה מהרשימה → חזרה למסך הכניסה
+  // יציאה (גם מלשונית אחרת), או טוקן שהשרת דחה / לא חודש → חזרה למסך הכניסה
   onModChange((s) => {
     if (!s) location.reload();
   });
@@ -618,7 +618,10 @@ async function start() {
   try {
     data = await store.load();
   } catch (e) {
-    app.replaceChildren(h('p', { class: 'banner bad' }, `טעינת הנתונים נכשלה: ${(e as Error).message}`));
+    app.replaceChildren(
+      h('p', { class: 'banner bad' }, `טעינת הנתונים נכשלה: ${(e as Error).message}`),
+      h('button', { class: 'btn', type: 'button', onclick: async () => { await store.signOut(); logout(); } }, 'יציאה והתחברות מחדש'),
+    );
     return;
   }
   render();
