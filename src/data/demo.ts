@@ -1,6 +1,6 @@
-import { DEFAULT_SETTINGS, kickSlug, type Clip, type CounterEvent, type Data, type LiveData, type Mission, type Store } from './types';
+import { DEFAULT_SETTINGS, kickSlug, type Clip, type Comment, type CounterEvent, type Data, type LiveData, type Mission, type Store } from './types';
 
-const KEY = 'journey-demo-v7';
+const KEY = 'journey-demo-v8';
 const MAX_INLINE_FILE = 2 * 1024 * 1024;
 
 // 70 עצירות דמו. בלי מיקום: הן מתמקמות לבד לאורך השביל (הכבישים) של המפה, מהדרום צפונה
@@ -19,7 +19,7 @@ const MILESTONES: Record<number, [string, string, string]> = {
 const chapterOf = (i: number) => (i < 16 ? 'האיים' : i < 36 ? 'העיר' : i < 54 ? 'הצפון' : 'ההר');
 
 function seed(): Data {
-  const start = Date.now() - 3 * 864e5;
+  const start = Date.now() - 80 * 36e5; // 70 עצירות × 1.1 שעות – האחרונה קצת לפני עכשיו (לא בעתיד)
   const missions: Mission[] = Array.from({ length: DEMO_N }, (_, i) => {
     const ms = MILESTONES[i];
     const last = i === DEMO_N - 1;
@@ -119,6 +119,29 @@ async function fetchClips(slug: string): Promise<Clip[]> {
   }
 }
 
+// ── תגובות בדמו ──
+const COMMENTS_KEY = `${KEY}-comments`;
+const DEMO_FANS = [['עומרי_77', 'אחי איך פספסת את הפנייה הזאת 😂'], ['NoaPlays', 'הקטע הכי טוב בסאבתון עד עכשיו'], ['dan.gg', 'הצ׳אט ידע לפניך'], ['Lior_kick', 'עוד ניסיון אחד וזה עובר, מבטיח'], ['ShaharTV', 'המוזיקה ברקע פה מושלמת']];
+function readComments(d: Data): Comment[] {
+  try {
+    const raw = localStorage.getItem(COMMENTS_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {
+    /* חסום */
+  }
+  // כמה תגובות דמו על המיילסטונים
+  const out: Comment[] = [];
+  d.missions.forEach((m, i) => {
+    if (!m.is_milestone) return;
+    const n = 1 + (i % 3);
+    for (let k = 0; k < n; k++) {
+      const [user, body] = DEMO_FANS[(i + k) % DEMO_FANS.length];
+      out.push({ id: `demo-c-${i}-${k}`, target_type: 'stop', target_id: m.id, kick_user_id: `demo-${user}`, username: user, avatar: null, body, created_at: new Date(Date.parse(m.happened_at ?? new Date().toISOString()) + (k + 1) * 9 * 60_000).toISOString(), hidden: false });
+    }
+  });
+  return out;
+}
+
 export function createDemoStore(): Store {
   const listeners = new Set<(d: Data) => void>();
   const channel = 'BroadcastChannel' in window ? new BroadcastChannel(KEY) : null;
@@ -147,6 +170,7 @@ export function createDemoStore(): Store {
       status: { is_live: live, on_category: live, category: d.settings.kick_category, title: 'סאבתון GTA 6 – יום 3', viewers: 2140, checked_at: new Date().toISOString() },
       segments: demoSegments(d),
       counters: readCounters(d),
+      recent: [...readCounters(d)].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at)).slice(0, 80),
       clips: await fetchClips(kickSlug(d.settings.kick_channel || 'odedsvr')),
       demoClips: true,
     };
@@ -154,8 +178,55 @@ export function createDemoStore(): Store {
   const emitLive = () => loadLive().then((l) => liveListeners.forEach((f) => f(l)));
   channel?.addEventListener('message', (e) => e.data === 'live' && emitLive());
 
+  const commentListeners = new Set<(c: Comment[], all: boolean) => void>();
+  const writeComments = (list: Comment[]) => {
+    try {
+      localStorage.setItem(COMMENTS_KEY, JSON.stringify(list));
+    } catch {
+      /* חסום */
+    }
+    channel?.postMessage('comments');
+    emitComments();
+  };
+  function emitComments() {
+    const all = readComments(read());
+    commentListeners.forEach((f) => (f as any)(all));
+  }
+  channel?.addEventListener('message', (e) => e.data === 'comments' && emitComments());
+  let lastPost = 0;
+
   return {
     mode: 'demo',
+    async loadComments(includeHidden = false) {
+      const all = readComments(read());
+      return includeHidden ? all : all.filter((c) => !c.hidden);
+    },
+    subscribeComments(cb, includeHidden = false) {
+      const f = (all: Comment[]) => cb(includeHidden ? all : all.filter((c) => !c.hidden));
+      commentListeners.add(f as any);
+      return () => commentListeners.delete(f as any);
+    },
+    async postComment(viewer, target, targetId, body) {
+      const text = body.trim().slice(0, 500);
+      if (!text) throw new Error('אי אפשר לשלוח תגובה ריקה');
+      if (Date.now() - lastPost < 15_000) throw new Error('רגע, אפשר להגיב פעם ב-15 שניות');
+      lastPost = Date.now();
+      const all = readComments(read());
+      all.push({ id: crypto.randomUUID(), target_type: target, target_id: targetId, kick_user_id: viewer.kick_user_id, username: viewer.username, avatar: viewer.avatar, body: text, created_at: new Date().toISOString(), hidden: false });
+      writeComments(all);
+    },
+    async moderateComment(id, action) {
+      let all = readComments(read());
+      if (action === 'delete') all = all.filter((c) => c.id !== id);
+      else all = all.map((c) => (c.id === id ? { ...c, hidden: action === 'hide' } : c));
+      writeComments(all);
+    },
+    async banUser(kickUserId) {
+      writeComments(readComments(read()).map((c) => (c.kick_user_id === kickUserId ? { ...c, hidden: true } : c)));
+    },
+    kickLoginUrl() {
+      return null;
+    },
     loadLive,
     subscribeLive(cb) {
       liveListeners.add(cb);

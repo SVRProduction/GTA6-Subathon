@@ -501,3 +501,38 @@ details[open] .log__chev { transform: rotate(-90deg); }
 @media (prefers-reduced-motion: reduce) {
   .onair::before, .stat--play.is-running i, .stat.is-bump, .stat.is-bump::after { animation: none; }
 }
+
+/* ── תגובות (על עצירות ועל קליפים) ── */
+.cmts { display: grid; gap: 12px; margin-top: 22px; padding-top: 16px; border-top: 2px dashed var(--ink); }
+.clip .cmts { margin-top: 6px; padding-top: 12px; }
+.cmts__title { font-size: 15px; }
+.cmts__list { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.cmts__empty { color: var(--ink-mute); font-size: 15px; }
+.cmt { display: grid; grid-template-columns: 34px 1fr; gap: 10px; align-items: start; }
+.cmt__pic { width: 34px; height: 34px; border-radius: 50%; border: 2px solid var(--ink); object-fit: cover; background: var(--paper); }
+.cmt__pic--letter { display: grid; place-items: center; font: 400 15px/1 var(--stamp); background: var(--mustard); }
+.cmt__main { min-width: 0; display: grid; gap: 2px; }
+.cmt__meta { display: flex; gap: 8px; align-items: baseline; font-size: 13px; color: var(--ink-mute); }
+.cmt__meta strong { font: 400 14px/1.2 var(--stamp); color: var(--ink); }
+.cmt__body { font-size: 16px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.cmts__form { display: grid; grid-template-columns: 34px 1fr; gap: 8px 10px; align-items: start; }
+.cmts__input {
+  width: 100%; min-height: 64px; padding: 10px 12px; border: 2px solid var(--ink); border-radius: 12px; background: #fff;
+  font: 400 16px/1.45 var(--body); color: var(--ink); resize: vertical;
+}
+.cmts__input:focus { outline: none; box-shadow: 3px 3px 0 var(--red); }
+.cmts__bar { grid-column: 2; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.cmts__who { margin-inline-end: auto; font-size: 13px; color: var(--ink-mute); }
+.cmts__count { font: 400 12px/1 var(--stamp); color: var(--red); }
+.linkish { padding: 0; border: 0; background: none; color: inherit; text-decoration: underline; text-underline-offset: 3px; font: inherit; cursor: pointer; }
+.btn--kick { background: #53fc18; color: #0b0e0f; justify-self: start; }
+.btn--kick:hover { background: #6bff38; }
+.kick-mark { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; background: #0b0e0f; color: #53fc18; font: 900 14px/1 'Arial Black', system-ui, sans-serif; }
+.clip__talk { display: grid; gap: 4px; }
+.clip__talk-btn { justify-self: start; min-height: 34px; padding: 0; font-size: 14px; }
+/* סיכה עם תגובות: בועה קטנה */
+.pin--talk .pin__disc::before {
+  content: ''; position: absolute; left: -4px; top: -4px; width: 9px; height: 7px; border-radius: 4px 4px 4px 0;
+  background: var(--paper-2); border: 1.5px solid var(--ink);
+}
+.pin--dot.pin--talk .pin__disc::before { display: none; }

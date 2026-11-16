@@ -10,6 +10,9 @@ import { createWater, type Water } from './journey/water';
 import { createLife, type Life } from './journey/life';
 import { createLive, fmtHours } from './live';
 import { clipCard, clipsView, clipStop, playClip } from './clips';
+import { commentCount, commentsBox, initComments } from './comments';
+import { loginError } from './auth';
+import { createDesk } from './desk';
 import { countOf, kickSlug, playMs, type Clip, type LiveData } from './data/types';
 
 const store = createStore();
@@ -84,6 +87,21 @@ const world = createWorld(stage, () => {
   onMapReady?.();
   onMapReady = null;
 });
+
+// ── שולחן השדרן: עמודות, פיד, שורת עכשיו ──
+const desk = createDesk({
+  store,
+  stage,
+  panel,
+  goToStop: (i) => goTo(i),
+  openStop: (i) => {
+    goTo(i);
+    openPanel(i);
+  },
+  onLayout: () => frame(true),
+});
+/** הפאנל יושב בעמודת הצד (מחשב) – אז לא מזיזים את המפה כדי לפנות לו מקום */
+const panelInStage = () => panel.parentElement === stage;
 
 const svgNS = 'http://www.w3.org/2000/svg';
 const mkPath = (cls: string, normalized = false) => {
@@ -246,6 +264,7 @@ let liveData: LiveData | null = null;
 let clipsByStop = new Map<number, Clip[]>();
 function onLive(l: LiveData) {
   liveData = l;
+  desk.setLive(l);
   liveUi.setLive(l);
   if (data) {
     kickChannel = liveUi.isLive() ? kickSlug(data.settings.kick_channel) : '';
@@ -259,7 +278,7 @@ function onLive(l: LiveData) {
   }
   if (active === -3) openClips(true);
   // פאנל של עצירה שכבר פתוח: מוסיפים את הנתונים והקליפים, בלי לקפוץ לראש הפאנל ובלי לעצור קליפ שמתנגן
-  else if (active >= 0 && !panelBody.querySelector('.is-playing, iframe')) {
+  else if (active >= 0 && !panelBody.querySelector('.is-playing, iframe') && ![...panelBody.querySelectorAll('textarea')].some((t) => t.value.trim())) {
     const keep = panelBody.scrollTop;
     openPanel(active, true);
     panelBody.scrollTop = keep;
@@ -267,6 +286,7 @@ function onLive(l: LiveData) {
 }
 
 function openClips(refresh = false) {
+  if (!refresh) desk.showDetails();
   active = -3;
   userClosed = true;
   const keep = refresh ? panelBody.scrollTop : 0;
@@ -282,6 +302,7 @@ function openClips(refresh = false) {
         goTo(i);
         openPanel(i);
       },
+      comments: clipComments,
     }),
   );
   panelBody.classList.remove('has-media');
@@ -291,6 +312,21 @@ function openClips(refresh = false) {
   q<HTMLButtonElement>('[data-panel-prev]').disabled = true;
   q<HTMLButtonElement>('[data-panel-next]').disabled = true;
   pins.forEach((p) => p.classList.remove('pin--active'));
+}
+
+/** תגובות על קליפ: כפתור "💬 N" שפותח את השרשור מתחת לקליפ */
+function clipComments(c: Clip) {
+  const wrap = h('div', { class: 'clip__talk' });
+  const n = commentCount('clip', c.id);
+  const btn = h('button', { class: 'btn btn--quiet clip__talk-btn', type: 'button', ariaExpanded: 'false' }, n ? `💬 ${n} תגובות` : '💬 להגיב');
+  btn.onclick = () => {
+    const open = btn.getAttribute('aria-expanded') !== 'true';
+    btn.setAttribute('aria-expanded', String(open));
+    wrap.querySelector('.cmts')?.remove();
+    if (open) wrap.append(commentsBox(store, 'clip', c.id, { toast, title: false }));
+  };
+  wrap.append(btn);
+  return wrap;
 }
 
 /** שורת הנתונים של עצירה: מוות, חתולים, וכמה שעות שיחק עד אליה */
@@ -423,6 +459,7 @@ function livePlayer(ch: string) {
 
 /** "כל העצירות": רשימה בתוך הפאנל, לחיצה קופצת לעצירה */
 function openList() {
+  desk.showDetails();
   active = -2;
   userClosed = true; // לא להחליף את הרשימה לבד בזמן גלילה
   fill(
@@ -456,6 +493,14 @@ function openList() {
 }
 q('[data-list]').onclick = openList;
 q('[data-clips]').onclick = () => openClips();
+// תגובות: נטענות פעם אחת; עצירה עם תגובות מקבלת סימן קטן בסיכה
+initComments(store, (list) => {
+  desk.setComments(list);
+  if (!data) return;
+  const talked = new Set(list.filter((c) => c.target_type === 'stop').map((c) => c.target_id));
+  pins.forEach((p, i) => p.classList.toggle('pin--talk', talked.has(data.missions[i]?.id)));
+});
+if (loginError) setTimeout(() => toast('ההתחברות עם Kick לא הצליחה. נסו שוב.'), 600);
 
 // ── פאנל הצד: פתיחה וסגירה באותו מסלול, וניתן לעצור באמצע ──
 function openPanel(i: number, auto = false) {
@@ -469,6 +514,7 @@ function openPanel(i: number, auto = false) {
     return;
   }
   active = i;
+  desk.stopChanged(i + 1);
   // כמו יומן מסע: תמונה למעלה, חותמת (סוג · יום · פרק), כותרת, סיפור, ציטוט, צפייה
   const [media, ...rest] = stopBody(m, i, toast, { embed: true, snapshot: mapSnapshot(i) });
   fill(
@@ -480,6 +526,7 @@ function openPanel(i: number, auto = false) {
     stopStats(i),
     ...rest,
     stopClips(i),
+    commentsBox(store, 'stop', m.id, { toast }),
     i === cur && kickChannel ? livePlayer(kickChannel) : null,
   );
   panelBody.classList.toggle('has-media', !!media);
@@ -490,12 +537,14 @@ function openPanel(i: number, auto = false) {
   q<HTMLButtonElement>('[data-panel-next]').disabled = i === data.missions.length - 1;
   pins.forEach((p, k) => p.classList.toggle('pin--active', k === i));
   if (!auto) {
+    desk.showDetails();
     history.replaceState(null, '', `#m-${i + 1}`);
     q<HTMLButtonElement>('[data-panel-close]').focus({ preventScroll: true });
   }
 }
 function closePanel() {
   if (active === -1) return;
+  desk.stopChanged(null);
   panel.removeAttribute('data-open');
   active = -1;
   pins.forEach((p) => p.classList.remove('pin--active'));
@@ -510,6 +559,7 @@ panel.addEventListener('transitionend', (e) => {
 q('[data-panel-close]').onclick = () => {
   userClosed = true;
   closePanel();
+  desk.showFeed();
 };
 q('[data-panel-prev]').onclick = () => {
   const i = Math.max(0, active - 1);
@@ -569,7 +619,7 @@ let snapTimer = 0;
 addEventListener(
   'wheel',
   (e) => {
-    if (flat || !data || world.exploring() || inPanel(e.target)) return;
+    if (flat || !data || world.exploring() || inPanel(e.target) || !stage.contains(e.target as Node)) return;
     e.preventDefault();
     const unit = e.deltaMode === 1 ? 32 : e.deltaMode === 2 ? innerHeight : 1;
     focus = clampF(focus - (e.deltaY * unit) / PX_WHEEL);
@@ -611,7 +661,7 @@ stage.addEventListener('pointerup', endTouch);
 stage.addEventListener('pointercancel', endTouch);
 
 addEventListener('keydown', (e) => {
-  if (flat || !data || world.exploring() || (e.target as HTMLElement).closest('input, textarea, select')) return;
+  if (flat || !data || world.exploring() || (e.target as HTMLElement).closest('input, textarea, select, .col-side, .col-live')) return;
   const here = Math.round(Math.max(-1, Math.min(data.missions.length - 1, focus)));
   const map: Record<string, number | undefined> = {
     ArrowUp: here + 1,
@@ -638,7 +688,9 @@ function frame(force = false) {
   const dt = Math.min((now - last) / 1000, 0.1);
   last = now;
   const { w: vw, h: vh } = world.view();
-  const wantShift = active >= 0 && vw > 760 ? panel.offsetWidth / 2 + 16 : 0;
+  // העמודה של המפה מוסתרת (לשונית אחרת בטלפון) או עוד בלי גודל – אין מה לצייר
+  if (vw < 40 || vh < 40) return;
+  const wantShift = active >= 0 && vw > 760 && panelInStage() ? panel.offsetWidth / 2 + 16 : 0;
   // הטיה (מבט רחפן): גדלה עם הכניסה למסע; שטוח במבט הפתיחה, בגרירה חופשית ובהפחתת תנועה
   const kNow = Math.min(1, Math.max(0, shown + 1));
   const easeT = kNow * kNow * (3 - 2 * kNow);
@@ -658,10 +710,14 @@ function frame(force = false) {
   // זום המסע: לפי ההגדרה, אבל תמיד ממלא את רוחב המסך
   const tripZ = Math.max(world.fitZ() * Math.max(1, data.settings.map_zoom || 3), vw / w);
   // מבט הפתיחה: כל המפה, בשטח שהכרטיס של הפתיחה לא מכסה (לידו בדסקטופ, מעליו בטלפון)
-  const mobile = vw <= 760;
-  // מבט הפתיחה: כל המפה בשטח שכרטיס הפתיחה לא מכסה (לידו בדסקטופ, מעליו בטלפון); הים ממלא את השאר
-  const op = opening.getBoundingClientRect();
-  const free = mobile ? { x0: 0, x1: vw, y0: 0, y1: Math.max(vh * 0.45, op.top - 8) } : { x0: op.right + 16, x1: vw, y0: 0, y1: vh };
+  // "טלפון" לפי מבנה הדף (לשוניות), לא לפי רוחב עמודת המפה – בדסקטופ העמודה צרה אבל הפאנל בצד
+  const mobile = desk.mode() === 'phone';
+  // מבט הפתיחה: כל המפה בשטח שכרטיס הפתיחה לא מכסה (לידו כשיש מקום בצד, אחרת מעליו); הים ממלא את השאר
+  const sr = stage.getBoundingClientRect();
+  const or = opening.getBoundingClientRect();
+  const op = { top: or.top - sr.top, right: or.right - sr.left };
+  const cardWide = mobile || op.right > vw * 0.55;
+  const free = cardWide ? { x0: 0, x1: vw, y0: 0, y1: Math.max(vh * 0.45, op.top - 8) } : { x0: op.right + 16, x1: vw, y0: 0, y1: vh };
   const overZ = Math.min((free.x1 - free.x0) / w, (free.y1 - free.y0) / hh) * 0.94;
   const overX = w / 2 - ((free.x0 + free.x1) / 2 - vw / 2) / overZ;
   const overY = hh / 2 - ((free.y0 + free.y1) / 2 - vh / 2) / overZ;
@@ -875,10 +931,12 @@ store
     setMap();
     store.loadLive().then(onLive).catch(console.error);
     store.subscribeLive(onLive);
+    desk.setData(data);
     store.subscribe((next) => {
       const known = new Set(data.missions.map((x) => x.id));
       const added = next.missions.filter((x: Mission) => !known.has(x.id));
       data = next;
+      desk.setData(next);
       setMap();
       rebuild();
       if (added.length) toast(`נוסף למפה: ${added[added.length - 1].title}`);
