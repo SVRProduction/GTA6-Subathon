@@ -1,6 +1,6 @@
 import { DEFAULT_SETTINGS, kickSlug, type Clip, type Comment, type CounterEvent, type Data, type LiveData, type Mission, type Store } from './types';
 
-const KEY = 'journey-demo-v7';
+const KEY = 'journey-demo-v8';
 const MAX_INLINE_FILE = 2 * 1024 * 1024;
 
 // 70 עצירות דמו. בלי מיקום: הן מתמקמות לבד לאורך השביל (הכבישים) של המפה, מהדרום צפונה
@@ -19,7 +19,7 @@ const MILESTONES: Record<number, [string, string, string]> = {
 const chapterOf = (i: number) => (i < 16 ? 'האיים' : i < 36 ? 'העיר' : i < 54 ? 'הצפון' : 'ההר');
 
 function seed(): Data {
-  const start = Date.now() - 3 * 864e5;
+  const start = Date.now() - 80 * 36e5; // 70 עצירות × 1.1 שעות – האחרונה קצת לפני עכשיו (לא בעתיד)
   const missions: Mission[] = Array.from({ length: DEMO_N }, (_, i) => {
     const ms = MILESTONES[i];
     const last = i === DEMO_N - 1;
@@ -170,6 +170,7 @@ export function createDemoStore(): Store {
       status: { is_live: live, on_category: live, category: d.settings.kick_category, title: 'סאבתון GTA 6 – יום 3', viewers: 2140, checked_at: new Date().toISOString() },
       segments: demoSegments(d),
       counters: readCounters(d),
+      recent: [...readCounters(d)].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at)).slice(0, 80),
       clips: await fetchClips(kickSlug(d.settings.kick_channel || 'odedsvr')),
       demoClips: true,
     };

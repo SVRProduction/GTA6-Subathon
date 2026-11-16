@@ -5,14 +5,39 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>סאבתון GTA 6, המסע</title>
     <meta name="description" content="כל משימה מהסאבתון, במקום שבו היא קרתה על המפה." />
-    <meta name="theme-color" content="#1386a0" />
+    <meta name="theme-color" content="#121417" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@400;500;700;900&family=Suez+One&family=Amatic+SC:wght@700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans+Hebrew:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/src/styles.css" />
+    <link rel="stylesheet" href="/src/desk.css" />
   </head>
-  <body>
-    <main class="journey" aria-labelledby="journey-title">
+  <body class="desk">
+    <a class="skip" href="#feed">דילוג לפיד הפעילות</a>
+    <!-- שורת "עכשיו": מה קורה בשידור ברגע זה -->
+    <header class="nowbar" data-nowbar>
+      <div class="nowbar__brand"><span class="onair-dot" data-live-dot></span><strong data-desk-title>סאבתון GTA 6</strong><span class="nowbar__state" data-live-state>לא בשידור</span></div>
+      <div class="nowbar__mission" data-now-mission></div>
+      <dl class="nowbar__nums" data-now-nums></dl>
+      <nav class="nowbar__links" aria-label="דפים"><a href="./stats.html">סטטיסטיקות</a></nav>
+    </header>
+
+    <div class="cols" data-cols>
+    <!-- ימין: פיד הפעילות + פרטי עצירה -->
+    <aside class="col col-side" data-col="feed" aria-label="פיד ופרטים">
+      <div class="side-tabs" role="tablist" aria-label="תצוגה">
+        <button role="tab" type="button" data-side-tab="feed" aria-selected="true">פיד חי</button>
+        <button role="tab" type="button" data-side-tab="stop" aria-selected="false">פרטים</button>
+      </div>
+      <section class="side-pane feed" id="feed" data-side-pane="feed" tabindex="-1">
+        <div class="missed" data-missed hidden></div>
+        <div class="chips" role="group" aria-label="סינון" data-chips></div>
+        <ol class="feed__list" data-feed aria-live="polite"></ol>
+      </section>
+      <section class="side-pane side-stop" data-side-pane="stop" hidden></section>
+    </aside>
+
+    <main class="col col-map journey" data-col="map" aria-labelledby="journey-title">
       <div class="journey__track" data-track>
         <div class="journey__stage" data-stage>
           <div class="horizon" data-horizon aria-hidden="true"></div>
@@ -67,6 +92,17 @@
         <ol class="log__list" data-log role="list"></ol>
       </div>
     </main>
+
+    <!-- שמאל: הלייב (כשבאוויר) או הקליפים האחרונים -->
+    <aside class="col col-live" data-col="live" aria-label="לייב" data-live-col></aside>
+    </div>
+
+    <!-- טלפון: לשוניות בתחתית -->
+    <nav class="tabbar" aria-label="מסכים" data-tabbar>
+      <button type="button" data-tab="live"><span class="tabbar__dot" data-tab-dot></span>לייב</button>
+      <button type="button" data-tab="map" aria-current="page">מפה</button>
+      <button type="button" data-tab="feed">פיד<span class="tabbar__badge" data-tab-badge hidden></span></button>
+    </nav>
     <div id="toast" role="status" aria-live="polite"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>

@@ -99,6 +99,8 @@ export interface LiveData {
   clips: Clip[];
   /** בדמו: הקליפים הם מהערוץ האמיתי, מכל הקטגוריות (כי עוד אין קליפים מהמשחק) */
   demoClips?: boolean;
+  /** אירועי ספירה אחרונים, כל אחד עם זמן (לפיד הפעילות), מהחדש לישן */
+  recent?: CounterEvent[];
 }
 
 export interface Data {
