@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="he" dir="rtl" class="ap-root">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>הטלפון · סאבתון GTA 6</title>
+    <meta name="description" content="הסאבתון של OdedSVR בכיס: סטוריז, הלייב, קליפים, המפה והמספרים. אפשר להתקין כאפליקציה." />
+    <meta name="theme-color" content="#070b14" />
+    <link rel="manifest" href="./phone.webmanifest" />
+    <link rel="icon" href="./icons/icon-192.png" />
+    <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="סאבתון" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Karantina:wght@400;700&family=Rubik:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <script type="module" crossorigin src="./assets/phone-CEJXNeA8.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/auth-Bi0xMyp1.js">
+    <link rel="modulepreload" crossorigin href="./assets/polls-BPWGExDW.js">
+    <link rel="modulepreload" crossorigin href="./assets/stats-B6tJifno.js">
+    <link rel="modulepreload" crossorigin href="./assets/route-GYoCKq3w.js">
+    <link rel="stylesheet" crossorigin href="./assets/stats-BnaT7-iV.css">
+    <link rel="stylesheet" crossorigin href="./assets/phone-77rseMyw.css">
+  </head>
+  <body class="ap-body">
+    <aside class="ap-desk" aria-hidden="true">
+      <p class="ap-desk__kicker">סאבתון GTA 6</p>
+      <p class="ap-desk__title">המסע, בכיס.</p>
+      <p class="ap-desk__sub">נבנה קודם כול לטלפון. פותחים את הכתובת בנייד, מתקינים, וזה מחכה במסך הבית.</p>
+    </aside>
+    <div class="ap" id="app">
+      <header class="ap-bar">
+        <a class="ap-bar__brand" href="#home" aria-label="סאבתון GTA 6, לדף הבית"><span class="ap-bar__logo" aria-hidden="true">VI</span><span>סאבתון</span></a>
+        <span class="ap-bar__end">
+          <button class="ap-bar__live" type="button" data-live hidden>בלייב</button>
+          <button class="ap-bar__install" type="button" data-install hidden>להתקין</button>
+          <a class="ap-bar__map" href="./" aria-label="לאתר המלא">האתר</a>
+        </span>
+      </header>
+      <main class="ap-views">
+        <section class="ap-view ap-view--home" id="view-home" data-view="home" aria-label="בית"></section>
+        <section class="ap-view ap-view--map" id="view-map" data-view="map" aria-label="מפה" hidden></section>
+        <section class="ap-view ap-view--clips" id="view-clips" data-view="clips" aria-label="קליפים" hidden></section>
+        <section class="ap-view ap-view--stats" id="view-stats" data-view="stats" aria-label="מספרים" hidden></section>
+      </main>
+      <nav class="ap-tabs" aria-label="ניווט ראשי">
+        <a class="ap-tab" href="#home" data-tab="home"><span class="ap-tab__ico" data-ico="home"></span><span>בית</span></a>
+        <a class="ap-tab" href="#map" data-tab="map"><span class="ap-tab__ico" data-ico="map"></span><span>מפה</span></a>
+        <button class="ap-tab ap-tab--add" type="button" data-upload aria-label="להעלות סטורי"><span class="ap-tab__plus" data-ico="plus"></span></button>
+        <a class="ap-tab" href="#clips" data-tab="clips"><span class="ap-tab__ico" data-ico="clips"></span><span>קליפים</span></a>
+        <a class="ap-tab" href="#stats" data-tab="stats"><span class="ap-tab__ico" data-ico="stats"></span><span>מספרים</span></a>
+      </nav>
+    </div>
+    <div class="ap-sheet-wrap" data-sheet hidden></div>
+    <div id="toast" role="status" aria-live="polite"></div>
+  </body>
+</html>
