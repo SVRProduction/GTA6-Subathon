@@ -52,6 +52,6 @@ jobs:
           script: |
             const [owner, repo] = process.env.GITHUB_REPOSITORY.split('/');
             const n = context.payload.pull_request.number;
-            const base = `https://${owner.toLowerCase()}.github.io/${repo}/pr/${n}/`;
+            const base = `https://${owner.toLowerCase()}.github.io/${context.payload.repository.name}/pr/${n}/`;
             await github.rest.issues.createComment({ owner, repo, issue_number: n,
-              body: `תצוגה מקדימה (מתעדכנת בכל push, דקה-שתיים אחרי שה-workflow מסתיים):\n- גרסה A: ${base}?v=a\n- גרסה B: ${base}?v=b\n- גרסה C: ${base}?v=c\n- אדמין: ${base}admin.html` });
+              body: `תצוגה מקדימה (מתעדכנת בכל push, דקה-שתיים אחרי שה-workflow מסתיים):\n- האתר: ${base}\n- אדמין: ${base}admin.html` });

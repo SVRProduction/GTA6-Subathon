@@ -71,6 +71,27 @@ export interface Clip {
   created_at: string;
 }
 
+/** תגובה של צופה (מחובר עם Kick) על עצירה או על קליפ */
+export type CommentTarget = 'stop' | 'clip';
+export interface Comment {
+  id: string;
+  target_type: CommentTarget;
+  target_id: string;
+  kick_user_id: string;
+  username: string;
+  avatar: string | null;
+  body: string;
+  created_at: string;
+  hidden?: boolean;
+}
+/** מי שמחובר עם Kick (נשמר בדפדפן; הכרטיס חתום בשרת) */
+export interface Viewer {
+  token: string;
+  kick_user_id: string;
+  username: string;
+  avatar: string | null;
+}
+
 export interface LiveData {
   status: LiveStatus | null;
   segments: Segment[];
@@ -104,6 +125,15 @@ export interface Store {
   subscribeLive(cb: (d: LiveData) => void): () => void;
   /** +1 / -1 למונה, משויך לעצירה הנוכחית */
   bump(counter: CounterName, delta: 1 | -1, missionId: string | null): Promise<void>;
+  /** תגובות: כולם קוראים; כותבים רק מחוברים עם Kick (דרך הפונקציה kick-comment) */
+  loadComments(includeHidden?: boolean): Promise<Comment[]>;
+  subscribeComments(cb: (c: Comment[]) => void, includeHidden?: boolean): () => void;
+  postComment(viewer: Viewer, target: CommentTarget, targetId: string, body: string): Promise<void>;
+  /** אדמין: הסתרה/החזרה, מחיקה, חסימת משתמש */
+  moderateComment(id: string, action: 'hide' | 'show' | 'delete'): Promise<void>;
+  banUser(kickUserId: string, username: string): Promise<void>;
+  /** כתובת ההתחברות עם Kick (null = לא מוגדר; בדמו מתחברים כמשתמש דמו) */
+  kickLoginUrl(returnTo: string): string | null;
 }
 
 export const DEFAULT_SETTINGS: Settings = {

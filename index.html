@@ -3,70 +3,48 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>סאבתון GTA 6, המסע</title>
-    <meta name="description" content="כל משימה מהסאבתון, במקום שבו היא קרתה על המפה." />
-    <meta name="theme-color" content="#1386a0" />
+    <title>סאבתון GTA 6</title>
+    <meta name="description" content="המסע של הסאבתון: סטוריז של כל מיילסטון, קליפים, המפה והמספרים." />
+    <meta name="theme-color" content="#fff7ef" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./icons/icon-192.png" />
+    <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="סאבתון" />
+    <meta property="og:title" content="סאבתון GTA 6" />
+    <meta property="og:description" content="סטוריז של כל מיילסטון, קליפים, המפה והמספרים." />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@400;500;700;900&family=Suez+One&family=Amatic+SC:wght@700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/src/styles.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/src/app/app.css" />
   </head>
   <body>
-    <main class="journey" aria-labelledby="journey-title">
-      <div class="journey__track" data-track>
-        <div class="journey__stage" data-stage>
-          <div class="horizon" data-horizon aria-hidden="true"></div>
-          <div class="sky" data-sky aria-hidden="true"></div>
-          <div class="journey__pins" data-pins></div>
-
-          <header class="opening" data-opening>
-            <p class="stamp">המסע</p>
-            <h1 class="opening__title" id="journey-title">סאבתון GTA 6</h1>
-            <p class="opening__how">המפה נוסעת איתכם ממשימה למשימה. לוחצים על סיכה כדי לקרוא מה קרה שם.</p>
-            <p class="opening__hint"><span class="hint-desk">גוללים למעלה כדי להתקדם, ולמטה כדי לחזור</span><span class="hint-touch">גוררים את המפה למטה כדי להתקדם, ולמעלה כדי לחזור</span></p>
-            <div class="opening__actions">
-              <button class="btn btn--primary" type="button" data-start>מתחילים מההתחלה</button>
-              <button class="btn" type="button" data-jump-now>קפיצה לעכשיו</button>
-            </div>
-          </header>
-
-          <div class="hud" data-hud>
-            <ol class="rail" data-rail aria-label="פרקים"></ol>
-            <div class="odo" aria-live="off"><span data-odo-day></span><span data-odo-stop></span><span data-odo-ms></span></div>
-            <div class="profile" data-progress aria-hidden="true">
-              <svg viewBox="0 0 1000 60" preserveAspectRatio="none"><path class="profile__fill" data-profile-fill /><path class="profile__line" data-profile-line /><path class="profile__ahead" data-profile-ahead /></svg>
-              <i class="profile__now" data-progress-now></i>
-            </div>
-            <div class="locator" data-locator aria-hidden="true"></div>
-            <div class="hud__actions">
-              <button class="btn btn--small" type="button" data-list>כל העצירות</button>
-              <button class="btn btn--small" type="button" data-clips>קליפים</button>
-              <button class="btn btn--small" type="button" data-explore>לטייל חופשי</button>
-            </div>
-            <button class="btn btn--small explore-close" type="button" data-explore-close>חזרה למסע ✕</button>
-          </div>
-
-          <a class="live" id="live" target="_blank" rel="noopener" hidden>בשידור חי עכשיו</a>
-
-          <aside class="panel" data-panel aria-labelledby="panel-title" hidden>
-            <div class="panel__grip" data-grip aria-hidden="true"></div>
-            <button class="panel__close" type="button" data-panel-close aria-label="סגירה">×</button>
-            <div class="panel__scroll" data-panel-body></div>
-            <nav class="panel__nav" aria-label="עצירות">
-              <button class="btn btn--small" type="button" data-panel-prev>→ הקודם</button>
-              <button class="btn btn--small" type="button" data-panel-next>הבא ←</button>
-            </nav>
-          </aside>
-        </div>
-      </div>
-
-      <!-- בלי אנימציה (הפחתת תנועה / ‎?2d): כל העצירות כרשימה -->
-      <div class="log" id="log">
-        <h2 class="log__title stamp">יומן המסע</h2>
-        <ol class="log__list" data-log role="list"></ol>
-      </div>
-    </main>
+    <aside class="desk" aria-hidden="true">
+      <p class="desk__kicker">סאבתון GTA 6</p>
+      <p class="desk__title">המסע, בכיס.</p>
+      <p class="desk__sub">נבנה קודם כול לטלפון. פתחו את הכתובת בנייד, או המשיכו כאן.</p>
+    </aside>
+    <div class="app" id="app">
+      <header class="bar">
+        <a class="bar__brand" href="#home" aria-label="סאבתון GTA 6, לדף הבית"><span class="bar__logo" aria-hidden="true">6</span><span>סאבתון</span></a>
+        <button class="bar__live" type="button" data-live hidden>בלייב</button>
+      </header>
+      <main class="views">
+        <section class="view view--home" id="view-home" data-view="home" aria-label="בית"></section>
+        <section class="view view--map" id="view-map" data-view="map" aria-label="מפה" hidden></section>
+        <section class="view view--clips" id="view-clips" data-view="clips" aria-label="קליפים" hidden></section>
+        <section class="view view--stats" id="view-stats" data-view="stats" aria-label="סטטיסטיקות" hidden></section>
+      </main>
+      <nav class="tabs" aria-label="ניווט ראשי">
+        <a class="tab" href="#home" data-tab="home"><span class="tab__ico" data-ico="House"></span><span>בית</span></a>
+        <a class="tab" href="#map" data-tab="map"><span class="tab__ico" data-ico="Map"></span><span>מפה</span></a>
+        <a class="tab" href="#clips" data-tab="clips"><span class="tab__ico" data-ico="Clapperboard"></span><span>קליפים</span></a>
+        <a class="tab" href="#stats" data-tab="stats"><span class="tab__ico" data-ico="ChartColumnBig"></span><span>מספרים</span></a>
+      </nav>
+    </div>
+    <div class="story" data-story hidden></div>
+    <div class="sheet-wrap" data-sheet hidden></div>
     <div id="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="/src/main.ts"></script>
+    <script type="module" src="/src/app/app.ts"></script>
   </body>
 </html>
