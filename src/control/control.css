@@ -589,3 +589,6 @@ button.pc__opt:active { transform: scale(0.985); }
 /* כפתורי תצוגה בחלון השכבות (בעיקר לטלפון, שם הם לא על המסך) */
 .ly-view { display: flex; flex-wrap: wrap; gap: 8px; }
 .ly-view .btn { min-height: 44px; }
+@media (max-width: 760px) {
+  .poll-chip { width: calc(100% - 32px); }
+}
