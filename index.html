@@ -5,11 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>סאבתון GTA 6, המסע</title>
     <meta name="description" content="כל משימה מהסאבתון, במקום שבו היא קרתה על המפה." />
-    <meta name="theme-color" content="#1386a0" />
+    <meta name="theme-color" content="#0a101c" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@400;500;700;900&family=Suez+One&family=Amatic+SC:wght@700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Karantina:wght@400;700&family=Rubik:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/src/styles.css" />
+    <link rel="stylesheet" href="/src/mission.css" />
   </head>
   <body>
     <main class="journey" aria-labelledby="journey-title">
@@ -20,9 +21,9 @@
           <div class="journey__pins" data-pins></div>
 
           <header class="opening" data-opening>
-            <p class="stamp">המסע</p>
+            <p class="stamp">OdedSVR · המסע</p>
             <h1 class="opening__title" id="journey-title">סאבתון GTA 6</h1>
-            <p class="opening__how">המפה נוסעת איתכם ממשימה למשימה. לוחצים על סיכה כדי לקרוא מה קרה שם.</p>
+            <p class="opening__how">כל משימה מהסאבתון, במקום שבו היא קרתה. גוללים כדי לנסוע לאורך המסלול, לוחצים על סימן כדי לפתוח את המשימה.</p>
             <p class="opening__hint"><span class="hint-desk">גוללים למעלה כדי להתקדם, ולמטה כדי לחזור</span><span class="hint-touch">גוררים את המפה למטה כדי להתקדם, ולמעלה כדי לחזור</span></p>
             <div class="opening__actions">
               <button class="btn btn--primary" type="button" data-start>מתחילים מההתחלה</button>
@@ -42,6 +43,7 @@
               <button class="btn btn--small" type="button" data-list>כל העצירות</button>
               <button class="btn btn--small" type="button" data-clips>קליפים</button>
               <a class="btn btn--small" href="./stats.html">סטטיסטיקות</a>
+              <button class="btn btn--small" type="button" data-cinema>מצב קולנוע</button>
               <button class="btn btn--small" type="button" data-explore>לטייל חופשי</button>
             </div>
             <button class="btn btn--small explore-close" type="button" data-explore-close>חזרה למסע ✕</button>

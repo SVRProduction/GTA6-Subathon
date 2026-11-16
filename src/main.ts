@@ -12,6 +12,7 @@ import { createLive, fmtHours } from './live';
 import { clipCard, clipsView, clipStop, playClip } from './clips';
 import { commentCount, commentsBox, initComments } from './comments';
 import { loginError } from './auth';
+import { createMissionHud, legend } from './mission';
 import { countOf, kickSlug, playMs, type Clip, type LiveData } from './data/types';
 
 const store = createStore();
@@ -112,6 +113,7 @@ const locView = document.createElementNS(svgNS, 'rect');
 locRoute.classList.add('loc-route');
 locView.classList.add('loc-view');
 locSvg.append(locRoute, locView);
+locSvg.setAttribute('preserveAspectRatio', 'xMidYMid slice'); // המפה הקטנה עגולה: ממלאים את העיגול
 locator.append(locImg, locSvg);
 
 // ── בנייה מחדש כשהנתונים או המפה משתנים ──
@@ -244,11 +246,13 @@ const liveUi = createLive(stage, {
   },
 });
 let liveData: LiveData | null = null;
+const mission = createMissionHud(stage, { reduce });
 /** קליפים לפי עצירה (העצירה שהייתה פעילה כשצולמו) */
 let clipsByStop = new Map<number, Clip[]>();
 function onLive(l: LiveData) {
   liveData = l;
   liveUi.setLive(l);
+  mission.setLive(l);
   if (data) {
     kickChannel = liveUi.isLive() ? kickSlug(data.settings.kick_channel) : '';
     clipsByStop = new Map();
@@ -263,7 +267,7 @@ function onLive(l: LiveData) {
   // פאנל של עצירה שכבר פתוח: מוסיפים את הנתונים והקליפים, בלי לקפוץ לראש הפאנל ובלי לעצור קליפ שמתנגן
   else if (active >= 0 && !panelBody.querySelector('.is-playing, iframe') && ![...panelBody.querySelectorAll('textarea')].some((t) => t.value.trim())) {
     const keep = panelBody.scrollTop;
-    openPanel(active, true);
+    openPanel(active, true, true);
     panelBody.scrollTop = keep;
   }
 }
@@ -386,7 +390,7 @@ const snapImg = new Image();
 snapImg.crossOrigin = 'anonymous';
 // התמונה נטענת אחרי שהפאנל כבר נפתח (כניסה מקישור ישיר): מרעננים אותו כדי שתמונת המיקום תופיע
 snapImg.onload = () => {
-  if (active >= 0 && curve) openPanel(active, true);
+  if (active >= 0 && curve) openPanel(active, true, true);
 };
 function mapSnapshot(i: number): HTMLElement | null {
   if (!curve || !snapImg.complete || !snapImg.naturalWidth) return null;
@@ -483,7 +487,12 @@ initComments(store, (list) => {
 if (loginError) setTimeout(() => toast('ההתחברות עם Kick לא הצליחה. נסו שוב.'), 600);
 
 // ── פאנל הצד: פתיחה וסגירה באותו מסלול, וניתן לעצור באמצע ──
-function openPanel(i: number, auto = false) {
+let menuTab: 'story' | 'clips' | 'talk' = 'story';
+/**
+ * תפריט עצירה. בגלילה (auto) – כרטיס צד קטן; בלחיצה על סיכה – תפריט במסך מלא עם לשוניות ומקרא.
+ * refresh = רענון נתונים של מה שכבר פתוח (שומר מצב ולשונית)
+ */
+function openPanel(i: number, auto = false, refresh = false) {
   if (!auto) userClosed = false;
   const m = data.missions[i];
   if (!m) return;
@@ -493,24 +502,55 @@ function openPanel(i: number, auto = false) {
     q(`#log-${i + 1}`)?.scrollIntoView({ block: 'start' });
     return;
   }
+  if (!refresh) {
+    panel.classList.toggle('is-menu', !auto);
+    if (active !== i) menuTab = 'story';
+  }
   active = i;
-  // כמו יומן מסע: תמונה למעלה, חותמת (סוג · יום · פרק), כותרת, סיפור, ציטוט, צפייה
   const [media, ...rest] = stopBody(m, i, toast, { embed: true, snapshot: mapSnapshot(i) });
+  const clips = stopClips(i);
+  const nClips = clipsByStop.get(i)?.length ?? 0;
+  const nTalk = commentCount('stop', m.id);
+  const pane = (key: typeof menuTab, ...kids: Array<Node | string | null | false | undefined>) => {
+    const el = h('div', { class: `mtab-pane ${menuTab === key ? 'is-on' : ''}`, id: `mtab-${key}` }, ...kids);
+    el.setAttribute('role', 'tabpanel');
+    el.dataset.tab = key;
+    return el;
+  };
+  const tab = (key: typeof menuTab, label: string, n = 0) => {
+    const b = h('button', { type: 'button', class: 'mtab' }, label, n ? h('span', { class: 'mtab__n' }, String(n)) : null);
+    b.setAttribute('role', 'tab');
+    b.setAttribute('aria-selected', String(menuTab === key));
+    b.setAttribute('aria-controls', `mtab-${key}`);
+    b.onclick = () => {
+      menuTab = key;
+      panelBody.querySelectorAll<HTMLElement>('.mtab').forEach((x) => x.setAttribute('aria-selected', String(x === b)));
+      panelBody.querySelectorAll<HTMLElement>('.mtab-pane').forEach((x) => x.classList.toggle('is-on', x.dataset.tab === key));
+    };
+    return b;
+  };
   fill(
     panelBody,
-    media,
-    h('p', { class: 'stop__meta stamp' }, [kindLabel(m), metaText(m)].filter(Boolean).join(' · ')),
-    h('h2', { class: 'stop__title', id: 'panel-title' }, m.title),
-    m.body && m.summary ? h('p', { class: 'stop__teaser' }, m.summary) : null,
-    stopStats(i),
-    ...rest,
-    stopClips(i),
-    commentsBox(store, 'stop', m.id, { toast }),
-    i === cur && kickChannel ? livePlayer(kickChannel) : null,
+    h(
+      'header',
+      { class: 'mhead' },
+      h('p', { class: 'stop__meta stamp' }, [kindLabel(m), metaText(m)].filter(Boolean).join('  |  ')),
+      h('h2', { class: 'stop__title', id: 'panel-title' }, m.title),
+      stopStats(i),
+      (() => {
+        const t = h('div', { class: 'mtabs', ariaLabel: 'תפריט העצירה' }, tab('story', 'סיפור'), tab('clips', 'קליפים', nClips), tab('talk', 'תגובות', nTalk));
+        t.setAttribute('role', 'tablist');
+        return t;
+      })(),
+    ),
+    pane('story', media, m.body && m.summary ? h('p', { class: 'stop__teaser' }, m.summary) : null, ...rest, i === cur && kickChannel ? livePlayer(kickChannel) : null),
+    pane('clips', clips ?? h('p', { class: 'mempty' }, 'עוד אין קליפים מהקטע הזה. קליפ שנעשה בלייב בזמן המשימה יופיע כאן לבד.')),
+    pane('talk', commentsBox(store, 'stop', m.id, { toast, title: false })),
+    legend(),
   );
   panelBody.classList.toggle('has-media', !!media);
   panel.hidden = false;
-  panelBody.scrollTop = 0;
+  if (!refresh) panelBody.scrollTop = 0;
   requestAnimationFrame(() => panel.setAttribute('data-open', ''));
   q<HTMLButtonElement>('[data-panel-prev]').disabled = i === 0;
   q<HTMLButtonElement>('[data-panel-next]').disabled = i === data.missions.length - 1;
@@ -523,6 +563,7 @@ function openPanel(i: number, auto = false) {
 function closePanel() {
   if (active === -1) return;
   panel.removeAttribute('data-open');
+  panel.classList.remove('is-menu');
   active = -1;
   pins.forEach((p) => p.classList.remove('pin--active'));
   history.replaceState(null, '', location.pathname + location.search);
@@ -553,6 +594,10 @@ enableSheetDrag(panel, [q('[data-grip]'), panelBody], () => {
 });
 addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
+  if (cinema) {
+    stopCinema();
+    return;
+  }
   if (active !== -1) {
     userClosed = true;
     closePanel();
@@ -645,6 +690,9 @@ addEventListener('keydown', (e) => {
     ' ': here + 1,
     ArrowDown: here - 1,
     PageDown: here - 1,
+    // מימין לשמאל: שמאלה = קדימה במסע
+    ArrowLeft: here + 1,
+    ArrowRight: here - 1,
     Home: -1,
     End: cur,
   };
@@ -653,6 +701,62 @@ addEventListener('keydown', (e) => {
   e.preventDefault();
   goTo(to);
 });
+
+// קיצורים: C קליפים, S סטטיסטיקות, M / Esc חזרה למפה, K מצב קולנוע
+addEventListener('keydown', (e) => {
+  if (flat || !data || e.metaKey || e.ctrlKey || e.altKey || (e.target as HTMLElement).closest('input, textarea, select')) return;
+  const k = e.key.toLowerCase();
+  if (k === 'c' || k === 'ב') openClips();
+  else if (k === 's' || k === 'ד') location.href = './stats.html';
+  else if (k === 'k' || k === 'ל') (cinema ? stopCinema() : startCinema());
+  else if (k === 'm' || k === 'צ') {
+    if (cinema) stopCinema();
+    if (active !== -1) {
+      userClosed = true;
+      closePanel();
+    }
+    if (world.exploring()) explore(false);
+  } else return;
+  e.preventDefault();
+});
+
+// ── מצב קולנוע: בלי HUD, טיסה איטית לאורך כל המסלול עד "עכשיו" ──
+let cinema = false;
+let cinemaRaf = 0;
+function startCinema() {
+  if (!data || world.exploring()) return;
+  cinema = true;
+  userClosed = true;
+  closePanel();
+  stage.classList.add('is-cinema');
+  focus = shown = -1;
+  let t0 = performance.now();
+  const speed = reduce ? 4 : 0.55; // עצירות לשנייה
+  const step = (now: number) => {
+    if (!cinema) return;
+    const dt = Math.min(0.1, (now - t0) / 1000);
+    t0 = now;
+    focus = Math.min(cur, focus + dt * speed);
+    if (focus >= cur && Math.abs(shown - cur) < 0.02) {
+      window.setTimeout(stopCinema, 2500);
+      return;
+    }
+    cinemaRaf = requestAnimationFrame(step);
+  };
+  cinemaRaf = requestAnimationFrame(step);
+  toast('מצב קולנוע: Esc או K ליציאה');
+}
+function stopCinema() {
+  if (!cinema) return;
+  cinema = false;
+  cancelAnimationFrame(cinemaRaf);
+  stage.classList.remove('is-cinema');
+  focus = snapF(focus);
+}
+q('[data-cinema]').onclick = startCinema;
+// כל מגע/גלילה עוצרים את הטיסה
+addEventListener('wheel', () => cinema && stopCinema(), { passive: true });
+stage.addEventListener('pointerdown', () => cinema && stopCinema());
 
 function onScroll() {}
 addEventListener('resize', () => frame(true));
@@ -851,7 +955,7 @@ fetch(`${import.meta.env.BASE_URL}map.json`)
     trailPending = false;
     rebuild();
     frame(true);
-    if (active >= 0 && curve) openPanel(active, true); // קישור ישיר: הפאנל נפתח לפני שהמסלול נבנה
+    if (active >= 0 && curve) openPanel(active, true, true); // קישור ישיר: הפאנל נפתח לפני שהמסלול נבנה
   });
 function setMap() {
   const custom = safeUrl(data.settings.map_image_url);
@@ -904,10 +1008,15 @@ store
     store.subscribe((next) => {
       const known = new Set(data.missions.map((x) => x.id));
       const added = next.missions.filter((x: Mission) => !known.has(x.id));
+      const before = data.missions[currentIndex(data)];
       data = next;
       setMap();
       rebuild();
-      if (added.length) toast(`נוסף למפה: ${added[added.length - 1].title}`);
+      if (added.length) {
+        const n = added[added.length - 1];
+        const done = before && before.id !== n.id ? before.title : null;
+        mission.banner(done, n.title);
+      }
     });
   })
   .catch((e) => {
