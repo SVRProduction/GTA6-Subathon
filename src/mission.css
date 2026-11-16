@@ -142,6 +142,10 @@ body { color: var(--m-txt); background: var(--m-bg); font: 400 16px/1.6 var(--m-
 .pin--past.pin--dot .pin__disc { background: var(--m-gold); border-color: var(--ink); }
 .pin--active .pin__disc { box-shadow: 0 0 0 3px var(--m-pink), 0 0 0 7px rgba(255, 95, 143, 0.28), 0 4px 10px rgba(0, 0, 0, 0.5); }
 .pin__card { border-radius: 12px; padding: 12px 14px; }
+/* גובר על הנייר של styles.css (סדר הטעינה בבנייה משתנה) */
+.pin .pin__card { background: var(--m-glass); border: 1px solid var(--m-edge); color: var(--m-txt); }
+.pin .pin__teaser { color: var(--m-txt-2); }
+.pin .pin__meta { color: var(--m-txt-3); }
 .pin__kind { font: 500 12px/1.3 var(--m-body); color: var(--m-gold); }
 .pin__title { font: 700 26px/0.95 var(--m-display); letter-spacing: 0.01em; }
 .pin__teaser { color: var(--m-txt-2); }

@@ -1,0 +1,38 @@
+/* דף המספרים בתוך הטלפון (phone-stats.html) – החוקים של גרסה 4, בצבעים של האתר */
+/* בתוך האפליקציה (טאב סטטיסטיקות) */
+.is-embed .sx-nav { display: none; }
+.is-embed .sx-top .stamp { margin-top: 4px; }
+.is-embed body { background-image: none; }
+
+/* בתוך האפליקציה (גרסה 4): אותו מבנה, בצבעים של האתר – כהה, זהב, ורוד ללייב */
+.is-app body { background: #070b14; background-image: none; font-family: 'Rubik', system-ui, sans-serif; color: #f3efe6; }
+.is-app, .is-app * { scrollbar-width: none; }
+.is-app ::-webkit-scrollbar { display: none; }
+.is-app .sx-top { padding-top: 14px; }
+.is-app .sx-title { font: 900 30px/1.08 'Rubik', sans-serif; letter-spacing: -0.02em; background: linear-gradient(120deg, #ff5c8a, #ff9a4d 48%, #f6c81e); -webkit-background-clip: text; background-clip: text; color: transparent; width: fit-content; }
+.is-app .stamp { font: 700 13px/1.2 'Rubik', sans-serif; color: #ff5c8a; }
+.is-app :is(.sx-tile, .sx-card) { border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 22px; background: #10172a; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.3); color: #f3efe6; }
+.is-app .sx-tile span, .is-app .sx-rates dt, .is-app .sx-hard__name small, .is-app .sx-bar__val, .is-app .sx-bar__day, .is-app .sx-loading, .is-app .sx-empty, .is-app .sx-foot { color: rgba(243, 239, 230, 0.6); }
+.is-app .sx-rates dl > div { border-top-color: rgba(255, 255, 255, 0.1); }
+.is-app .sx-rates dd a, .is-app .sx-hard__name { color: #f3efe6; }
+.is-app .sx-tile b { font: 800 34px/1 'Rubik', sans-serif; letter-spacing: -0.02em; }
+.is-app .sx-tile span, .is-app .sx-rates dt, .is-app .sx-hard__name small, .is-app .sx-bar__val, .is-app .sx-bar__day, .is-app .sx-hard__n { font-family: 'Rubik', sans-serif; font-weight: 600; }
+.is-app .sx-tile--play { background: linear-gradient(140deg, rgba(246, 200, 30, 0.18), rgba(246, 200, 30, 0.04)), #10172a; border-color: rgba(246, 200, 30, 0.35); }
+.is-app .sx-tile--play b { color: #f6c81e; }
+.is-app .sx-tile--play span { color: rgba(243, 239, 230, 0.78); }
+.is-app .sx-tile--deaths b { color: #ff5c8a; }
+.is-app .sx-tile--cats { background: linear-gradient(140deg, rgba(246, 200, 30, 0.1), rgba(255, 255, 255, 0.02)), #10172a; }
+.is-app .sx-tiles .sx-tile:nth-child(n + 4) b { font-size: 24px; }
+.is-app .sx-card h2 { font: 800 20px/1.2 'Rubik', sans-serif; }
+.is-app .sx-rates dd { font: 700 20px/1.25 'Rubik', sans-serif; }
+.is-app .sx-bar i { border: 0; border-radius: 10px 10px 4px 4px; background: #f6c81e; }
+.is-app .sx-bar:last-child i { background: linear-gradient(#ff5c8a, #ff9a4d); }
+.is-app .sx-hard li { background: rgba(255, 255, 255, 0.05); border-radius: 16px; }
+.is-app .sx-hard__rank { border: 0; background: rgba(255, 255, 255, 0.1); color: #f3efe6; font-family: 'Rubik', sans-serif; font-weight: 800; }
+.is-app .sx-hard li:first-child .sx-hard__rank { background: #ff5c8a; color: #1b0710; }
+.is-app .sx-hard__name strong { font-family: 'Rubik', sans-serif; font-weight: 700; }
+.is-app .clip__media { border: 0; border-radius: 16px; }
+.is-app .clip__play { border: 0; background: #f6c81e; color: #15110a; }
+.is-app .btn { border: 0; border-radius: 999px; box-shadow: none; background: rgba(255, 255, 255, 0.08); color: #f3efe6; font: 700 15px/1 'Rubik', sans-serif; }
+.is-app .sx-card > .btn { min-height: 44px; }
+.is-app .clips__note { border: 0; background: rgba(255, 255, 255, 0.05); color: rgba(243, 239, 230, 0.78); font-family: 'Rubik', sans-serif; }
