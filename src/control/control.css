@@ -153,7 +153,11 @@ select.f-in { appearance: none; background-image: linear-gradient(45deg, transpa
 .is-editing .mk.is-drag { cursor: grabbing; }
 .is-editing .mk.is-drag .mk__shield { transform: translateY(-6px) scale(1.2); box-shadow: 0 0 0 2px var(--mk), 0 14px 26px rgba(0, 0, 0, 0.6); }
 .is-placing, .is-placing .world, .is-placing .journey__pins { cursor: crosshair; }
-.is-placing .pin, .is-placing .mk { pointer-events: none; }
+.is-picking .pin, .is-picking .mk { pointer-events: none; }
+/* מצב עריכה: לחיצה על עצירה פותחת את טופס העריכה (גם כשכלי פעיל), עם אזור לחיצה גדול לנקודות הקטנות */
+.is-editing .pin { cursor: pointer; }
+.is-editing .pin--dot .pin__disc { --s: 16px; box-shadow: 0 0 0 2px var(--m-gold), 0 2px 6px rgba(0, 0, 0, 0.5); }
+.is-editing .pin__disc::after { content: ''; position: absolute; inset: -10px; border-radius: 50%; }
 
 /* ═══ מגש העריכה (למודים) ═══ */
 .ed-tray {
@@ -592,3 +596,18 @@ button.pc__opt:active { transform: scale(0.985); }
 @media (max-width: 760px) {
   .poll-chip { width: calc(100% - 32px); }
 }
+
+/* קישור מהפופאפ לעמוד הטלפון המלא */
+.phone__pagelink { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; margin-inline-start: auto; margin-inline-end: 8px; padding: 0 12px; border-radius: 999px; background: rgba(246, 200, 30, 0.14); color: var(--m-gold); font: 600 12px/1 var(--m-body); text-decoration: none; }
+.phone__pagelink:hover { background: rgba(246, 200, 30, 0.24); }
+
+/* רשימת העצירות: כפתורי עריכה ומחיקה למודים */
+.list__item--mod { display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: center; }
+.list__ops { display: flex; gap: 4px; }
+.list__op { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--m-edge); background: rgba(255, 255, 255, 0.05); color: var(--m-txt); cursor: pointer; }
+.list__op:hover { background: rgba(255, 255, 255, 0.12); }
+.list__op--danger { color: #ff8fa3; border-color: rgba(255, 143, 163, 0.35); }
+.list__op--danger[data-armed] { width: auto; padding: 0 10px; background: #c43a55; color: #fff; font: 600 12px/1 var(--m-body); }
+
+/* ‎?embed – המפה בתוך אפליקציית הטלפון: בלי פתיחה, בלי כפתור הטלפון ובלי תג הלייב (יש אותם באפליקציה) */
+.is-embed .opening, .is-embed .tb, .is-embed .phone-btn, .is-embed .phone, .is-embed .onair, .is-embed .poll-chip, .is-embed .mh, .is-embed .tb__btn--more, .is-embed [data-key="feed"], .is-embed [data-key="stats"], .is-embed .tb__gap { display: none !important; }
