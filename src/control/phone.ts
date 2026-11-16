@@ -24,6 +24,10 @@ export function createPhone(opts: {
   openStop: (i: number) => void;
   openTarget: (c: Comment) => void;
   locatePoll: () => void;
+  /** עמוד עצמאי (phone.html): הטלפון תמיד פתוח, בלי כפתור שליפה, והלשונית נשמרת בכתובת */
+  page?: boolean;
+  /** בעמוד עצמאי: מה לשים בכותרת במקום כפתור הסגירה */
+  headExtra?: HTMLElement;
 }) {
   let data: Data | null = null;
   let ex: Extras | null = null;
@@ -38,11 +42,13 @@ export function createPhone(opts: {
   const screen = h('div', { class: 'phone__screen' });
   const tabsEl = h('nav', { class: 'phone__tabs', ariaLabel: 'הטלפון' });
   const closeBtn = h('button', { type: 'button', class: 'phone__close', ariaLabel: 'סגירת הטלפון' }, svg('close', 20));
+  // בפופאפ במפה: קישור לעמוד הטלפון המלא (שאפשר להתקין כאפליקציה)
+  const pageLink = h('a', { class: 'phone__pagelink', href: `${import.meta.env.BASE_URL}phone.html`, title: 'לפתוח כעמוד מלא ולהתקין כאפליקציה' }, svg('upload', 16), h('span', {}, 'להתקין כאפליקציה'));
   const statusbar = h('div', { class: 'phone__status', ariaHidden: 'true' }, h('span', { class: 'phone__clock' }), h('span', { class: 'phone__notch' }), h('span', { class: 'phone__bat' }, '100%'));
   const phone = h(
     'aside',
     { class: 'phone', id: 'phone', hidden: true, ariaLabel: 'הטלפון: סטוריז, צ׳אט וסקר' },
-    h('div', { class: 'phone__device' }, statusbar, h('header', { class: 'phone__head' }, h('strong', {}, 'הטלפון'), closeBtn), screen, tabsEl),
+    h('div', { class: 'phone__device' }, statusbar, h('header', { class: 'phone__head' }, h('strong', {}, 'הטלפון'), opts.page ? null : pageLink, closeBtn), screen, tabsEl),
   );
   opts.stage.append(btn, phone);
   const clock = statusbar.querySelector<HTMLElement>('.phone__clock')!;
@@ -50,7 +56,21 @@ export function createPhone(opts: {
   tickClock();
   setInterval(tickClock, 30_000);
 
+  if (opts.page) {
+    btn.hidden = true;
+    closeBtn.replaceWith(opts.headExtra ?? h('span'));
+    phone.classList.add('phone--page');
+  }
   function setOpen(on: boolean) {
+    if (opts.page) {
+      if (!on) return;
+      openState = true;
+      phone.hidden = false;
+      phone.classList.add('is-open');
+      updateBadge();
+      render();
+      return;
+    }
     openState = on;
     btn.setAttribute('aria-expanded', String(on));
     document.body.classList.toggle('is-phone', on);
@@ -252,6 +272,7 @@ export function createPhone(opts: {
 
   function go(t: Tab) {
     tab = t;
+    if (opts.page) history.replaceState(null, '', `#${t}`);
     render();
   }
   function render() {

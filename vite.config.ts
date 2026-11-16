@@ -11,6 +11,7 @@ export default defineConfig({
         admin: resolve(__dirname, 'admin.html'),
         stats: resolve(__dirname, 'stats.html'),
         overlay: resolve(__dirname, 'overlay.html'),
+        phone: resolve(__dirname, 'phone.html'),
       },
     },
   },

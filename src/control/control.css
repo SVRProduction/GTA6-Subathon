@@ -592,3 +592,7 @@ button.pc__opt:active { transform: scale(0.985); }
 @media (max-width: 760px) {
   .poll-chip { width: calc(100% - 32px); }
 }
+
+/* קישור מהפופאפ לעמוד הטלפון המלא */
+.phone__pagelink { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; margin-inline-start: auto; margin-inline-end: 8px; padding: 0 12px; border-radius: 999px; background: rgba(246, 200, 30, 0.14); color: var(--m-gold); font: 600 12px/1 var(--m-body); text-decoration: none; }
+.phone__pagelink:hover { background: rgba(246, 200, 30, 0.24); }
