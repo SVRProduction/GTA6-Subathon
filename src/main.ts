@@ -13,6 +13,7 @@ import { clipCard, clipsView, clipStop, playClip } from './clips';
 import { commentCount, commentsBox, initComments } from './comments';
 import { loginError } from './auth';
 import { createMissionHud, legend } from './mission';
+import { createControl } from './control';
 import { countOf, kickSlug, playMs, type Clip, type LiveData } from './data/types';
 
 const store = createStore();
@@ -253,6 +254,7 @@ function onLive(l: LiveData) {
   liveData = l;
   liveUi.setLive(l);
   mission.setLive(l);
+  control.setLive();
   if (data) {
     kickChannel = liveUi.isLive() ? kickSlug(data.settings.kick_channel) : '';
     clipsByStop = new Map();
@@ -476,10 +478,41 @@ function openList() {
   q<HTMLButtonElement>('[data-panel-next]').disabled = true;
   pins.forEach((p) => p.classList.remove('pin--active'));
 }
-q('[data-list]').onclick = openList;
-q('[data-clips]').onclick = () => openClips();
+// ── Mission Control: סרגל, חלונות קופצים, מרקרים, טלפון, סקרים, עריכה ──
+const control = createControl({
+  store,
+  stage,
+  world,
+  toast,
+  data: () => data ?? null,
+  live: () => liveData,
+  goStop: (i) => goTo(i),
+  openStop: (i) => {
+    goTo(i);
+    openPanel(i);
+  },
+  stopPoint: (i) => curve?.stops[i] ?? null,
+  flyTo: (x, y) => {
+    // הטיסה לנקודה חופשית: העצירה הקרובה ביותר אליה
+    if (!curve || !data) return;
+    const { w, h: hh } = world.size();
+    let best = 0;
+    let bd = Infinity;
+    curve.stops.forEach((p, k) => {
+      const dd = Math.hypot(p.x - x * w, p.y - y * hh);
+      if (dd < bd) ((bd = dd), (best = k));
+    });
+    userClosed = true;
+    closePanel();
+    goTo(best);
+  },
+  mapImage: snapImg,
+  clipComments,
+});
+void openList;
 // תגובות: נטענות פעם אחת; עצירה עם תגובות מקבלת סימן קטן בסיכה
 initComments(store, (list) => {
+  control.setComments(list);
   if (!data) return;
   const talked = new Set(list.filter((c) => c.target_type === 'stop').map((c) => c.target_id));
   pins.forEach((p, i) => p.classList.toggle('pin--talk', talked.has(data.missions[i]?.id)));
@@ -537,6 +570,13 @@ function openPanel(i: number, auto = false, refresh = false) {
       h('p', { class: 'stop__meta stamp' }, [kindLabel(m), metaText(m)].filter(Boolean).join('  |  ')),
       h('h2', { class: 'stop__title', id: 'panel-title' }, m.title),
       stopStats(i),
+      control.isMod()
+        ? (() => {
+            const b = h('button', { type: 'button', class: 'btn btn--small mod-edit' }, 'עריכת העצירה');
+            b.onclick = () => control.editStop(m);
+            return b;
+          })()
+        : null,
       (() => {
         const t = h('div', { class: 'mtabs', ariaLabel: 'תפריט העצירה' }, tab('story', 'סיפור'), tab('clips', 'קליפים', nClips), tab('talk', 'תגובות', nTalk));
         t.setAttribute('role', 'tablist');
@@ -706,9 +746,7 @@ addEventListener('keydown', (e) => {
 addEventListener('keydown', (e) => {
   if (flat || !data || e.metaKey || e.ctrlKey || e.altKey || (e.target as HTMLElement).closest('input, textarea, select')) return;
   const k = e.key.toLowerCase();
-  if (k === 'c' || k === 'ב') openClips();
-  else if (k === 's' || k === 'ד') location.href = './stats.html';
-  else if (k === 'k' || k === 'ל') (cinema ? stopCinema() : startCinema());
+  if (k === 'k' || k === 'ל') (cinema ? stopCinema() : startCinema());
   else if (k === 'm' || k === 'צ') {
     if (cinema) stopCinema();
     if (active !== -1) {
@@ -847,6 +885,7 @@ function frame(force = false) {
     if (k >= 0.97 && !userClosed && travelTo === null && target !== active) openPanel(target, true);
     else if (k < 0.6 && active >= 0) closePanel();
   }
+  control.place();
   const tag = pinsEl.querySelector<HTMLElement>('.ahead-tag');
   if (tag) {
     // התווית מתחילה בסוף הקו ופונה החוצה, כדי לא לכסות את הסיכה האחרונה
@@ -1003,6 +1042,7 @@ store
       else onMapReady = open;
     }
     setMap();
+    control.setData(data);
     store.loadLive().then(onLive).catch(console.error);
     store.subscribeLive(onLive);
     store.subscribe((next) => {
@@ -1012,6 +1052,7 @@ store
       data = next;
       setMap();
       rebuild();
+      control.setData(next);
       if (added.length) {
         const n = added[added.length - 1];
         const done = before && before.id !== n.id ? before.title : null;
@@ -1024,3 +1065,6 @@ store
     q('#journey-title').textContent = 'המסע לא נטען';
     toast('לא הצלחנו לטעון את הנתונים. נסו לרענן את הדף');
   });
+
+// אפליקציה (PWA): מעטפת שעובדת גם בקליטה חלשה
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`, { scope: import.meta.env.BASE_URL }).catch(() => {});

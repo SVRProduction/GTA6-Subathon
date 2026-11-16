@@ -1,8 +1,9 @@
 import { $, fill, fmtDate, h } from '../dom';
 import { createStore } from '../data/store';
-import { countOf, currentIndex, newMission, statusFresh, type Comment, type CounterName, type Data, type LiveData, type Mission } from '../data/types';
+import { countOf, currentIndex, newMission, statusFresh, type Comment, type CounterName, type Data, type Extras, type LiveData, type Mission } from '../data/types';
 import { safeUrl } from '../dom';
 import { createPicker } from './picker';
+import { markersPanel, pollsPanel, storiesPanel } from './extras';
 
 const DEFAULT_MAP = `${import.meta.env.BASE_URL}map.webp`;
 const mapUrl = () => safeUrl(data.settings.map_image_url) || DEFAULT_MAP;
@@ -34,6 +35,7 @@ let live: LiveData | null = null;
 let settingsOpen = false;
 let comments: Comment[] = [];
 let showHidden = false;
+let ex: Extras = { markers: [], stories: [], polls: [] };
 
 let toastTimer = 0;
 function toast(text: string, bad = false) {
@@ -49,6 +51,7 @@ async function run(action: () => Promise<void>, ok?: string) {
   try {
     await action();
     if (store.mode === 'supabase') data = await store.load();
+    ex = await store.loadExtras(true).catch(() => ex);
     render();
     if (ok) toast(ok);
     return true;
@@ -359,6 +362,14 @@ function commentsPanel() {
       const i = data.missions.findIndex((m) => m.id === c.target_id);
       return i >= 0 ? { label: `עצירה ${i + 1}: ${data.missions[i].title}`, href: `./#m-${i + 1}` } : { label: 'עצירה שנמחקה', href: '' };
     }
+    if (c.target_type === 'marker') {
+      const m = ex.markers.find((x) => x.id === c.target_id);
+      return { label: `מרקר: ${m?.title || 'מרקר שנמחק'}`, href: m ? `./#marker-${m.id}` : '' };
+    }
+    if (c.target_type === 'story') {
+      const st = ex.stories.find((x) => x.id === c.target_id);
+      return { label: `סטורי של ${st?.username || 'צופה'}`, href: '' };
+    }
     const clip = live?.clips.find((x) => x.id === c.target_id);
     return { label: `קליפ: ${clip?.title || 'קליפ'}`, href: '' };
   };
@@ -534,6 +545,9 @@ function render() {
       ),
       missions.length ? list : h('p', { class: 'empty' }, 'עדיין אין עצירות. מוסיפים את המשימה הראשונה כשהלייב מתחיל.'),
     ),
+    storiesPanel({ store, ex, data, run, twice }),
+    pollsPanel({ store, ex, data, run, twice }),
+    markersPanel({ store, ex, data, run, twice }),
     commentsPanel(),
     (() => {
       // נשאר פתוח גם אחרי שמירה (העמוד נבנה מחדש בכל שינוי)
@@ -551,6 +565,14 @@ function render() {
 
 async function start() {
   if (!(await store.isAuthed())) return renderLogin();
+  // מצב דמו: מי שנכנס לניהול הוא מוד גם במפה (כפתור "עריכה"). ב-Supabase המפה בודקת את ההתחברות עצמה.
+  if (store.mode === 'demo') {
+    try {
+      localStorage.setItem('mc-mod', '1');
+    } catch {
+      /* חסום */
+    }
+  }
   try {
     data = await store.load();
   } catch (e) {
@@ -575,6 +597,15 @@ async function start() {
   store.loadComments(true).then(onComments).catch(() => {});
   store.subscribeComments(onComments, true);
   store.subscribeLive(onLive);
+  // סטוריז, מרקרים וסקרים (כולל סטוריז שמחכים לאישור)
+  const onExtras = (e: Extras) => {
+    ex = e;
+    // לא בונים מחדש בזמן הקלדה בטופס הסקר
+    const typing = document.activeElement instanceof HTMLInputElement && !!document.activeElement.closest('.pl-form');
+    if (!editor.open && !typing) render();
+  };
+  store.loadExtras(true).then(onExtras).catch(() => {});
+  store.subscribeExtras(onExtras, true);
   addEventListener('hashchange', render);
 }
 start();

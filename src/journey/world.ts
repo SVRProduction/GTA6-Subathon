@@ -335,6 +335,18 @@ export function createWorld(stage: HTMLElement, onSize: (w: number, h: number) =
     },
     apply,
     project: project2,
+    /** נקודה על המסך (יחסית לבמה) → נקודה במפה (פיקסלים של התמונה), ההפך של project */
+    unproject(sx: number, sy: number) {
+      const c = free ?? cam;
+      const { w, h } = view();
+      const a = (tilt * Math.PI) / 180;
+      const P = persp();
+      const dx = sx - w / 2;
+      const dy = sy - h / 2;
+      const Y = (dy * P) / (P * Math.cos(a) + dy * Math.sin(a));
+      const s = P / (P - Y * Math.sin(a));
+      return { x: c.x + dx / s / c.z, y: c.y + Y / c.z };
+    },
     exploring: () => !!free,
     setTilt(deg: number) {
       tilt = deg;

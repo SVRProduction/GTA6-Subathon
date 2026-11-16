@@ -136,6 +136,11 @@ Deno.serve(async (req) => {
       }
     }
 
+    // ── סקרים שהזמן שלהם נגמר: נסגרים (מנצח + מרקר "החלטה" אם יש מיקום) ──
+    const { data: due } = await sb.from('polls').select('id').eq('status', 'open').lte('ends_at', now.toISOString());
+    for (const p of due ?? []) await sb.rpc('close_poll', { p_id: p.id });
+    report.polls_closed = due?.length ?? 0;
+
     // ── 3: קליפים חדשים (עמוד אחרי עמוד, עד שמגיעים לקליפ מוכר) ──
     const { data: newest } = await sb.from('clips').select('created_at').order('created_at', { ascending: false }).limit(1).maybeSingle();
     const since = newest ? new Date(newest.created_at).getTime() : 0;

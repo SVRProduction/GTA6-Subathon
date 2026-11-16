@@ -263,3 +263,53 @@ dialog form { display: grid; gap: 18px; padding: 22px 22px 0; }
 .cmt-mod__meta strong { font: 400 15px/1.2 var(--stamp); color: var(--ink); }
 .cmt-mod__meta a { color: var(--ink-soft); }
 .cmt-mod__body { font-size: 16px; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* ── גרסה 6: סטוריז לאישור, סקרים, מרקרים ── */
+.panel.is-hot { box-shadow: 4px 4px 0 var(--red); border-color: var(--red); }
+.hint { margin: 0; font-size: 14px; color: var(--ink-mute); }
+.sq-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.sq { display: grid; grid-template-columns: 96px 1fr; gap: 14px; padding: 12px; border-radius: 14px; background: var(--paper-3); border: 2px solid transparent; }
+.sq.is-pending { border-color: var(--ink); }
+.sq__img { display: block; width: 96px; aspect-ratio: 4 / 5; border-radius: 10px; overflow: hidden; border: 2px solid var(--ink); background: var(--ink); }
+.sq__img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.sq__main { display: grid; gap: 6px; align-content: start; min-width: 0; }
+.sq__meta { margin: 0; display: flex; gap: 10px; flex-wrap: wrap; align-items: baseline; font-size: 13px; color: var(--ink-mute); }
+.sq__meta strong { font: 400 15px/1.2 var(--stamp); color: var(--ink); }
+.sq__cap { margin: 0; font-size: 16px; overflow-wrap: anywhere; }
+.sq__cap.is-empty { color: var(--ink-mute); font-style: italic; }
+.ops .ok { background: var(--ink); color: var(--paper-2); }
+.ops .ok:hover:not(:disabled) { background: #000; }
+.fold--inner { box-shadow: none; border-width: 2px; }
+.fold--inner > summary { min-height: 48px; }
+.fold--inner > ul { padding: 0 12px 12px; }
+.mk-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; max-height: 50vh; overflow: auto; }
+.mk-list li { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; padding: 8px 12px; border-radius: 12px; background: var(--paper-3); }
+.mk-list__type { min-width: 70px; padding: 4px 10px; border-radius: 999px; border: 2px solid var(--ink); font: 400 13px/1.2 var(--stamp); text-align: center; }
+.mk-list__type.t-death { background: var(--red); color: var(--paper-2); }
+.mk-list__type.t-decision { background: var(--mustard); }
+.mk-list__main { display: grid; min-width: 0; }
+.mk-list__main strong { overflow-wrap: anywhere; }
+.mk-list__main small { color: var(--ink-mute); font-size: 13px; }
+.mk-list__link { display: inline-flex; align-items: center; min-height: 36px; padding: 0 12px; border: 2px solid var(--ink); border-radius: 10px; color: var(--ink); text-decoration: none; font-size: 14px; }
+.pl-form { display: grid; gap: 12px; }
+.pl-opts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.pl-row { display: flex; gap: 12px; align-items: end; flex-wrap: wrap; }
+.pl-row .field { flex: 0 1 160px; }
+.pl-open { display: grid; gap: 10px; padding: 14px; border-radius: 14px; border: 2px solid var(--ink); background: var(--paper-3); }
+.pl-open h3 { font: 900 24px/1.15 var(--display); }
+.pl-bars { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.pl-bars li { position: relative; display: flex; justify-content: space-between; gap: 10px; padding: 8px 12px; border-radius: 10px; border: 2px solid var(--ink); overflow: hidden; isolation: isolate; font-size: 15px; }
+.pl-bars li::before { content: ''; position: absolute; inset: 0; inset-inline-end: auto; width: var(--p); background: rgba(217, 169, 59, 0.45); z-index: -1; }
+.pl-bars li.is-win { background: rgba(217, 169, 59, 0.2); font-weight: 700; }
+.pl-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn.danger { color: var(--red); border-color: var(--red); }
+.pl-past { list-style: none; margin: 0; display: grid; gap: 12px; }
+.pl-past li { display: grid; gap: 6px; }
+.pl-past__head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+@media (max-width: 560px) {
+  .pl-opts { grid-template-columns: 1fr; }
+  .sq { grid-template-columns: 76px 1fr; }
+  .sq__img { width: 76px; }
+  .mk-list li { grid-template-columns: 1fr auto; }
+  .mk-list__type { grid-column: 1 / -1; justify-self: start; }
+}

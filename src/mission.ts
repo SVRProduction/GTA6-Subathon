@@ -5,14 +5,15 @@ import { h } from './dom';
 import { fmtPlay } from './live';
 
 export function createMissionHud(stage: HTMLElement, opts: { reduce: boolean }) {
-  // ── שעון + מיתות (פינה עליונה) ──
+  // ── זמן משחק: גדול, בצד שמאל. (המיתות – בחלון הסטטיסטיקות; על המסך רק ההבזק "מתת") ──
   const clock = h('b', { class: 'mh__clock' }, '0:00');
-  const deaths = h('b', { class: 'mh__deaths' }, '0');
+  const sub = h('span', { class: 'mh__sub' });
   const readout = h(
     'div',
-    { class: 'mh', ariaLabel: 'נתוני המסע' },
-    h('div', { class: 'mh__row' }, h('span', { class: 'mh__label' }, 'זמן משחק'), clock),
-    h('div', { class: 'mh__row mh__row--d' }, h('span', { class: 'mh__label' }, 'מיתות'), deaths),
+    { class: 'mh', role: 'timer', ariaLabel: 'שעות משחק ב-GTA 6' },
+    h('span', { class: 'mh__label' }, 'שעות משחק ב-GTA 6'),
+    clock,
+    sub,
   );
   stage.querySelector('.hud')!.append(readout);
 
@@ -28,7 +29,10 @@ export function createMissionHud(stage: HTMLElement, opts: { reduce: boolean }) 
   function tick() {
     if (!live) return;
     clock.textContent = fmtPlay(playMs(live));
-    readout.classList.toggle('is-running', !!live.status?.on_category && statusFresh(live.status));
+    const running = !!live.status?.on_category && statusFresh(live.status);
+    readout.classList.toggle('is-running', running);
+    const v = live.status?.viewers;
+    sub.textContent = running ? `השעון רץ · בלייב${v ? ` · ${v.toLocaleString('he-IL')} צופים` : ''}` : 'השעון עוצר כשהלייב לא על GTA 6';
   }
   window.setInterval(tick, 15_000);
 
@@ -36,7 +40,6 @@ export function createMissionHud(stage: HTMLElement, opts: { reduce: boolean }) 
     setLive(l: LiveData) {
       live = l;
       const d = countOf(l, 'deaths');
-      deaths.textContent = d.toLocaleString('he-IL');
       if (lastDeaths >= 0 && d > lastDeaths) this.flash();
       lastDeaths = d;
       tick();
@@ -56,9 +59,7 @@ export function createMissionHud(stage: HTMLElement, opts: { reduce: boolean }) 
       void flash.offsetWidth;
       flash.classList.add('is-on');
       window.setTimeout(() => flash.classList.remove('is-on'), 1800);
-      readout.classList.remove('is-hit');
-      void readout.offsetWidth;
-      readout.classList.add('is-hit');
+
     },
   };
 }
@@ -79,6 +80,8 @@ export function legend() {
       item('route', 'הדרך שעברנו'),
       item('ahead', 'ההמשך'),
       item('clip', 'יש קליפ מכאן'),
+      item('mk', 'מרקר חופשי (מוות, רכב, נשק…)'),
+      item('poll', 'סקר פתוח'),
     ),
     h('p', { class: 'mlegend__title' }, 'מקשים'),
     h(
@@ -87,6 +90,8 @@ export function legend() {
       h('li', {}, h('kbd', {}, '↑'), h('kbd', {}, '↓'), h('span', {}, 'עצירה הבאה / הקודמת')),
       h('li', {}, h('kbd', {}, 'C'), h('span', {}, 'קליפים')),
       h('li', {}, h('kbd', {}, 'S'), h('span', {}, 'סטטיסטיקות')),
+      h('li', {}, h('kbd', {}, 'F'), h('span', {}, 'פיד חי')),
+      h('li', {}, h('kbd', {}, 'T'), h('span', {}, 'הטלפון')),
       h('li', {}, h('kbd', {}, 'K'), h('span', {}, 'מצב קולנוע')),
       h('li', {}, h('kbd', {}, 'Esc'), h('span', {}, 'חזרה למפה')),
     ),

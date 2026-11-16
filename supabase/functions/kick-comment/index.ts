@@ -38,7 +38,7 @@ Deno.serve(async (req) => {
   const who = await verify<{ uid: string; name: string; pic: string | null }>(input.token ?? '', secret);
   if (!who) return fail('צריך להתחבר מחדש עם Kick', 401);
   const type = input.target_type;
-  if (type !== 'stop' && type !== 'clip') return fail('יעד לא תקין');
+  if (type !== 'stop' && type !== 'clip' && type !== 'marker' && type !== 'story') return fail('יעד לא תקין');
   const target = String(input.target_id ?? '').slice(0, 80);
   const body = clean(String(input.body ?? ''));
   if (!target) return fail('יעד לא תקין');
@@ -55,9 +55,8 @@ Deno.serve(async (req) => {
   if ((recent?.length ?? 0) >= 30) return fail('הגעתם למגבלת התגובות לשעה. נסו שוב מאוחר יותר.', 429);
 
   // היעד קיים?
-  const exists = type === 'stop'
-    ? (await sb.from('missions').select('id').eq('id', target).maybeSingle()).data
-    : (await sb.from('clips').select('id').eq('id', target).maybeSingle()).data;
+  const table = { stop: 'missions', clip: 'clips', marker: 'markers', story: 'stories' }[type];
+  const exists = (await sb.from(table).select('id').eq('id', target).maybeSingle()).data;
   if (!exists) return fail('העצירה או הקליפ לא נמצאו');
 
   const { error } = await sb.from('comments').insert({
