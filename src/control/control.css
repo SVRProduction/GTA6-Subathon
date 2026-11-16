@@ -608,3 +608,6 @@ button.pc__opt:active { transform: scale(0.985); }
 .list__op:hover { background: rgba(255, 255, 255, 0.12); }
 .list__op--danger { color: #ff8fa3; border-color: rgba(255, 143, 163, 0.35); }
 .list__op--danger[data-armed] { width: auto; padding: 0 10px; background: #c43a55; color: #fff; font: 600 12px/1 var(--m-body); }
+
+/* ‎?embed – המפה בתוך אפליקציית הטלפון: בלי פתיחה, בלי כפתור הטלפון ובלי תג הלייב (יש אותם באפליקציה) */
+.is-embed .opening, .is-embed .tb, .is-embed .phone-btn, .is-embed .phone, .is-embed .onair, .is-embed .poll-chip, .is-embed .mh, .is-embed .tb__btn--more, .is-embed [data-key="feed"], .is-embed [data-key="stats"], .is-embed .tb__gap { display: none !important; }
