@@ -173,7 +173,17 @@ export function createRoad() {
     }
     // שומרים על פוקוס המקלדת כשהרשימה מתעדכנת ברקע
     const focusedId = (document.activeElement as HTMLElement | null)?.closest?.('li.stop')?.id;
+    // עוגן גלילה: הרשימה מוחלפת כולה, אז שומרים ידנית את מיקום העצירה הראשונה שנראית במסך
+    let anchor: { id: string; top: number } | null = null;
+    if (!root.closest('[hidden]') && list.getBoundingClientRect().top < 0) {
+      const vis = [...list.querySelectorAll<HTMLElement>('li.stop')].find((li) => li.getBoundingClientRect().bottom > 80);
+      if (vis) anchor = { id: vis.id, top: vis.getBoundingClientRect().top };
+    }
     list.replaceChildren(...items);
+    if (anchor) {
+      const el = document.getElementById(anchor.id);
+      if (el) window.scrollBy(0, el.getBoundingClientRect().top - anchor.top);
+    }
     if (focusedId && list.contains(document.activeElement) === false) {
       document.getElementById(focusedId)?.querySelector<HTMLElement>('a')?.focus({ preventScroll: true });
     }

@@ -21,6 +21,9 @@ export function mountSheet(closeHandler: () => void) {
   document.body.append(dlg);
   onClose = closeHandler;
   dlg.addEventListener('close', () => {
+    // טוסט שהוצג בתוך החלונית חוזר לגוף הדף
+    const t = dlg.querySelector('.toast');
+    if (t) document.body.append(t);
     teardown();
     openKey = '';
     document.documentElement.classList.remove('has-sheet');

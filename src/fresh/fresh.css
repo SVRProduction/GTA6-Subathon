@@ -2187,3 +2187,7 @@ html.has-sheet {
     grid-row: 3;
   }
 }
+/* העוגן מטופל ידנית ב-road.ts */
+.road__list {
+  overflow-anchor: none;
+}

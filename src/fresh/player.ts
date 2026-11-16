@@ -46,6 +46,7 @@ export function createPlayer(p: NonNullable<Playable>, opts: { poster?: string |
   v.addEventListener('error', () => !box.classList.contains('is-failed') && fail(), { once: true });
 
   const start = () => v.play().catch(() => {});
+  let triedNative = false;
 
   // hls.js קודם (MSE). HLS מובנה רק כשאין MSE (אייפון ישן): ה-HLS המובנה של Chrome לא מנגן את ה-ts של Kick
   if (p.kind === 'file') {
@@ -62,7 +63,12 @@ export function createPlayer(p: NonNullable<Playable>, opts: { poster?: string |
       hls.on(Hls.Events.ERROR, (_e, d) => {
         if (d.fatal) {
           hls.destroy();
-          fail();
+          // ניסיון אחרון: HLS מובנה (ספארי), ורק אז קישור החוצה
+          if (!triedNative && v.canPlayType('application/vnd.apple.mpegurl')) {
+            triedNative = true;
+            v.src = p.src;
+            start();
+          } else fail();
         }
       });
       hls.loadSource(p.src);
