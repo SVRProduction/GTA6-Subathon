@@ -162,6 +162,8 @@ function rebuild() {
         class: `pin pin--${state} ${m.is_milestone ? 'pin--ms' : 'pin--dot'} ${clipsByStop.has(i) ? 'pin--clip' : ''}`,
         ariaLabel: `${kindLabel(m)} ${i + 1}: ${m.title}`,
         onclick: () => {
+          // מצב עריכה (מודים): לחיצה על עצירה פותחת ישר את טופס העריכה – שמירה, הזזה ומחיקה
+          if (control.isEditing()) return control.editStop(data.missions[i]);
           goTo(i);
           openPanel(i);
         },
@@ -480,6 +482,8 @@ function openList() {
 }
 // ── Mission Control: סרגל, חלונות קופצים, מרקרים, טלפון, סקרים, עריכה ──
 const control = createControl({
+  // עצירה שנמחקה בזמן שהתפריט שלה פתוח – סוגרים אותו
+  onStopDeleted: () => closePanel(),
   store,
   stage,
   world,
