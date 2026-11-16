@@ -225,3 +225,7 @@ html.ap-root, html.ap-root body { height: 100%; overflow: hidden; }
   .ap-sheet, .ap-sheet__dim, .ap-tab__plus { transition: none !important; }
   .ap-live-card__dot, .ap-bar__live::before, .ap-stop.is-fresh { animation: none !important; }
 }
+
+/* בלי פס גלילה בכל העמוד (הגלילה עצמה נשארת): נראה כמו אפליקציה */
+html.ap-root, html.ap-root *, .ap-view, .ap-sheet__body, .ap-feed { scrollbar-width: none; -ms-overflow-style: none; }
+html.ap-root ::-webkit-scrollbar { display: none; width: 0; height: 0; }
