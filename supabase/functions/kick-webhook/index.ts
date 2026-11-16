@@ -1,4 +1,5 @@
 // kick-webhook: Kick שולח לכאן כל הודעת צ'אט (chat.message.sent).
+// סקרים: כשיש סקר פתוח, כל צופה יכול לכתוב !1 / !2 / !3 / !4 – קול אחד לכל משתמש, הצבעה חוזרת מחליפה.
 // פקודות שסופרות (רק אתה או מודרטור):  !death / !מוות  ·  !cat / !חתול  ·  עם "-" בסוף = ביטול (‎!death-)
 // הפונקציה צריכה לרוץ בלי בדיקת JWT של Supabase: supabase functions deploy kick-webhook --no-verify-jwt
 import { createClient } from 'npm:@supabase/supabase-js@2.45.4';
@@ -26,6 +27,12 @@ async function verify(id: string, ts: string, body: string, sig: string) {
   return crypto.subtle.verify('RSASSA-PKCS1-v1_5', await kickKey(true), s, data);
 }
 
+/** "!2" → 1 (אינדקס האפשרות); לא הצבעה → null */
+export function parseVote(content: string) {
+  const m = content.trim().match(/^!\s*([1-4])\s*$/);
+  return m ? Number(m[1]) - 1 : null;
+}
+
 /** "!death" → {counter, delta}; לא פקודה → null */
 export function parse(content: string) {
   const m = content.trim().match(/^!\s*([a-zA-Z֐-׿]+)\s*([+-]?)/);
@@ -49,6 +56,20 @@ Deno.serve(async (req) => {
   if (type !== 'chat.message.sent') return new Response('ignored');
 
   const ev = JSON.parse(body);
+  // ── הצבעה בסקר (כל הצופים) ──
+  const vote = parseVote(String(ev.content ?? ''));
+  if (vote != null) {
+    const uid = ev.sender?.user_id;
+    if (uid == null) return new Response('ignored');
+    const sb = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+    const { data: p } = await sb.from('polls').select('id, options, ends_at').eq('status', 'open').order('created_at', { ascending: false }).limit(1).maybeSingle();
+    if (!p || Date.parse(p.ends_at) <= Date.now() || vote >= p.options.length) return new Response('no poll');
+    const { data: ban } = await sb.from('comment_bans').select('kick_user_id').eq('kick_user_id', String(uid)).maybeSingle();
+    if (ban) return new Response('banned');
+    const { error } = await sb.from('poll_votes').upsert({ poll_id: p.id, kick_user_id: String(uid), option: vote, source: 'chat', updated_at: new Date().toISOString() });
+    if (error) return new Response(error.message, { status: 500 });
+    return new Response('voted');
+  }
   const cmd = parse(String(ev.content ?? ''));
   if (!cmd) return new Response('ignored');
   const badges: Array<{ type?: string }> = ev.sender?.identity?.badges ?? [];

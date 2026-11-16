@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { STORAGE_BUCKET } from '../config';
-import { DEFAULT_SETTINGS, type Clip, type CounterEvent, type Data, type LiveData, type LiveStatus, type Mission, type Segment, type Settings, type Store } from './types';
+import { DEFAULT_SETTINGS, type Clip, type Comment, type CounterEvent, type Data, type Extras, type LiveData, type LiveStatus, type Marker, type Mission, type Poll, type Segment, type Settings, type Store, type Story, type Viewer } from './types';
 
 export function createSupabaseStore(url: string, key: string): Store {
   const sb = createClient(url, key);
@@ -36,6 +36,8 @@ export function createSupabaseStore(url: string, key: string): Store {
     counter_events: async () => {
       const rows = ((await sb.from('counter_totals').select('counter, mission_id, n, last_at').limit(1000)).data ?? []) as Array<{ counter: CounterEvent['counter']; mission_id: string | null; n: number; last_at: string }>;
       live.counters = rows.map((r) => ({ counter: r.counter, mission_id: r.mission_id, delta: r.n, created_at: r.last_at }));
+      // האירועים האחרונים עצמם (עם זמן), לפיד הפעילות
+      live.recent = ((await sb.from('counter_events').select('counter, delta, mission_id, created_at').order('id', { ascending: false }).limit(80)).data ?? []) as CounterEvent[];
     },
     clips: async () => {
       live.clips = ((await sb.from('clips').select('*').order('created_at', { ascending: false }).limit(500)).data ?? []) as Clip[];
@@ -46,8 +48,148 @@ export function createSupabaseStore(url: string, key: string): Store {
     return { ...live };
   }
 
+  const fn = (name: string) => `${url}/functions/v1/${name}`;
+  async function loadComments(includeHidden = false): Promise<Comment[]> {
+    let q = sb.from('comments').select('*').order('created_at', { ascending: true }).limit(2000);
+    if (!includeHidden) q = q.eq('hidden', false);
+    return ((await q).data ?? []) as Comment[];
+  }
+
+  // ── מרקרים / סטוריז / סקרים ──
+  async function loadExtras(mod = false): Promise<Extras> {
+    const now = new Date().toISOString();
+    let stories = sb.from('stories').select('*').order('created_at', { ascending: false }).limit(300);
+    // צופים: רק מאושרים ובתוקף (זה גם מה שה-RLS מאפשר להם); מודים רואים גם את התור
+    if (!mod) stories = stories.eq('status', 'approved').gt('expires_at', now);
+    const [m, st, p, r] = await Promise.all([
+      sb.from('markers').select('*').order('created_at').limit(2000),
+      stories,
+      sb.from('polls').select('*').order('created_at', { ascending: false }).limit(30),
+      sb.from('poll_results').select('poll_id, option, n').limit(500),
+    ]);
+    const results = (r.data ?? []) as Array<{ poll_id: string; option: number; n: number }>;
+    const polls = ((p.data ?? []) as Array<Omit<Poll, 'votes'>>).map((x) => ({
+      ...x,
+      votes: x.options.map((_, k) => results.find((v) => v.poll_id === x.id && v.option === k)?.n ?? 0),
+    }));
+    return { markers: (m.data ?? []) as Marker[], stories: (st.data ?? []) as Story[], polls: polls.reverse() };
+  }
+  /** פעולות של צופה מחובר עם Kick: דרך הפונקציה kick-viewer, שבודקת את הכרטיס החתום */
+  async function viewerCall(viewer: Viewer, action: string, payload: Record<string, unknown>) {
+    const r = await fetch(fn('kick-viewer'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: key },
+      body: JSON.stringify({ token: viewer.token, action, ...payload }),
+    });
+    if (!r.ok) throw new Error((await r.json().catch(() => null))?.error ?? 'הפעולה לא הצליחה. נסו שוב.');
+  }
+  /** תמונה לסטורי: מוקטנת ל-JPEG של עד 1080px לפני השליחה */
+  async function toJpeg(file: File, max = 1080) {
+    const bmp = await createImageBitmap(file);
+    const k = Math.min(1, max / Math.max(bmp.width, bmp.height));
+    const c = document.createElement('canvas');
+    c.width = Math.round(bmp.width * k);
+    c.height = Math.round(bmp.height * k);
+    c.getContext('2d')!.drawImage(bmp, 0, 0, c.width, c.height);
+    return c.toDataURL('image/jpeg', 0.82).split(',')[1];
+  }
+
   return {
     mode: 'supabase',
+    loadExtras,
+    subscribeExtras(cb, mod = false) {
+      let timer: number | undefined;
+      const refresh = () => {
+        clearTimeout(timer);
+        // סקר חי: הרבה קולות בשנייה – מאחדים לרענון אחד בכל ~700ms
+        timer = window.setTimeout(
+          () =>
+            loadExtras(mod)
+              .then((e) => {
+                hasOpen = e.polls.some((p) => p.status === 'open');
+                cb(e);
+              })
+              .catch(console.error),
+          250 + Math.random() * 500,
+        );
+      };
+      // הקולות עצמם פרטיים (אין Realtime עליהם לצופים), אז בזמן סקר פתוח מרעננים את התוצאות כל ~3 שניות
+      let hasOpen = false;
+      const fast = window.setInterval(() => hasOpen && document.visibilityState !== 'hidden' && refresh(), 3000);
+      const ch = sb.channel(`extras-${mod ? 'mod' : 'pub'}`);
+      for (const table of ['markers', 'stories', 'polls', 'poll_votes']) ch.on('postgres_changes', { event: '*', schema: 'public', table }, refresh);
+      ch.subscribe();
+      const poll = window.setInterval(refresh, 60_000);
+      loadExtras(mod).then((e) => (hasOpen = e.polls.some((p) => p.status === 'open'))).catch(() => {});
+      return () => {
+        clearTimeout(timer);
+        clearInterval(poll);
+        clearInterval(fast);
+        sb.removeChannel(ch);
+      };
+    },
+    async saveMarker(m) {
+      check(await sb.from('markers').upsert(m));
+    },
+    async deleteMarker(id) {
+      check(await sb.from('markers').delete().eq('id', id));
+    },
+    async submitStory(viewer, d) {
+      await viewerCall(viewer, 'story', { image: await toJpeg(d.image), caption: d.caption, mission_id: d.mission_id, x: d.x, y: d.y });
+    },
+    async likeStory(viewer, id) {
+      await viewerCall(viewer, 'like', { story_id: id });
+    },
+    async moderateStory(id, action) {
+      if (action === 'delete') check(await sb.from('stories').delete().eq('id', id));
+      else check(await sb.from('stories').update({ status: action === 'approve' ? 'approved' : 'rejected' }).eq('id', id));
+    },
+    async createPoll(p) {
+      const options = p.options.map((o) => o.trim()).filter(Boolean).slice(0, 4);
+      if (!p.question.trim() || options.length < 2) throw new Error('צריך שאלה ולפחות 2 אפשרויות');
+      check(await sb.rpc('open_poll', { p_question: p.question.trim(), p_options: options, p_minutes: Math.max(1, p.minutes), p_x: p.x, p_y: p.y }));
+    },
+    async closePoll(id) {
+      check(await sb.rpc('close_poll', { p_id: id }));
+    },
+    async deletePoll(id) {
+      check(await sb.from('polls').delete().eq('id', id));
+    },
+    async vote(viewer, pollId, option) {
+      await viewerCall(viewer, 'vote', { poll_id: pollId, option });
+    },
+    loadComments,
+    subscribeComments(cb, includeHidden = false) {
+      let timer: number | undefined;
+      const refresh = () => {
+        clearTimeout(timer);
+        timer = window.setTimeout(() => loadComments(includeHidden).then(cb).catch(console.error), 150 + Math.random() * 600);
+      };
+      const ch = sb.channel(`comments-${includeHidden ? 'all' : 'pub'}`).on('postgres_changes', { event: '*', schema: 'public', table: 'comments' }, refresh).subscribe();
+      return () => {
+        clearTimeout(timer);
+        sb.removeChannel(ch);
+      };
+    },
+    async postComment(viewer, target, targetId, body) {
+      const r = await fetch(fn('kick-comment'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', apikey: key },
+        body: JSON.stringify({ token: viewer.token, target_type: target, target_id: targetId, body }),
+      });
+      if (!r.ok) throw new Error((await r.json().catch(() => null))?.error ?? 'התגובה לא נשלחה. נסו שוב.');
+    },
+    async moderateComment(id, action) {
+      if (action === 'delete') check(await sb.from('comments').delete().eq('id', id));
+      else check(await sb.from('comments').update({ hidden: action === 'hide' }).eq('id', id));
+    },
+    async banUser(kickUserId, username) {
+      check(await sb.from('comment_bans').upsert({ kick_user_id: kickUserId, username }));
+      check(await sb.from('comments').update({ hidden: true }).eq('kick_user_id', kickUserId));
+    },
+    kickLoginUrl(returnTo) {
+      return `${fn('kick-auth')}?return=${encodeURIComponent(returnTo)}`;
+    },
     loadLive,
     subscribeLive(cb) {
       const timers = new Map<string, number>();

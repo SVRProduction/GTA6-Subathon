@@ -71,6 +71,27 @@ export interface Clip {
   created_at: string;
 }
 
+/** תגובה של צופה (מחובר עם Kick) על עצירה או על קליפ */
+export type CommentTarget = 'stop' | 'clip' | 'marker' | 'story';
+export interface Comment {
+  id: string;
+  target_type: CommentTarget;
+  target_id: string;
+  kick_user_id: string;
+  username: string;
+  avatar: string | null;
+  body: string;
+  created_at: string;
+  hidden?: boolean;
+}
+/** מי שמחובר עם Kick (נשמר בדפדפן; הכרטיס חתום בשרת) */
+export interface Viewer {
+  token: string;
+  kick_user_id: string;
+  username: string;
+  avatar: string | null;
+}
+
 export interface LiveData {
   status: LiveStatus | null;
   segments: Segment[];
@@ -78,6 +99,80 @@ export interface LiveData {
   clips: Clip[];
   /** בדמו: הקליפים הם מהערוץ האמיתי, מכל הקטגוריות (כי עוד אין קליפים מהמשחק) */
   demoClips?: boolean;
+  /** אירועי ספירה אחרונים, כל אחד עם זמן (לפיד הפעילות), מהחדש לישן */
+  recent?: CounterEvent[];
+}
+
+// ── מרקרים חופשיים, סטוריז של צופים, סקרים ──
+/** סוגי מרקרים: כל אחד עם אייקון אחיד; custom = אימוג'י או תמונה משלכם */
+export type MarkerType = 'death' | 'car' | 'weapon' | 'property' | 'heist' | 'chase' | 'moment' | 'decision' | 'custom';
+/** מרקר חופשי: בכל מקום במפה, לא מחובר למסלול */
+export interface Marker {
+  id: string;
+  type: MarkerType;
+  /** מיקום על המפה, 0–1 */
+  x: number;
+  y: number;
+  title: string;
+  body: string;
+  /** ל-custom: אימוג'י */
+  emoji: string | null;
+  /** תמונה (רכב חדש, נשק…) – אופציונלי לכל סוג */
+  image_url: string | null;
+  /** העצירה במסלול שהמרקר שייך אליה (בדרך כלל הנוכחית כשנוצר) */
+  mission_id: string | null;
+  created_at: string;
+}
+export type StoryStatus = 'pending' | 'approved' | 'rejected';
+/** סטורי שצופה העלה (מחובר עם Kick); מופיע רק אחרי אישור מוד, ונעלם אחרי 48 שעות */
+export interface Story {
+  id: string;
+  kick_user_id: string;
+  username: string;
+  avatar: string | null;
+  image_url: string;
+  caption: string;
+  mission_id: string | null;
+  x: number | null;
+  y: number | null;
+  status: StoryStatus;
+  likes: number;
+  created_at: string;
+  expires_at: string;
+}
+/** סקר של הצ'אט: מצביעים ב-!1/!2 בצ'אט של Kick או באתר; קול אחד לכל משתמש Kick */
+export interface Poll {
+  id: string;
+  question: string;
+  options: string[];
+  /** מיקום על המפה (לאן הולכים?) – כשהסקר נסגר נוצר שם מרקר "החלטה" */
+  x: number | null;
+  y: number | null;
+  status: 'open' | 'closed';
+  ends_at: string;
+  winner: number | null;
+  created_at: string;
+  /** מספר קולות לכל אפשרות */
+  votes: number[];
+}
+export interface Extras {
+  markers: Marker[];
+  stories: Story[];
+  polls: Poll[];
+}
+export interface StoryDraft {
+  image: File;
+  caption: string;
+  mission_id: string | null;
+  x: number | null;
+  y: number | null;
+}
+export interface PollDraft {
+  question: string;
+  options: string[];
+  minutes: number;
+  x: number | null;
+  y: number | null;
 }
 
 export interface Data {
@@ -104,6 +199,32 @@ export interface Store {
   subscribeLive(cb: (d: LiveData) => void): () => void;
   /** +1 / -1 למונה, משויך לעצירה הנוכחית */
   bump(counter: CounterName, delta: 1 | -1, missionId: string | null): Promise<void>;
+  /** תגובות: כולם קוראים; כותבים רק מחוברים עם Kick (דרך הפונקציה kick-comment) */
+  loadComments(includeHidden?: boolean): Promise<Comment[]>;
+  subscribeComments(cb: (c: Comment[]) => void, includeHidden?: boolean): () => void;
+  postComment(viewer: Viewer, target: CommentTarget, targetId: string, body: string): Promise<void>;
+  /** אדמין: הסתרה/החזרה, מחיקה, חסימת משתמש */
+  moderateComment(id: string, action: 'hide' | 'show' | 'delete'): Promise<void>;
+  banUser(kickUserId: string, username: string): Promise<void>;
+  /** כתובת ההתחברות עם Kick (null = לא מוגדר; בדמו מתחברים כמשתמש דמו) */
+  kickLoginUrl(returnTo: string): string | null;
+  /** מרקרים, סטוריז וסקרים. mod=true כולל סטוריז שממתינים לאישור */
+  loadExtras(mod?: boolean): Promise<Extras>;
+  subscribeExtras(cb: (e: Extras) => void, mod?: boolean): () => void;
+  /** מוד: מרקרים */
+  saveMarker(m: Marker): Promise<void>;
+  deleteMarker(id: string): Promise<void>;
+  /** צופה: סטורי חדש (נכנס לתור האישור) ולייק */
+  submitStory(viewer: Viewer, draft: StoryDraft): Promise<void>;
+  likeStory(viewer: Viewer, id: string): Promise<void>;
+  /** מוד: אישור / דחייה / מחיקה של סטורי */
+  moderateStory(id: string, action: 'approve' | 'reject' | 'delete'): Promise<void>;
+  /** מוד: סקרים */
+  createPoll(p: PollDraft): Promise<void>;
+  closePoll(id: string): Promise<void>;
+  deletePoll(id: string): Promise<void>;
+  /** צופה: הצבעה (אפשר לשנות; הקול האחרון קובע) */
+  vote(viewer: Viewer, pollId: string, option: number): Promise<void>;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -167,3 +288,20 @@ export function playMs(d: LiveData, until = Date.now()) {
 /** סכום מונה, כולל או לעצירה אחת */
 export const countOf = (d: LiveData, c: CounterName, missionId?: string) =>
   Math.max(0, d.counters.reduce((n, e) => n + (e.counter === c && (missionId == null || e.mission_id === missionId) ? e.delta : 0), 0));
+
+export const MARKER_TYPES: Record<MarkerType, { label: string; hint: string }> = {
+  death: { label: 'מוות', hint: 'מתתי כאן' },
+  car: { label: 'רכב חדש', hint: 'רכב שהשגנו' },
+  weapon: { label: 'נשק חדש', hint: 'נשק שהשגנו' },
+  property: { label: 'נכס', hint: 'בית, עסק, מחבוא' },
+  heist: { label: 'שוד', hint: 'שוד או כסף גדול' },
+  chase: { label: 'מרדף', hint: 'מרדף משטרתי' },
+  moment: { label: 'רגע', hint: 'סתם רגע שווה' },
+  decision: { label: 'החלטת הצ׳אט', hint: 'נוצר מסקר' },
+  custom: { label: 'משלכם', hint: 'אימוג׳י או תמונה' },
+};
+
+/** האם הסקר עדיין פתוח (לפי סטטוס וזמן) */
+export const pollOpen = (p: Poll, now = Date.now()) => p.status === 'open' && Date.parse(p.ends_at) > now;
+/** הסטוריז שמוצגים לצופים: מאושרים ובתוקף */
+export const liveStories = (list: Story[], now = Date.now()) => list.filter((s) => s.status === 'approved' && Date.parse(s.expires_at) > now);

@@ -65,7 +65,7 @@ export function clipCard(c: Clip, opts: { stop?: string; onPlay: (c: Clip, el: H
 }
 
 /** תוכן הפאנל "קליפים" */
-export function clipsView(clips: Clip[], d: Data, opts: { demo: boolean; channel: string; onStop: (i: number) => void }) {
+export function clipsView(clips: Clip[], d: Data, opts: { demo: boolean; channel: string; onStop: (i: number) => void; comments?: (c: Clip) => HTMLElement }) {
   let sort: 'new' | 'top' = 'new';
   let stopPlaying: (() => void) | null = null;
   const grid = h('div', { class: 'clips' });
@@ -87,6 +87,7 @@ export function clipsView(clips: Clip[], d: Data, opts: { demo: boolean; channel
           go.onclick = () => opts.onStop(i);
           card.querySelector('.clip__body')!.append(go);
         }
+        if (opts.comments) card.append(opts.comments(c));
         return card;
       }),
     );

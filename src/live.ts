@@ -1,5 +1,5 @@
-// מה שקורה בשידור, באתר: תג "משחק עכשיו", זמן משחק שמתקתק, ומוני מוות וחתולים.
-import { countOf, kickSlug, playMs, statusFresh, type CounterName, type Data, type LiveData } from './data/types';
+// תג "משחק עכשיו" במפה. המונים וזמן המשחק נמצאים בדף הסטטיסטיקות (stats.html).
+import { kickSlug, statusFresh, type Data, type LiveData } from './data/types';
 import { h } from './dom';
 
 /** 187:05 → שעות:דקות */
@@ -18,26 +18,7 @@ export function createLive(stage: HTMLElement, opts: { onWatch: (channel: string
   const badge = h('button', { class: 'onair', type: 'button', hidden: true });
   badge.onclick = () => data && opts.onWatch(kickSlug(data.settings.kick_channel));
 
-  // ── מונים: זמן משחק, מוות, חתולים ──
-  const cell = (cls: string, icon: string, label: string) => {
-    const n = h('b', {}, '0');
-    const el = h('span', { class: `stat stat--${cls}`, title: label, ariaLabel: label }, h('i', { ariaHidden: 'true' }, icon), n);
-    return { el, n };
-  };
-  const play = cell('play', '⏱', 'שעות משחק ב-GTA 6');
-  const deaths = cell('deaths', '💀', 'כמה פעמים מת');
-  const cats = cell('cats', '🐈', 'חתולים שנדרסו');
-  const stats = h('div', { class: 'stats', hidden: true }, play.el, deaths.el, cats.el);
-  stage.querySelector('.hud')!.append(stats);
   stage.append(badge);
-
-  const shown: Record<CounterName, number> = { deaths: -1, cats: -1 };
-  function bumpAnim(c: CounterName, el: HTMLElement) {
-    el.classList.remove('is-bump');
-    void el.offsetWidth;
-    el.classList.add('is-bump');
-    if (c === 'deaths') el.dataset.fx = '+1';
-  }
 
   function render() {
     if (!live || !data) return;
@@ -53,18 +34,9 @@ export function createLive(stage: HTMLElement, opts: { onWatch: (channel: string
     badge.dataset.viewers = fresh && s?.viewers ? `${s.viewers.toLocaleString('he-IL')} צופים` : '';
     stage.classList.toggle('is-onair', isLive);
 
-    stats.hidden = false;
-    play.n.textContent = fmtPlay(playMs(live));
-    play.el.classList.toggle('is-running', onGame);
-    for (const [c, ui] of [['deaths', deaths], ['cats', cats]] as const) {
-      const v = countOf(live, c);
-      if (shown[c] >= 0 && v > shown[c]) bumpAnim(c, ui.el);
-      shown[c] = v;
-      ui.n.textContent = v.toLocaleString('he-IL');
-    }
   }
-  // זמן המשחק מתקתק גם בלי עדכון מהשרת
-  window.setInterval(render, 15_000);
+  // התג נעלם לבד אם הבדיקות נעצרו
+  window.setInterval(render, 30_000);
 
   return {
     setData(d: Data) {
