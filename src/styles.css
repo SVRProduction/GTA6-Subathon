@@ -536,3 +536,7 @@ details[open] .log__chev { transform: rotate(-90deg); }
   background: var(--paper-2); border: 1.5px solid var(--ink);
 }
 .pin--dot.pin--talk .pin__disc::before { display: none; }
+
+/* בתוך האפליקציה (map.html?embed): בלי פתיחה, בלי קישורים שכבר קיימים בטאבים */
+.is-embed .opening, .is-embed .onair, .is-embed .hud__actions a[href$='stats.html'], .is-embed .hud__actions [data-clips] { display: none !important; }
+.is-embed .hud__actions { bottom: 64px; }

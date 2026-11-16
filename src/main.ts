@@ -32,6 +32,9 @@ const logEl = q('[data-log]');
 
 const DEFAULT_MAP = `${import.meta.env.BASE_URL}map.webp`;
 const flat = new URLSearchParams(location.search).has('2d');
+// בתוך האפליקציה (טאב "מפה"): בלי כרטיס הפתיחה, מתחילים ישר במסע; האפליקציה מזיזה עם ‎#m-N
+const embed = new URLSearchParams(location.search).has('embed');
+if (embed) document.documentElement.classList.add('is-embed');
 const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
 document.body.classList.toggle('flat', flat);
 document.documentElement.classList.toggle('flat-root', flat);
@@ -897,7 +900,15 @@ store
       };
       if (flat) open();
       else onMapReady = open;
-    }
+    } else if (embed) onMapReady = () => goTo(cur);
+    if (embed)
+      addEventListener('hashchange', () => {
+        const m = location.hash.match(/^#m-(\d+)$/);
+        if (m && data.missions[+m[1] - 1]) {
+          goTo(+m[1] - 1);
+          openPanel(+m[1] - 1);
+        }
+      });
     setMap();
     store.loadLive().then(onLive).catch(console.error);
     store.subscribeLive(onLive);
