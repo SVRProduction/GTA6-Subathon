@@ -277,6 +277,7 @@ export function createDemoStore(): Store {
   function settle(e: DemoExtras, p: Poll) {
     if (p.status === 'closed') return;
     p.status = 'closed';
+    p.ends_at = new Date(Math.min(Date.parse(p.ends_at), Date.now())).toISOString();
     const best = Math.max(...p.votes);
     p.winner = best > 0 ? p.votes.indexOf(best) : null;
     if (p.winner != null && p.x != null && p.y != null) {

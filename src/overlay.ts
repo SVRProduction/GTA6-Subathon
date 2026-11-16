@@ -29,14 +29,29 @@ root.append(clock, card);
 let shownId = '';
 let shownState = '';
 
-function current(): { p: Poll; state: 'open' | 'won' } | null {
+type State = 'open' | 'counting' | 'won';
+/** מתי האוברליי ראה כל סקר נסגר (שעון מקומי) – כך ההכרזה לא תלויה במתי השרת סגר אותו */
+const closedSeen = new Map<string, number>();
+const seenOpen = new Set<string>();
+let firstLoad = true;
+
+function current(): { p: Poll; state: State } | null {
   if (!ex) return null;
-  const open = ex.polls.find(pollOpen);
-  if (open) return { p: open, state: 'open' };
   const now = Date.now();
+  for (const p of ex.polls) {
+    if (p.status === 'open') seenOpen.add(p.id);
+    else if (!closedSeen.has(p.id)) {
+      // בטעינה הראשונה: רק סקר שנסגר ממש עכשיו (פחות מ-20 שניות) מוכרז
+      const fresh = seenOpen.has(p.id) || (firstLoad && now - Date.parse(p.ends_at) < WIN_MS);
+      closedSeen.set(p.id, fresh ? now : 0);
+    }
+  }
+  firstLoad = false;
+  const open = ex.polls.find((p) => p.status === 'open');
+  if (open) return { p: open, state: pollOpen(open) ? 'open' : 'counting' };
   const recent = ex.polls
-    .filter((p) => p.status === 'closed' && p.winner != null && now - new Date(p.ends_at).getTime() < WIN_MS)
-    .sort((a, b) => b.ends_at.localeCompare(a.ends_at))[0];
+    .filter((p) => p.winner != null && now - (closedSeen.get(p.id) || 0) < WIN_MS)
+    .sort((a, b) => (closedSeen.get(b.id) || 0) - (closedSeen.get(a.id) || 0))[0];
   return recent ? { p: recent, state: 'won' } : null;
 }
 
@@ -61,7 +76,7 @@ function render() {
   const { p, state } = c;
   const total = p.votes.reduce((a, b) => a + b, 0);
   const lead = Math.max(...p.votes);
-  const fresh = p.id !== shownId || state !== shownState;
+  const fresh = p.id !== shownId || (state === 'won') !== (shownState === 'won');
   if (fresh) {
     shownId = p.id;
     shownState = state;
@@ -71,7 +86,7 @@ function render() {
       h(
         'header',
         { class: 'ov-head' },
-        h('span', { class: 'ov-tag' }, h('i'), state === 'open' ? 'סקר הצ׳אט' : 'הצ׳אט החליט'),
+        h('span', { class: 'ov-tag' }, h('i'), state === 'won' ? 'הצ׳אט החליט' : 'סקר הצ׳אט'),
         h('b', { class: 'ov-time' }),
       ),
       h('div', { class: 'ov-main' }, miniMap(p), h('h2', { class: 'ov-q' }, p.question)),
@@ -84,13 +99,13 @@ function render() {
       ),
       h('footer', { class: 'ov-foot' }),
     );
-    card.classList.add('is-on', state === 'open' ? 'is-open' : 'is-won');
+    card.classList.add('is-on', state === 'won' ? 'is-won' : 'is-open');
   }
   card.querySelectorAll<HTMLElement>('.ov-opt').forEach((li, i) => {
     const v = p.votes[i] ?? 0;
     const pct = total ? Math.round((v / total) * 100) : 0;
     li.style.setProperty('--p', `${pct}%`);
-    li.classList.toggle('is-lead', state === 'open' && total > 0 && v === lead);
+    li.classList.toggle('is-lead', state !== 'won' && total > 0 && v === lead);
     li.classList.toggle('is-win', state === 'won' && p.winner === i);
     li.querySelector('.ov-pct')!.textContent = `${pct}%`;
   });
@@ -102,6 +117,9 @@ function render() {
       h('span', {}, 'כתבו ', h('b', {}, p.options.map((_, i) => `!${i + 1}`).join(' / ')), ' בצ׳אט · או באתר'),
       h('span', {}, `${total.toLocaleString('he-IL')} קולות`),
     );
+  } else if (state === 'counting') {
+    time.textContent = '0:00';
+    foot.replaceChildren(h('span', {}, 'ההצבעה נגמרה · סופרים…'), h('span', {}, `${total.toLocaleString('he-IL')} קולות`));
   } else {
     time.textContent = '';
     foot.replaceChildren(

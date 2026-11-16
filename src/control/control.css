@@ -585,3 +585,7 @@ button.pc__opt:active { transform: scale(0.985); }
   .journey__stage:has(.panel[data-open]:not(.is-menu)) .phone-btn { left: 50%; }
   .journey__stage:has(.panel[data-open]:not(.is-menu)) .poll-chip { left: calc(180px + (100% - 620px) / 2); max-width: calc(100% - 640px); }
 }
+
+/* כפתורי תצוגה בחלון השכבות (בעיקר לטלפון, שם הם לא על המסך) */
+.ly-view { display: flex; flex-wrap: wrap; gap: 8px; }
+.ly-view .btn { min-height: 44px; }

@@ -296,7 +296,19 @@ export function createControl(o: {
     };
     const counts = new Map<string, number>();
     (ex?.markers ?? []).forEach((m) => counts.set(m.type, (counts.get(m.type) ?? 0) + 1));
+    // בטלפון כפתורי התצוגה של המפה מוסתרים מהמסך, אז הם כאן
+    const viewBtn = (sel: string, icon: string, label: string) => {
+      const b = h('button', { type: 'button', class: 'btn btn--small' }, svg(icon, 16), label);
+      b.onclick = () => {
+        closePopup();
+        stage.querySelector<HTMLElement>(sel)?.click();
+      };
+      return b;
+    };
+    const guideBtn = h('button', { type: 'button', class: 'btn btn--small tb__btn--mod' }, svg('help', 16), 'מדריך למודים');
+    guideBtn.onclick = () => openGuide();
     return [
+      h('div', { class: 'ly-view' }, viewBtn('[data-explore]', 'explore', 'לטייל חופשי'), viewBtn('[data-cinema]', 'cinema', 'מצב קולנוע'), mod ? guideBtn : null),
       h('p', { class: 'f-hint' }, 'שתי שכבות: המסלול (העצירות, לפי הסדר) ומרקרים חופשיים בכל מקום על המפה.'),
       h('div', { class: 'lys' }, row('route', 'המסלול והעצירות', svg('stops', 16), o.data()?.missions.length ?? 0), ...(Object.keys(MARKER_TYPES) as MarkerType[]).map((t) => row(t, MARKER_TYPES[t].label, markerIcon(t, 16), counts.get(t) ?? 0))),
       h('div', { class: 'keys' }, h('p', { class: 'pop__sub' }, 'מקשים'), h('ul', {}, ...[['↑ ↓', 'עצירה הבאה / הקודמת'], ['S', 'סטטיסטיקות'], ['F', 'פיד חי'], ['C', 'קליפים'], ['T', 'הטלפון'], ['K', 'מצב קולנוע'], ['Esc', 'סגירה']].map(([k, l]) => h('li', {}, h('kbd', {}, k), h('span', {}, l))))),

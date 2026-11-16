@@ -102,15 +102,29 @@ export function createSupabaseStore(url: string, key: string): Store {
       const refresh = () => {
         clearTimeout(timer);
         // סקר חי: הרבה קולות בשנייה – מאחדים לרענון אחד בכל ~700ms
-        timer = window.setTimeout(() => loadExtras(mod).then(cb).catch(console.error), 250 + Math.random() * 500);
+        timer = window.setTimeout(
+          () =>
+            loadExtras(mod)
+              .then((e) => {
+                hasOpen = e.polls.some((p) => p.status === 'open');
+                cb(e);
+              })
+              .catch(console.error),
+          250 + Math.random() * 500,
+        );
       };
+      // הקולות עצמם פרטיים (אין Realtime עליהם לצופים), אז בזמן סקר פתוח מרעננים את התוצאות כל ~3 שניות
+      let hasOpen = false;
+      const fast = window.setInterval(() => hasOpen && document.visibilityState !== 'hidden' && refresh(), 3000);
       const ch = sb.channel(`extras-${mod ? 'mod' : 'pub'}`);
       for (const table of ['markers', 'stories', 'polls', 'poll_votes']) ch.on('postgres_changes', { event: '*', schema: 'public', table }, refresh);
       ch.subscribe();
       const poll = window.setInterval(refresh, 60_000);
+      loadExtras(mod).then((e) => (hasOpen = e.polls.some((p) => p.status === 'open'))).catch(() => {});
       return () => {
         clearTimeout(timer);
         clearInterval(poll);
+        clearInterval(fast);
         sb.removeChannel(ch);
       };
     },
