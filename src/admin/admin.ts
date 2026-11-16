@@ -1,6 +1,6 @@
 import { $, fill, fmtDate, h } from '../dom';
 import { createStore } from '../data/store';
-import { countOf, currentIndex, newMission, statusFresh, type CounterName, type Data, type LiveData, type Mission } from '../data/types';
+import { countOf, currentIndex, newMission, statusFresh, type Comment, type CounterName, type Data, type LiveData, type Mission } from '../data/types';
 import { safeUrl } from '../dom';
 import { createPicker } from './picker';
 
@@ -31,6 +31,9 @@ const app = $('app');
 const editor = $<HTMLDialogElement>('editor');
 let data: Data;
 let live: LiveData | null = null;
+let settingsOpen = false;
+let comments: Comment[] = [];
+let showHidden = false;
 
 let toastTimer = 0;
 function toast(text: string, bad = false) {
@@ -137,7 +140,9 @@ function renderLogin() {
   const form = h(
     'form',
     { class: 'panel login' },
+    h('p', { class: 'stamp' }, 'חדר הבקרה'),
     h('h1', {}, 'ניהול המסע'),
+    h('p', { class: 'muted' }, 'כניסה למי שמעדכן את המפה בזמן הלייב.'),
     field('אימייל', email),
     field('סיסמה', pass),
     h('button', { class: 'btn primary', type: 'submit' }, 'כניסה'),
@@ -198,19 +203,34 @@ function openEditor(m: Mission, isNew: boolean) {
   const form = h(
     'form',
     {},
-    h('h2', {}, isNew ? 'נקודה חדשה על המפה' : 'עריכה'),
-    field('שם', title),
-    h('div', { class: 'field' }, h('span', {}, 'איפה זה קרה על המפה?'), picker.el),
-    field('תקציר קצר (מופיע בכרטיס ליד הסיכה)', summary),
-    h('div', { class: 'row' }, field('סוג', kind), field('יום בסאבתון', day), field('מתי קרה', when)),
-    h('label', { class: 'check' }, milestone, h('span', {}, '★ מיילסטון – סיכה גדולה עם תמונה, וריקאפ מלא')),
-    field('פרק בעלילה', chapter, 'מקבץ את הסיכות בפס הפרקים בצד. ריק = לפי יום'),
-    field('ריקאפ מלא (מה קרה ולמה זה חשוב)', body),
-    field('קישור לקטע מהלייב', recap, 'קליפ או VOD של Kick, YouTube, או קובץ וידאו ישיר (mp4) שיתנגן בתוך האתר'),
-    field('קישור להורדה', download),
-    h('div', { class: 'upload' }, h('span', {}, 'או העלאת קובץ להורדה:'), uploader(download, 'video/*,audio/*,image/*')),
-    shotField(image),
-    h('div', { class: 'row' }, field('ציטוט (אופציונלי)', quote), field('מי אמר', quoteBy)),
+    h('header', { class: 'editor__head' }, h('p', { class: 'stamp' }, isNew ? `עצירה ${data.missions.length + 1}` : 'עריכה'), h('h2', {}, isNew ? 'עצירה חדשה על המפה' : m.title || 'עריכת עצירה')),
+    h(
+      'fieldset',
+      { class: 'group' },
+      h('legend', {}, 'מה קרה ואיפה'),
+      field('שם', title),
+      field('תקציר קצר', summary, 'מופיע בכרטיס הקטן ליד הסיכה'),
+      h('div', { class: 'field' }, h('span', {}, 'איפה על המפה'), picker.el),
+      h('label', { class: 'check check--ms' }, milestone, h('span', {}, h('strong', {}, 'מיילסטון'), h('small', {}, 'סיכה צהובה גדולה, סימון בפס ההתקדמות וריקאפ מלא'))),
+    ),
+    h(
+      'fieldset',
+      { class: 'group' },
+      h('legend', {}, 'ריקאפ ומדיה'),
+      shotField(image),
+      field('ריקאפ מלא', body, 'מה קרה ולמה זה חשוב לעלילה'),
+      field('קישור לקטע מהלייב', recap, 'קליפ או VOD של Kick, YouTube, או קובץ mp4 ישיר שמתנגן בתוך האתר'),
+      field('קישור להורדה', download),
+      h('div', { class: 'upload' }, h('span', {}, 'או העלאת קובץ להורדה:'), uploader(download, 'video/*,audio/*,image/*')),
+    ),
+    h(
+      'details',
+      { class: 'group group--more', open: !isNew },
+      h('summary', {}, 'עוד פרטים: סוג, יום, פרק וציטוט'),
+      h('div', { class: 'row' }, field('סוג', kind), field('יום בסאבתון', day), field('מתי קרה', when)),
+      field('פרק בעלילה', chapter, 'מקבץ את הסיכות בפס הפרקים. ריק = לפי יום'),
+      h('div', { class: 'row' }, field('ציטוט', quote), field('מי אמר', quoteBy)),
+    ),
     h(
       'div',
       { class: 'actions' },
@@ -307,6 +327,76 @@ function countersPanel(compact: boolean) {
   );
 }
 
+/** העצירה הנוכחית והפעולה הכי חשובה בלייב: עצירה חדשה */
+function nowCard() {
+  const { missions } = data;
+  const i = currentIndex(data);
+  const m = missions[i];
+  const nextOrder = missions.length ? Math.max(...missions.map((x) => x.order_index)) + 1 : 0;
+  const add = h('button', { class: 'btn primary btn--big', type: 'button' }, '+ עצירה חדשה');
+  add.onclick = () => {
+    const last = missions[missions.length - 1];
+    openEditor({ ...newMission(nextOrder), chapter: last?.chapter ?? null, stream_day: last?.stream_day ?? null }, true);
+  };
+  return h(
+    'section',
+    { class: 'now-card' },
+    h(
+      'div',
+      { class: 'now-card__info' },
+      h('p', { class: 'stamp' }, m ? 'אנחנו עכשיו ב' : 'עוד לא התחלנו'),
+      m ? h('h2', {}, h('span', { class: `num ${m.is_milestone ? 'num--ms' : ''}` }, String(i + 1)), m.title || '(ללא שם)') : h('h2', {}, 'העצירה הראשונה מחכה'),
+      m ? h('p', { class: 'muted' }, [m.chapter, m.stream_day ? `יום ${m.stream_day}` : '', fmtDate(m.happened_at)].filter(Boolean).join('  |  ')) : null,
+    ),
+    h('div', { class: 'now-card__actions' }, add, m ? h('button', { class: 'btn', type: 'button', onclick: () => openEditor(m, false) }, 'עריכת הנוכחית') : null),
+  );
+}
+
+/** תגובות אחרונות מהצופים: הסתרה, מחיקה וחסימה */
+function commentsPanel() {
+  const titleOf = (c: Comment) => {
+    if (c.target_type === 'stop') {
+      const i = data.missions.findIndex((m) => m.id === c.target_id);
+      return i >= 0 ? { label: `עצירה ${i + 1}: ${data.missions[i].title}`, href: `./#m-${i + 1}` } : { label: 'עצירה שנמחקה', href: '' };
+    }
+    const clip = live?.clips.find((x) => x.id === c.target_id);
+    return { label: `קליפ: ${clip?.title || 'קליפ'}`, href: '' };
+  };
+  const list = [...comments].filter((c) => showHidden || !c.hidden).reverse().slice(0, 60);
+  const toggle = h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: showHidden, onchange: (e: Event) => { showHidden = (e.target as HTMLInputElement).checked; render(); } }), h('span', {}, 'להציג גם מוסתרות'));
+  return h(
+    'section',
+    { class: 'panel' },
+    h('div', { class: 'panel-head' }, h('h2', {}, `תגובות אחרונות (${comments.filter((c) => !c.hidden).length})`), toggle),
+    list.length
+      ? h(
+          'ol',
+          { class: 'cmt-mod' },
+          ...list.map((c) => {
+            const t = titleOf(c);
+            return h(
+              'li',
+              { class: c.hidden ? 'is-hidden' : '' },
+              h(
+                'div',
+                { class: 'cmt-mod__main' },
+                h('p', { class: 'cmt-mod__meta' }, h('strong', {}, c.username), h('span', {}, fmtDate(c.created_at)), t.href ? h('a', { href: t.href, target: '_blank' }, t.label) : h('span', {}, t.label)),
+                h('p', { class: 'cmt-mod__body' }, c.body),
+              ),
+              h(
+                'div',
+                { class: 'ops' },
+                h('button', { type: 'button', onclick: () => run(() => store.moderateComment(c.id, c.hidden ? 'show' : 'hide'), c.hidden ? 'התגובה חזרה' : 'התגובה הוסתרה') }, c.hidden ? 'החזרה' : 'הסתרה'),
+                h('button', { type: 'button', class: 'danger', onclick: (e: MouseEvent) => twice(e, () => run(() => store.moderateComment(c.id, 'delete'), 'נמחקה')) }, 'מחיקה'),
+                h('button', { type: 'button', class: 'danger', title: 'חוסם את המשתמש מלהגיב ומסתיר את כל התגובות שלו', onclick: (e: MouseEvent) => twice(e, () => run(() => store.banUser(c.kick_user_id, c.username), `${c.username} נחסם`)) }, 'חסימה'),
+              ),
+            );
+          }),
+        )
+      : h('p', { class: 'empty' }, 'עוד אין תגובות. צופים מגיבים מהפאנל של כל עצירה ומתחת לקליפים, אחרי התחברות עם Kick.'),
+  );
+}
+
 function render() {
   if (location.hash === '#counters') {
     fill(app, countersPanel(true));
@@ -351,8 +441,8 @@ function render() {
   );
   const settingsForm = h(
     'form',
-    { class: 'panel' },
-    h('h2', {}, 'הגדרות'),
+    { class: 'panel settings' },
+    h('h2', {}, 'הגדרות האתר'),
     h('div', { class: 'row' }, field('כותרת הסאבתון', sTitle), field('ערוץ Kick', sKick), field('תחילת הסאבתון', sStart)),
     field('קטגוריה ב-Kick', sCat, 'הכתובת של הקטגוריה (מה שאחרי kick.com/category/). רק הזמן בקטגוריה הזו נספר, ורק הקליפים ממנה מופיעים.'),
     h('label', { class: 'check' }, sLive, h('span', {}, 'אני בלייב עכשיו (גיבוי ידני: משמש רק כשהבדיקה האוטומטית מול Kick לא פעילה)')),
@@ -385,12 +475,12 @@ function render() {
       h(
         'li',
         { class: i === cur ? 'now' : '' },
-        h('span', { class: 'num' }, String(i + 1)),
+        h('span', { class: `num ${m.is_milestone ? 'num--ms' : ''}` }, String(i + 1)),
         h(
           'div',
           { class: 'info' },
-          h('strong', {}, (m.is_milestone ? '★ ' : '') + (m.title || '(ללא שם)')),
-          h('small', {}, [m.kind === 'moment' ? 'קטע' : 'משימה', m.stream_day ? `יום ${m.stream_day}` : '', fmtDate(m.happened_at), i === cur ? '📍 נוכחית' : ''].filter(Boolean).join(' · ')),
+          h('strong', {}, m.title || '(ללא שם)'),
+          h('small', {}, [m.is_milestone ? 'מיילסטון' : m.kind === 'moment' ? 'קטע' : 'משימה', m.stream_day ? `יום ${m.stream_day}` : '', fmtDate(m.happened_at), i === cur ? 'כאן אנחנו עכשיו' : ''].filter(Boolean).join('  |  ')),
         ),
         h(
           'div',
@@ -414,8 +504,8 @@ function render() {
     h(
       'header',
       { class: 'top' },
-      h('h1', {}, 'ניהול המסע'),
-      h('a', { class: 'btn', href: './', target: '_blank' }, 'צפייה באתר ↗'),
+      h('div', { class: 'top__title' }, h('p', { class: 'stamp' }, 'חדר הבקרה'), h('h1', {}, settings.title || 'ניהול המסע')),
+      h('a', { class: 'btn', href: './', target: '_blank' }, 'לאתר'),
       store.mode === 'supabase'
         ? h('button', { class: 'btn', type: 'button', onclick: async () => { await store.signOut(); renderLogin(); } }, 'יציאה')
         : null,
@@ -423,6 +513,7 @@ function render() {
     store.mode === 'demo'
       ? h('p', { class: 'banner' }, 'מצב דמו: השינויים נשמרים רק בדפדפן הזה. אחרי חיבור Supabase (ראה README) הם יגיעו לכל הצופים בזמן אמת.')
       : null,
+    nowCard(),
     countersPanel(false),
     h(
       'section',
@@ -432,19 +523,30 @@ function render() {
         { class: 'panel-head' },
         h('h2', {}, `העצירות (${missions.length})`),
         h('button', {
-          class: 'btn primary',
+          class: 'btn',
           type: 'button',
           onclick: () => {
             // ממשיכים את הפרק והיום של הנקודה האחרונה – באמצע לייב רק שם ומיקום
             const last = missions[missions.length - 1];
             openEditor({ ...newMission(nextOrder), chapter: last?.chapter ?? null, stream_day: last?.stream_day ?? null }, true);
           },
-        }, '+ נקודה חדשה'),
+        }, '+ עצירה חדשה'),
       ),
-      missions.length ? list : h('p', { class: 'empty' }, 'עדיין אין נקודות. הוסף את המשימה הראשונה כשהלייב מתחיל.'),
+      missions.length ? list : h('p', { class: 'empty' }, 'עדיין אין עצירות. מוסיפים את המשימה הראשונה כשהלייב מתחיל.'),
     ),
-    settingsForm,
+    commentsPanel(),
+    (() => {
+      // נשאר פתוח גם אחרי שמירה (העמוד נבנה מחדש בכל שינוי)
+      const fold = h('details', { class: 'fold', open: settingsOpen }, h('summary', {}, h('span', {}, 'הגדרות האתר'), h('small', {}, 'שם, ערוץ, קטגוריה, מפה וזום')), settingsForm);
+      fold.addEventListener('toggle', () => (settingsOpen = fold.open));
+      return fold;
+    })(),
   );
+  // לפעולה הכי נפוצה בלייב: גלילה לרשימה מעלה את העצירה הנוכחית
+  // (גוללים רק בתוך הרשימה, לא את כל העמוד)
+  const box = app.querySelector<HTMLElement>('.list');
+  const now = box?.querySelector<HTMLElement>('li.now');
+  if (box && now) box.scrollTop = now.offsetTop - box.offsetTop - box.clientHeight / 2 + now.clientHeight / 2;
 }
 
 async function start() {
@@ -466,6 +568,12 @@ async function start() {
     if (!editor.open) render();
   };
   store.loadLive().then(onLive).catch(() => {});
+  const onComments = (c: Comment[]) => {
+    comments = c;
+    if (!editor.open) render();
+  };
+  store.loadComments(true).then(onComments).catch(() => {});
+  store.subscribeComments(onComments, true);
   store.subscribeLive(onLive);
   addEventListener('hashchange', render);
 }
