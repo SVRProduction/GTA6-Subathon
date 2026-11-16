@@ -1,32 +1,39 @@
-// phone.html – "הטלפון" כאפליקציה: המבנה של גרסה 4 (בית עם סטוריז, מפה, פיד קליפים, מספרים)
-// בעיצוב של האתר (גרסה 6). אפשר להתקין כ-WebApp. ‎#home / #map / #clips / #stats / #m-N / #story-… / #clip-…
-import { getViewer, login, loginError, logout, onViewer } from '../auth';
+// גרסה 4 · Stories – האתר כאפליקציה לטלפון: בית עם סטוריז, מפה, פיד קליפים ומספרים.
+// המפה והמספרים הם הדפים הקיימים (index.html?embed / phone-stats.html) בתוך הטאבים, כך שהמנוע לא משוכפל.
+import { ChartColumnBig, Clapperboard, ExternalLink, House, Map as MapIco, MapPin, MessageCircle, Play, Share2, Volume2, VolumeX, X, createElement, type IconNode } from 'lucide';
+import { loginError } from '../auth';
 import { playClip } from '../clips';
 import { commentCount, commentsBox, initComments } from '../comments';
-import { svg } from '../control/icons';
-import { pollCard } from '../control/polls';
-import { statsView } from '../control/stats';
-import { createStoryViewer, seenSet, type StoryItem } from '../control/stories';
 import { createStore } from '../data/store';
-import { countOf, currentIndex, kickSlug, liveStories, playMs, pollOpen, statusFresh, type Clip, type Comment, type Data, type Extras, type LiveData, type Mission } from '../data/types';
+import { countOf, currentIndex, kickSlug, playMs, statusFresh, type Clip, type Data, type LiveData, type Mission } from '../data/types';
 import { fill, h, safeUrl } from '../dom';
 import { videoEmbed } from '../journey/content';
-import { buildCurve, makeTrail, placeAll } from '../journey/route';
+import { makeTrail, placeAll, type Pt } from '../journey/route';
 import { fmtPlay } from '../live';
 
 const store = createStore();
-// אייקונים בטאב-בר (מאותו סט כמו באתר)
-document.querySelectorAll<HTMLElement>('[data-ico]').forEach((el) => el.append(svg(el.dataset.ico!, el.classList.contains('ap-tab__plus') ? 28 : 22)));
 const B = import.meta.env.BASE_URL;
 const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const $ = <T extends HTMLElement = HTMLElement>(s: string) => document.querySelector<T>(s)!;
 
+const ICONS: Record<string, IconNode> = { House, Map: MapIco, Clapperboard, ChartColumnBig };
+function ico(node: IconNode, size = 22) {
+  const el = createElement(node);
+  el.setAttribute('width', String(size));
+  el.setAttribute('height', String(size));
+  el.setAttribute('stroke-width', '2');
+  el.setAttribute('aria-hidden', 'true');
+  return el;
+}
+document.querySelectorAll<HTMLElement>('[data-ico]').forEach((s) => s.append(ico(ICONS[s.dataset.ico!])));
+
 // ── מצב ──
 let data: Data | null = null;
 let live: LiveData | null = null;
-let ex: Extras | null = null;
-let comments: Comment[] = [];
-const freshIds = new Set<string>(); // עצירות / סטוריז שנוספו בזמן שהאפליקציה פתוחה
+let pos: Pt[] = []; // מיקום כל עצירה על המפה (0–1)
+const mapImg = new Image();
+mapImg.crossOrigin = 'anonymous';
+let trailRaw: Array<[number, number]> | null = null;
 
 let toastTimer = 0;
 function toast(t: string) {
@@ -34,108 +41,370 @@ function toast(t: string) {
   el.textContent = t;
   el.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = window.setTimeout(() => el.classList.remove('show'), 3400);
+  toastTimer = window.setTimeout(() => el.classList.remove('show'), 3200);
 }
+
 const num = (n: number) => n.toLocaleString('he-IL');
 const isLive = () => !!data && !!live && (statusFresh(live.status) ? !!live.status?.is_live : data.settings.is_live);
 const onGame = () => !!live && statusFresh(live.status) && !!live.status?.on_category;
-const ago = (iso: string | null | undefined) => {
+const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
+const ago = (iso: string | null) => {
   if (!iso) return '';
   const m = Math.max(1, Math.round((Date.now() - Date.parse(iso)) / 60_000));
   if (m < 60) return `לפני ${m} דק'`;
   if (m < 1440) return `לפני ${Math.round(m / 60)} שע'`;
   return `לפני ${Math.round(m / 1440)} ימים`;
 };
-const btn = (cls: string, label: Array<Node | string> | string, onclick: () => void, aria?: string) => {
-  const b = h('button', { class: cls }, ...(typeof label === 'string' ? [label] : label));
-  b.type = 'button';
-  if (aria) b.setAttribute('aria-label', aria);
-  b.onclick = onclick;
-  return b;
-};
 
 // ── צילום המפה במקום של עצירה (רקע לסטורי ולכרטיסים) ──
-const mapImg = new Image();
-mapImg.crossOrigin = 'anonymous';
-let trailRaw: Array<[number, number]> | null = null;
-let points: Array<{ x: number; y: number }> = [];
-function computePoints() {
+function computePositions() {
   if (!data || !mapImg.naturalWidth) return;
-  const W = mapImg.naturalWidth;
-  const H = mapImg.naturalHeight;
-  const trail = !data.settings.map_image_url && trailRaw ? makeTrail(trailRaw, W, H) : null;
-  points = buildCurve(placeAll(data.missions, trail), W, H, trail).stops;
+  const trail = trailRaw ? makeTrail(trailRaw, mapImg.naturalWidth, mapImg.naturalHeight) : null;
+  pos = placeAll(data.missions, trail);
 }
-/** חיתוך של המפה סביב העצירה + סיכה פועמת במקום */
-function snapshot(i: number, w: number, hh: number, span: number): HTMLElement | null {
-  computePoints();
-  const p = points[i];
-  if (!p || !mapImg.naturalWidth) return null;
-  const W = mapImg.naturalWidth;
-  const H = mapImg.naturalHeight;
+function snapshot(i: number, w: number, hgt: number, span = 0.2): HTMLCanvasElement {
   const c = document.createElement('canvas');
   c.width = w;
-  c.height = hh;
+  c.height = hgt;
+  c.className = 'snap';
+  const p = pos[i];
   const g = c.getContext('2d')!;
-  const sw = Math.min(W, Math.min(W, H) * span);
-  const sh = Math.min(H, (sw * hh) / w);
-  const sx = Math.max(0, Math.min(W - sw, p.x - sw / 2));
-  const sy = Math.max(0, Math.min(H - sh, p.y - sh / 2));
-  g.fillStyle = '#0b2f4a';
-  g.fillRect(0, 0, w, hh);
-  g.drawImage(mapImg, sx, sy, sw, sh, 0, 0, w, hh);
-  c.className = 'st-img';
-  c.setAttribute('role', 'img');
-  c.setAttribute('aria-label', `המקום של ${data?.missions[i]?.title ?? 'העצירה'} על המפה`);
-  const pin = h('span', { class: 'st-pin', ariaHidden: 'true' });
-  pin.style.left = `${((p.x - sx) / sw) * 100}%`;
-  pin.style.top = `${((p.y - sy) / sh) * 100}%`;
-  return h('div', { class: 'st-crop' }, c, pin);
+  g.fillStyle = '#0d3a5c';
+  g.fillRect(0, 0, w, hgt);
+  if (p && mapImg.naturalWidth) {
+    const W = mapImg.naturalWidth;
+    const H = mapImg.naturalHeight;
+    const sw = Math.min(W, W * span);
+    const sh = Math.min(H, (sw * hgt) / w);
+    // לא יוצאים מגבולות המפה (אחרת יש פס ריק); הסיכה זזה בהתאם
+    const sx = Math.max(0, Math.min(W - sw, p.x * W - sw / 2));
+    const sy = Math.max(0, Math.min(H - sh, p.y * H - sh / 2));
+    g.drawImage(mapImg, sx, sy, sw, sh, 0, 0, w, hgt);
+    c.dataset.px = String(((p.x * W - sx) / sw) * 100);
+    c.dataset.py = String(((p.y * H - sy) / sh) * 100);
+  }
+  return c;
 }
-function stopBg(i: number, w = 900, hh = 1600, span = 0.16): HTMLElement | null {
-  const m = data?.missions[i];
+/** עטיפה עם סיכה פועמת במקום של העצירה (אם הרקע הוא המפה) */
+function withPin(bg: HTMLElement) {
+  const pin = h('span', { className: 'st-pin', ariaHidden: 'true' });
+  if (bg.dataset.px) {
+    pin.style.left = `${bg.dataset.px}%`;
+    pin.style.top = `${bg.dataset.py}%`;
+  } else pin.hidden = true;
+  return [bg, pin];
+}
+/** רקע של עצירה: התמונה מהקטע אם יש, אחרת המפה במקום שלה */
+function stopBg(i: number, w: number, hgt: number, span?: number): HTMLElement {
+  const m = data!.missions[i];
   const img = safeUrl(m?.image_url);
-  if (img) return h('img', { class: 'st-img', src: img, alt: m?.title ?? '' });
-  return snapshot(i, w, hh, span);
+  return img ? h('img', { className: 'snap', src: img, alt: '' }) : snapshot(i, w, hgt, span);
 }
 
-// ══════════════ גיליון תחתון (תגובות / נגן / העלאה / צ׳אט) ══════════════
-const sheetWrap = $('[data-sheet]');
-let closeSheet: (() => void) | null = null;
-function openSheet(title: string, body: Node, opts: { tall?: boolean } = {}) {
-  closeSheet?.();
-  document.body.classList.add('is-sheet');
-  const close = btn('ap-sheet__close', [svg('close', 20)], () => done(), 'סגירה');
-  const panel = h('div', { class: `ap-sheet ${opts.tall ? 'ap-sheet--tall' : ''}`, role: 'dialog', ariaModal: 'true', ariaLabel: title }, h('div', { class: 'ap-sheet__grip', ariaHidden: 'true' }), h('header', { class: 'ap-sheet__head' }, h('h3', {}, title), close), h('div', { class: 'ap-sheet__body' }, body));
-  const dim = h('div', { class: 'ap-sheet__dim' });
-  fill(sheetWrap, dim, panel);
-  sheetWrap.hidden = false;
-  requestAnimationFrame(() => sheetWrap.classList.add('is-open'));
-  const done = () => {
-    if (closeSheet !== done) return;
-    closeSheet = null;
-    sheetWrap.classList.remove('is-open');
-    document.body.classList.remove('is-sheet');
-    sheetWrap.querySelectorAll('video, iframe').forEach((v) => v.remove());
-    setTimeout(() => {
-      if (closeSheet) return;
-      sheetWrap.hidden = true;
-      sheetWrap.replaceChildren();
-    }, reduce ? 0 : 240);
-    renderHome();
+// ── ניווט בין טאבים (ב-hash, כדי שאפשר לשלוח קישור) ──
+type Tab = 'home' | 'map' | 'clips' | 'stats';
+let tab: Tab = 'home';
+const frames: Partial<Record<Tab, HTMLIFrameElement>> = {};
+function frame(t: 'map' | 'stats', hash = '') {
+  const view = $(`#view-${t}`);
+  let f = frames[t];
+  const src = t === 'map' ? `${B}index.html?embed${hash}` : `${B}phone-stats.html?embed&app${hash}`;
+  if (!f) {
+    f = h('iframe', { className: 'frame', src, title: t === 'map' ? 'המפה' : 'המספרים', allow: 'autoplay; fullscreen' }) as HTMLIFrameElement;
+    frames[t] = f;
+    view.append(f);
+  } else if (hash) {
+    // אותו דף, רק מזיזים את המפה (בלי טעינה מחדש)
+    try {
+      f.contentWindow!.location.hash = hash;
+    } catch {
+      f.src = src;
+    }
+  }
+}
+function show(t: Tab, opts: { stop?: number; clip?: string } = {}) {
+  tab = t;
+  document.querySelectorAll<HTMLElement>('[data-view]').forEach((v) => (v.hidden = v.dataset.view !== t));
+  document.querySelectorAll<HTMLElement>('[data-tab]').forEach((a) => a.toggleAttribute('aria-current', a.dataset.tab === t));
+  document.body.dataset.tab = t;
+  if (t === 'map') frame('map', opts.stop != null ? `#m-${opts.stop + 1}` : '');
+  if (t === 'stats') frame('stats');
+  if (t === 'clips') renderClips(opts.clip);
+  else pauseFeed();
+  if (t === 'home') $('#view-home').scrollTop = $('#view-home').scrollTop; // נשאר איפה שהיה
+}
+function route() {
+  const hsh = location.hash.slice(1);
+  const m = hsh.match(/^m-(\d+)$/);
+  const s = hsh.match(/^story-(\d+)$/);
+  const c = hsh.match(/^clip-(.+)$/);
+  if (m) show('map', { stop: +m[1] - 1 });
+  else if (c) show('clips', { clip: decodeURIComponent(c[1]) });
+  else if (s) {
+    show('home');
+    if (data) openStoryAt(+s[1] - 1);
+  } else if (hsh === 'map' || hsh === 'clips' || hsh === 'stats') show(hsh);
+  else show('home');
+}
+addEventListener('hashchange', route);
+
+// ══════════════ סטוריז ══════════════
+interface Slide {
+  stop: number;
+  label: string;
+}
+interface Group {
+  key: string;
+  title: string;
+  ring: number; // העצירה שמציירת את הטבעת
+  slides: Slide[];
+  isNew?: boolean;
+}
+const SEEN_KEY = 'stories-seen';
+let seen = new Set<string>();
+try {
+  seen = new Set(JSON.parse(localStorage.getItem(SEEN_KEY) ?? '[]'));
+} catch {
+  /* חסום */
+}
+const markSeen = (k: string) => {
+  seen.add(k);
+  try {
+    localStorage.setItem(SEEN_KEY, JSON.stringify([...seen].slice(-300)));
+  } catch {
+    /* חסום */
+  }
+};
+let freshIds = new Set<string>(); // עצירות שנוספו בזמן שהדף פתוח
+
+function groups(): Group[] {
+  if (!data) return [];
+  const ms = data.missions;
+  const out: Group[] = [];
+  // "היום": כל מה שקרה היום (או ב-24 השעות האחרונות)
+  const now = new Date();
+  let today = ms.map((m, i) => ({ m, i })).filter((x) => x.m.happened_at && sameDay(new Date(x.m.happened_at), now));
+  if (!today.length) today = ms.map((m, i) => ({ m, i })).filter((x) => x.m.happened_at && Date.now() - Date.parse(x.m.happened_at) < 864e5);
+  if (today.length) {
+    const sl = today.slice(-12);
+    out.push({ key: `today-${now.toDateString()}-${sl.length}`, title: 'היום', ring: sl[sl.length - 1].i, slides: sl.map((x) => ({ stop: x.i, label: 'היום' })) });
+  }
+  // מיילסטונים, החדש קודם
+  ms.map((m, i) => ({ m, i }))
+    .filter((x) => x.m.is_milestone)
+    .reverse()
+    .forEach((x) => out.push({ key: `ms-${x.m.id}`, title: x.m.title, ring: x.i, slides: [{ stop: x.i, label: `מיילסטון ${x.i + 1}` }], isNew: freshIds.has(x.m.id) }));
+  return out;
+}
+
+const story = $('[data-story]');
+let sg = 0; // קבוצה
+let ss = 0; // שקופית
+let gs: Group[] = [];
+let timer = 0;
+let started = 0;
+let elapsed = 0;
+let paused = false;
+const DUR = 7000;
+
+function openStory(gi: number) {
+  gs = groups();
+  if (!gs[gi]) return;
+  sg = gi;
+  ss = 0;
+  story.hidden = false;
+  document.body.classList.add('is-story');
+  renderSlide();
+  requestAnimationFrame(() => story.classList.add('is-open'));
+}
+function openStoryAt(stop: number) {
+  gs = groups();
+  const gi = gs.findIndex((g) => g.slides.some((s) => s.stop === stop) && g.key.startsWith('ms-'));
+  if (gi >= 0) openStory(gi);
+  else show('map', { stop });
+}
+function closeStory() {
+  cancelAnimationFrame(timer);
+  story.classList.remove('is-open');
+  story.querySelectorAll('video').forEach((v) => v.pause());
+  document.body.classList.remove('is-story');
+  setTimeout(() => {
+    story.hidden = true;
+    story.replaceChildren();
+  }, reduce ? 0 : 260);
+  if (location.hash.startsWith('#story-')) history.replaceState(null, '', '#home');
+  renderHome();
+}
+function step(dir: 1 | -1) {
+  const g = gs[sg];
+  if (dir === 1) {
+    if (ss < g.slides.length - 1) ss++;
+    else if (sg < gs.length - 1) {
+      markSeen(g.key);
+      sg++;
+      ss = 0;
+    } else {
+      markSeen(g.key);
+      return closeStory();
+    }
+  } else if (ss > 0) ss--;
+  else if (sg > 0) {
+    sg--;
+    ss = 0;
+  } else elapsed = 0;
+  renderSlide();
+}
+function tick() {
+  const bar = story.querySelector<HTMLElement>('.st-prog .is-cur i');
+  if (!paused) {
+    const now = performance.now();
+    elapsed += now - started;
+    started = now;
+  } else started = performance.now();
+  if (bar) bar.style.transform = `scaleX(${Math.min(1, elapsed / DUR)})`;
+  if (elapsed >= DUR) return step(1);
+  timer = requestAnimationFrame(tick);
+}
+
+function renderSlide() {
+  if (!data) return;
+  cancelAnimationFrame(timer);
+  const g = gs[sg];
+  const sl = g.slides[ss];
+  const i = sl.stop;
+  const m: Mission = data.missions[i];
+  history.replaceState(null, '', `#story-${i + 1}`);
+  const url = safeUrl(m.recap_url);
+  const nC = commentCount('stop', m.id);
+  const deaths = live ? countOf(live, 'deaths', m.id) : 0;
+  const cats = live ? countOf(live, 'cats', m.id) : 0;
+  const close = h('button', { className: 'st-close', type: 'button', ariaLabel: 'סגירה' }, ico(X, 26));
+  close.onclick = closeStory;
+  const actions = h(
+    'div',
+    { className: 'st-actions' },
+    url ? h('button', { className: 'pill pill--solid', type: 'button', onclick: () => watch(m) }, ico(Play, 18), 'לצפייה בקטע') : null,
+    h('button', { className: 'pill', type: 'button', onclick: () => openComments('stop', m.id, m.title) }, ico(MessageCircle, 18), nC ? `${nC} תגובות` : 'תגובות'),
+    h('button', { className: 'pill pill--icon', type: 'button', ariaLabel: 'במפה', onclick: () => { closeStory(); location.hash = `#m-${i + 1}`; } }, ico(MapPin, 18)),
+    h('button', { className: 'pill pill--icon', type: 'button', ariaLabel: 'שיתוף', onclick: () => share(`${location.origin}${location.pathname}#story-${i + 1}`, m.title) }, ico(Share2, 18)),
+  );
+  // את הלחיצות "קדימה/אחורה" תופסים שני אזורים שקופים מעל התמונה (בעברית: שמאל = קדימה)
+  const back = h('button', { className: 'st-zone st-zone--back', type: 'button', ariaLabel: 'הקודם' });
+  const fwd = h('button', { className: 'st-zone st-zone--fwd', type: 'button', ariaLabel: 'הבא' });
+  back.onclick = () => step(-1);
+  fwd.onclick = () => step(1);
+  fill(
+    story,
+    h('div', { className: 'st-bg' }, ...withPin(stopBg(i, 900, 1600, 0.3))),
+    h('div', { className: 'st-shade' }),
+    h('div', { className: 'st-prog', ariaHidden: 'true' }, ...g.slides.map((_, k) => h('span', { className: k < ss ? 'is-done' : k === ss ? 'is-cur' : '' }, h('i')))),
+    h('div', { className: 'st-head' }, h('span', { className: 'st-ring' }, h('b', {}, String(i + 1))), h('div', {}, h('strong', {}, g.title === 'היום' ? 'היום בסאבתון' : sl.label), h('small', {}, [m.stream_day ? `יום ${m.stream_day}` : '', ago(m.happened_at)].filter(Boolean).join('  |  '))), close),
+    back,
+    fwd,
+    h(
+      'div',
+      { className: 'st-body' },
+      m.chapter ? h('p', { className: 'st-chip' }, m.chapter) : null,
+      h('h2', { className: 'st-title' }, m.title || `עצירה ${i + 1}`),
+      m.summary ? h('p', { className: 'st-sum' }, m.summary) : null,
+      m.quote ? h('blockquote', { className: 'st-quote' }, `“${m.quote}”`, m.quote_by ? h('cite', {}, m.quote_by) : null) : null,
+      deaths || cats ? h('p', { className: 'st-stats' }, deaths ? `💀 ${deaths}` : '', cats ? `  🐈 ${cats}` : '') : null,
+      actions,
+    ),
+  );
+  elapsed = 0;
+  started = performance.now();
+  paused = false;
+  if (!reduce) timer = requestAnimationFrame(tick);
+  else story.querySelector<HTMLElement>('.st-prog .is-cur i')?.style.setProperty('transform', 'scaleX(1)');
+}
+
+// מחוות: החזקה עוצרת, החלקה למטה סוגרת, חצים ו-Esc במקלדת
+{
+  let y0 = 0;
+  let x0 = 0;
+  let dy = 0;
+  let down = false;
+  story.addEventListener('pointerdown', (e) => {
+    if ((e.target as HTMLElement).closest('.st-actions, .st-close')) return;
+    down = true;
+    y0 = e.clientY;
+    x0 = e.clientX;
+    dy = 0;
+    paused = true;
+  });
+  story.addEventListener('pointermove', (e) => {
+    if (!down) return;
+    dy = Math.max(0, e.clientY - y0);
+    if (dy > 6 && Math.abs(e.clientX - x0) < dy) story.style.transform = `translateY(${dy}px) scale(${1 - dy / 2400})`;
+  });
+  const up = () => {
+    if (!down) return;
+    down = false;
+    paused = false;
+    story.style.transform = '';
+    if (dy > 110) closeStory();
   };
+  story.addEventListener('pointerup', up);
+  story.addEventListener('pointercancel', up);
+  // לחיצה אחרי החלקה לא נחשבת "הבא"
+  story.addEventListener('click', (e) => {
+    if (dy > 12) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+  }, true);
+  addEventListener('keydown', (e) => {
+    if (story.hidden || document.body.classList.contains('is-sheet')) return;
+    if (e.key === 'Escape') closeStory();
+    if (e.key === 'ArrowLeft') step(1);
+    if (e.key === 'ArrowRight') step(-1);
+  });
+}
+
+// ══════════════ גיליון תחתון (תגובות / נגן) ══════════════
+const sheet = $('[data-sheet]');
+let closeSheet: (() => void) | null = null;
+addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && document.body.classList.contains('is-sheet')) {
+    e.stopImmediatePropagation();
+    closeSheet?.();
+  }
+}, true);
+function openSheet(title: string, body: HTMLElement, opts: { tall?: boolean } = {}) {
+  paused = true;
+  document.body.classList.add('is-sheet');
+  const close = h('button', { className: 'sheet__close', type: 'button', ariaLabel: 'סגירה' }, ico(X, 22));
+  const panel = h('div', { className: `sheet ${opts.tall ? 'sheet--tall' : ''}`, role: 'dialog', ariaModal: 'true', ariaLabel: title }, h('div', { className: 'sheet__grip', ariaHidden: 'true' }), h('div', { className: 'sheet__head' }, h('h3', {}, title), close), h('div', { className: 'sheet__body' }, body));
+  const dim = h('div', { className: 'sheet__dim' });
+  fill(sheet, dim, panel);
+  sheet.hidden = false;
+  requestAnimationFrame(() => sheet.classList.add('is-open'));
+  const done = () => {
+    sheet.classList.remove('is-open');
+    document.body.classList.remove('is-sheet');
+    paused = false;
+    started = performance.now();
+    setTimeout(() => {
+      sheet.hidden = true;
+      sheet.replaceChildren();
+    }, reduce ? 0 : 240);
+  };
+  close.onclick = done;
   dim.onclick = done;
   closeSheet = done;
   // החלקה למטה מהידית או מהכותרת
   let y0 = -1;
-  for (const el of [panel.querySelector<HTMLElement>('.ap-sheet__grip')!, panel.querySelector<HTMLElement>('.ap-sheet__head')!]) {
+  const head = panel.querySelector<HTMLElement>('.sheet__head')!;
+  for (const el of [panel.querySelector<HTMLElement>('.sheet__grip')!, head]) {
     el.addEventListener('pointerdown', (e) => {
-      if ((e.target as HTMLElement).closest('button')) return;
+      if ((e.target as HTMLElement).closest('button')) return; // כפתור הסגירה
       y0 = e.clientY;
       el.setPointerCapture(e.pointerId);
     });
     el.addEventListener('pointermove', (e) => {
-      if (y0 >= 0) panel.style.transform = `translateY(${Math.max(0, e.clientY - y0)}px)`;
+      if (y0 < 0) return;
+      panel.style.transform = `translateY(${Math.max(0, e.clientY - y0)}px)`;
     });
     el.addEventListener('pointerup', (e) => {
       const d = e.clientY - y0;
@@ -144,19 +413,11 @@ function openSheet(title: string, body: Node, opts: { tall?: boolean } = {}) {
       if (d > 90) done();
     });
   }
-  setTimeout(() => close.focus({ preventScroll: true }), 40);
+  setTimeout(() => close.focus({ preventScroll: true }), 50);
 }
-addEventListener(
-  'keydown',
-  (e) => {
-    if (e.key === 'Escape' && closeSheet) {
-      e.stopImmediatePropagation();
-      closeSheet();
-    }
-  },
-  true,
-);
-const openComments = (type: 'stop' | 'clip', id: string, title: string) => openSheet(title ? `תגובות: ${title}` : 'תגובות', commentsBox(store, type, id, { toast, title: false }), { tall: true });
+function openComments(type: 'stop' | 'clip', id: string, title: string) {
+  openSheet(title ? `תגובות: ${title}` : 'תגובות', commentsBox(store, type, id, { toast, title: false }), { tall: true });
+}
 function watch(m: Mission) {
   const url = safeUrl(m.recap_url);
   if (!url) return;
@@ -165,12 +426,12 @@ function watch(m: Mission) {
     window.open(url, '_blank', 'noopener');
     return;
   }
-  openSheet(m.title, h('div', { class: 'ap-player' }, embed));
+  openSheet(m.title, h('div', { className: 'player' }, embed));
 }
 function watchLive() {
   if (!data) return;
   const ch = kickSlug(data.settings.kick_channel);
-  openSheet('הלייב', h('div', { class: 'ap-live' }, h('div', { class: 'ap-player' }, h('iframe', { src: `https://player.kick.com/${ch}`, allowFullscreen: true, title: 'הלייב', allow: 'autoplay; fullscreen' })), h('a', { class: 'pill', href: `https://kick.com/${ch}`, target: '_blank', rel: 'noopener' }, svg('external', 18), 'לפתוח ב-Kick')));
+  openSheet('הלייב', h('div', { className: 'player-wrap' }, h('div', { className: 'player' }, h('iframe', { src: `https://player.kick.com/${ch}`, allowFullscreen: true, title: 'הלייב', allow: 'autoplay; fullscreen' })), h('a', { className: 'pill', href: `https://kick.com/${ch}`, target: '_blank', rel: 'noopener' }, ico(ExternalLink, 18), 'לפתוח ב-Kick')));
 }
 async function share(url: string, title: string) {
   try {
@@ -184,255 +445,61 @@ async function share(url: string, title: string) {
   }
 }
 
-// ══════════════ סטוריז ══════════════
-type Ring = { key: string; title: string; items: StoryItem[]; face: () => HTMLElement; today?: boolean; fresh?: boolean };
-const viewer = createStoryViewer({
-  store,
-  toast,
-  stopBg: (i) => stopBg(i),
-  goStop: (i) => (location.hash = `#m-${i + 1}`),
-  watch,
-});
-const official = (i: number): StoryItem => {
-  const m = data!.missions[i];
-  return { kind: 'official', key: `m-${m.id}`, stop: i, m, t: Date.parse(m.happened_at ?? '') || 0 };
-};
-/** הטבעות בבית: "היום" (כל מה שקרה היום), סטוריז של צופים שאושרו, ומיילסטונים – החדש קודם */
-function rings(): Ring[] {
-  if (!data) return [];
-  const ms = data.missions;
-  const out: Ring[] = [];
-  const now = new Date();
-  let today = ms.map((m, i) => ({ m, i })).filter((x) => x.m.happened_at && new Date(x.m.happened_at).toDateString() === now.toDateString());
-  if (!today.length) today = ms.map((m, i) => ({ m, i })).filter((x) => x.m.happened_at && Date.now() - Date.parse(x.m.happened_at) < 864e5);
-  if (today.length) {
-    const sl = today.slice(-12).map((x) => official(x.i));
-    const last = today[today.length - 1].i;
-    out.push({ key: `today-${now.toDateString()}-${sl.length}`, title: 'היום', items: sl, today: true, face: () => h('span', { class: 'ap-ring__today' }, 'היום') });
-    void last;
-  }
-  const viewerS: StoryItem[] = liveStories(ex?.stories ?? []).map((s) => ({ kind: 'viewer', key: `s-${s.id}`, s, t: Date.parse(s.created_at) }));
-  const officialS: StoryItem[] = ms.map((m, i) => ({ m, i })).filter((x) => x.m.is_milestone).map((x) => official(x.i));
-  const all = [...viewerS, ...officialS].sort((a, b) => b.t - a.t);
-  for (const it of all) {
-    if (it.kind === 'viewer')
-      out.push({ key: it.key, title: it.s.username, items: [it], fresh: freshIds.has(it.key), face: () => h('img', { src: it.s.image_url, alt: '', loading: 'lazy' }) });
-    else
-      out.push({
-        key: it.key,
-        title: it.m.title,
-        items: [it],
-        fresh: freshIds.has(it.m.id),
-        face: () => {
-          const bg = stopBg(it.stop, 200, 200, 0.12);
-          return bg ?? h('b', {}, String(it.stop + 1));
-        },
-      });
-  }
-  return out;
-}
-/** פותח את הטבעת – והמשך הצפייה ממשיך לטבעות הבאות (כמו בגרסה 4) */
-function openRing(k: number) {
-  const rs = rings();
-  const flat: StoryItem[] = [];
-  let start = 0;
-  rs.forEach((r, j) => {
-    if (j === k) start = flat.length;
-    flat.push(...r.items);
-  });
-  viewer.open(flat, start, () => renderHome());
-}
-function openStoryByHash(key: string) {
-  if (!data) return;
-  const rs = rings();
-  // ‎#story-N = עצירה מספר N (כמו בגרסה 4); אחרת המפתח של הסטורי (m-<id> / s-<id>)
-  const n = /^\d+$/.test(key) ? +key - 1 : -1;
-  const want = n >= 0 && data.missions[n] ? `m-${data.missions[n].id}` : key;
-  const k = rs.findIndex((r) => r.items.some((it) => it.key === want));
-  if (k >= 0) openRing(k);
-  else if (n >= 0 && data.missions[n]) viewer.open([official(n)], 0, () => renderHome());
-}
-
-// ══════════════ ניווט בין טאבים ══════════════
-type Tab = 'home' | 'map' | 'clips' | 'stats';
-let tab: Tab = 'home';
-let mapFrame: HTMLIFrameElement | null = null;
-function mapTab(hash = '') {
-  const view = $('#view-map');
-  const src = `${B}index.html?embed${hash}`;
-  if (!mapFrame) {
-    mapFrame = h('iframe', { class: 'ap-frame', src, title: 'המפה', allow: 'autoplay; fullscreen' }) as HTMLIFrameElement;
-    view.append(mapFrame);
-  } else if (hash) {
-    try {
-      mapFrame.contentWindow!.location.hash = hash;
-    } catch {
-      mapFrame.src = src;
-    }
-  }
-}
-function show(t: Tab, opts: { stop?: number; clip?: string } = {}) {
-  tab = t;
-  document.querySelectorAll<HTMLElement>('[data-view]').forEach((v) => (v.hidden = v.dataset.view !== t));
-  document.querySelectorAll<HTMLElement>('[data-tab]').forEach((a) => (a.dataset.tab === t ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current')));
-  document.body.dataset.tab = t;
-  if (t === 'map') mapTab(opts.stop != null ? `#m-${opts.stop + 1}` : '');
-  if (t === 'stats') renderStats();
-  if (t === 'clips') renderClips(opts.clip);
-  else pauseFeed();
-}
-function route() {
-  const hs = location.hash.slice(1);
-  const m = hs.match(/^m-(\d+)$/);
-  const s = hs.match(/^story-(.+)$/);
-  const c = hs.match(/^clip-(.+)$/);
-  if (m) show('map', { stop: +m[1] - 1 });
-  else if (c) show('clips', { clip: decodeURIComponent(c[1]) });
-  else if (s) {
-    if (tab !== 'home') show('home');
-    if (!viewer.isOpen()) openStoryByHash(decodeURIComponent(s[1]));
-  } else if (hs === 'map' || hs === 'clips' || hs === 'stats') show(hs);
-  else if (hs === 'upload') {
-    show('home');
-    openUpload();
-  } else if (hs === 'chat') {
-    show('home');
-    openChat();
-  } else show('home');
-}
-addEventListener('hashchange', route);
-
-// ══════════════ העלאת סטורי (＋) ══════════════
-function openUpload() {
-  openSheet('סטורי חדש', uploadBody(), { tall: true });
-}
-function uploadBody(): HTMLElement {
-  const v = getViewer();
-  if (!v)
-    return h(
-      'div',
-      { class: 'ap-empty' },
-      svg('upload', 36),
-      h('p', {}, h('strong', {}, 'צילמתם רגע טוב מהלייב?'), ' מתחברים עם Kick, מעלים צילום מסך, ומוד מאשר לפני שזה מופיע לכולם.'),
-      btn('btn btn--kick', [h('span', { class: 'kick-mark', ariaHidden: 'true' }, 'K'), 'התחברות עם Kick'], () => login(store)),
-    );
-  let file: File | null = null;
-  const preview = h('span', { class: 'ap-up__preview' }, svg('upload', 30), h('span', {}, 'בחירת תמונה'), h('small', {}, 'צילום מסך מהמשחק או מהלייב'));
-  const input = h('input', { type: 'file', accept: 'image/*', class: 'ap-up__file' });
-  const send = h('button', { type: 'submit', class: 'btn btn--primary', disabled: true }, 'שליחה לאישור');
-  const take = (f: File | null | undefined) => {
-    if (!f || !f.type.startsWith('image/')) return;
-    file = f;
-    preview.replaceChildren(h('img', { src: URL.createObjectURL(f), alt: 'התמונה שנבחרה' }));
-    send.disabled = false;
-  };
-  input.onchange = () => take(input.files?.[0]);
-  const cap = h('textarea', { class: 'f-in', rows: 2, maxLength: 160, placeholder: 'כיתוב קצר (לא חובה)' });
-  const cur = data ? currentIndex(data) : -1;
-  const tie = h('input', { type: 'checkbox', checked: cur >= 0 });
-  const form = h(
-    'form',
-    { class: 'ap-up' },
-    h('label', { class: 'ap-up__pick' }, preview, input),
-    cap,
-    cur >= 0 && data ? h('label', { class: 'check' }, tie, h('span', {}, `לשייך לעצירה ${cur + 1}: ${data.missions[cur].title}`)) : null,
-    send,
-    h('p', { class: 'f-hint' }, `מחובר כ-${v.username} · `, btn('linkish', 'התנתקות', () => (logout(), openUpload()))),
-  );
-  form.addEventListener('paste', (e) => take([...(e.clipboardData?.items ?? [])].find((x) => x.type.startsWith('image/'))?.getAsFile()));
-  form.onsubmit = async (e) => {
-    e.preventDefault();
-    if (!file) return;
-    send.disabled = true;
-    send.textContent = 'שולח…';
-    try {
-      await store.submitStory(v, { image: file, caption: cap.value, mission_id: tie.checked && data && cur >= 0 ? data.missions[cur].id : null, x: null, y: null });
-      fill(form, h('div', { class: 'ap-empty is-done' }, svg('check', 38), h('p', {}, h('strong', {}, 'נשלח לאישור.'), ' מוד יאשר את הסטורי, ואז הוא יופיע לכולם בשורת הסטוריז.'), btn('btn', 'סגירה', () => closeSheet?.())));
-    } catch (err) {
-      toast((err as Error).message);
-      send.disabled = false;
-      send.textContent = 'שליחה לאישור';
-    }
-  };
-  return form;
-}
-
-// ══════════════ צ׳אט (כל התגובות) ══════════════
-const whereOf = (c: Comment) => {
-  if (c.target_type === 'stop' && data) {
-    const i = data.missions.findIndex((m) => m.id === c.target_id);
-    return { label: i >= 0 ? `עצירה ${i + 1}` : 'עצירה', go: i >= 0 ? () => (closeSheet?.(), (location.hash = `#m-${i + 1}`)) : null };
-  }
-  if (c.target_type === 'clip') return { label: 'קליפ', go: () => (closeSheet?.(), (location.hash = `#clip-${encodeURIComponent(c.target_id)}`)) };
-  return { label: c.target_type === 'story' ? 'סטורי' : 'מרקר', go: null };
-};
-function chatList(list: Comment[]) {
-  return h(
-    'ol',
-    { class: 'ap-chat' },
-    ...list.map((c) => {
-      const w = whereOf(c);
-      const row = h('div', { class: 'ap-chat__msg' }, h('span', { class: 'ap-chat__pic' }, c.username.slice(0, 1).toUpperCase()), h('div', { class: 'ap-chat__main' }, h('p', { class: 'ap-chat__meta' }, h('strong', {}, c.username), h('span', {}, `${w.label} · ${ago(c.created_at)}`)), h('p', { class: 'ap-chat__body' }, c.body)));
-      if (w.go) {
-        const b = btn('ap-chat__go', [row], w.go, `${c.username}: ${c.body}`);
-        return h('li', {}, b);
-      }
-      return h('li', {}, row);
-    }),
-  );
-}
-function openChat() {
-  const list = [...comments].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at)).slice(0, 80);
-  openSheet('הצ׳אט של האתר', list.length ? chatList(list) : h('div', { class: 'ap-empty' }, h('p', {}, 'עוד אין תגובות. פותחים עצירה, קליפ או סטורי ומגיבים שם.')), { tall: true });
-}
-
 // ══════════════ בית ══════════════
 const home = $('#view-home');
 function renderHome() {
   if (!data) return;
-  if (viewer.isOpen() || document.body.classList.contains('is-sheet')) return;
-  // לא בונים מחדש בזמן הקלדה (תגובה / הצבעה)
-  if (home.contains(document.activeElement) && document.activeElement?.matches('textarea, input')) return;
   const d = data;
   const ms = d.missions;
   const cur = currentIndex(d);
-  const seen = seenSet();
-  const keep = home.querySelector<HTMLElement>('.ap-rings')?.scrollLeft ?? 0;
-  const keepY = home.scrollTop;
+  const gl = groups();
+  const keep = home.querySelector<HTMLElement>('.rings')?.scrollLeft ?? 0;
 
-  const rs = rings();
-  const ringRow = h(
+  const rings = h(
     'div',
-    { class: 'ap-rings', role: 'list', ariaLabel: 'סטוריז' },
-    btn('ap-ring ap-ring--add', [h('span', { class: 'ap-ring__face' }, svg('plus', 26)), h('span', { class: 'ap-ring__name' }, 'הסטורי שלך')], openUpload, 'להעלות סטורי'),
-    ...rs.map((r, k) => {
-      const unseen = r.items.some((it) => !seen.has(it.key));
-      const b = btn(`ap-ring ${unseen ? '' : 'is-seen'} ${r.today ? 'is-today' : ''} ${r.items[0].kind === 'official' && !r.today ? 'is-official' : ''}`, [h('span', { class: 'ap-ring__face' }, r.face()), h('span', { class: 'ap-ring__name' }, r.title), r.fresh ? h('span', { class: 'ap-ring__new' }, 'חדש') : h('span')], () => openRing(k), `סטורי: ${r.title}`);
-      b.setAttribute('role', 'listitem');
+    { className: 'rings', role: 'list', ariaLabel: 'סטוריז' },
+    ...gl.map((g, gi) => {
+      const b = h(
+        'button',
+        { className: `ring ${seen.has(g.key) ? 'is-seen' : ''} ${g.isNew ? 'is-new' : ''} ${g.title === 'היום' ? 'is-today' : ''}`, type: 'button', role: 'listitem', ariaLabel: `סטורי: ${g.title}` },
+        h('span', { className: 'ring__pic' }, stopBg(g.ring, 200, 200, 0.14)),
+        h('span', { className: 'ring__name' }, g.title),
+      );
+      b.onclick = () => openStory(gi);
       return b;
     }),
   );
-
+  const m = ms[cur];
   const liveNow = isLive();
   const s = live?.status;
   const liveCard = liveNow
-    ? btn('ap-card ap-live-card', [h('span', { class: 'ap-live-card__dot', ariaHidden: 'true' }), h('span', { class: 'ap-live-card__txt' }, h('strong', {}, onGame() ? 'משחק GTA 6 עכשיו' : 'בלייב עכשיו'), h('small', {}, [s?.title, statusFresh(s ?? null) && s?.viewers ? `${num(s.viewers)} צופים` : ''].filter(Boolean).join('  |  '))), h('span', { class: 'ap-live-card__go' }, svg('play', 16), 'לצפייה')], watchLive)
-    : h('a', { class: 'ap-card ap-off-card', href: `https://kick.com/${kickSlug(d.settings.kick_channel)}`, target: '_blank', rel: 'noopener' }, h('span', {}, h('strong', {}, 'לא בלייב כרגע'), h('small', {}, 'עוקבים ב-Kick כדי לקבל התראה כשמתחילים')), svg('external', 20));
+    ? h(
+        'button',
+        { className: 'card card--live', type: 'button' },
+        h('span', { className: 'live-dot', ariaHidden: 'true' }),
+        h('div', { className: 'card--live__txt' }, h('strong', {}, onGame() ? 'משחק GTA 6 עכשיו' : 'בלייב עכשיו'), h('small', {}, [s?.title, statusFresh(s ?? null) && s?.viewers ? `${num(s.viewers)} צופים` : ''].filter(Boolean).join('  |  '))),
+        h('span', { className: 'card--live__go' }, 'לצפייה'),
+      )
+    : h('a', { className: 'card card--off', href: `https://kick.com/${kickSlug(d.settings.kick_channel)}`, target: '_blank', rel: 'noopener' }, h('div', {}, h('strong', {}, 'לא בלייב כרגע'), h('small', {}, 'עוקבים ב-Kick כדי לקבל התראה כשמתחילים')), ico(ExternalLink, 20));
+  if (liveNow) liveCard.addEventListener('click', watchLive);
 
-  const m = ms[cur];
-  const nC = m ? commentCount('stop', m.id) : 0;
   const nowCard = m
     ? h(
         'article',
-        { class: 'ap-card ap-now' },
-        h('div', { class: 'ap-now__map' }, stopBg(cur, 900, 480, 0.24) ?? h('span')),
+        { className: 'card card--now' },
+        h('div', { className: 'card--now__map' }, ...withPin(stopBg(cur, 900, 500, 0.26))),
         h(
           'div',
-          { class: 'ap-now__body' },
-          h('p', { class: 'ap-kicker' }, 'אנחנו עכשיו ב'),
+          { className: 'card--now__body' },
+          h('p', { className: 'eyebrow' }, 'אנחנו עכשיו ב'),
           h('h2', {}, m.title || `עצירה ${cur + 1}`),
-          h('p', { class: 'ap-muted' }, [`עצירה ${cur + 1}`, m.chapter, m.stream_day ? `יום ${m.stream_day}` : ''].filter(Boolean).join('  |  ')),
-          h('div', { class: 'ap-row' }, h('a', { class: 'pill pill--solid', href: `#m-${cur + 1}` }, svg('pin', 18), 'במפה'), btn('pill', [svg('chat', 18), nC ? `${nC} תגובות` : 'להגיב'], () => openComments('stop', m.id, m.title)), m.recap_url ? btn('pill pill--icon', [svg('play', 18)], () => watch(m), 'לצפייה בקטע') : null),
+          h('p', { className: 'muted' }, [`עצירה ${cur + 1}`, m.chapter, m.stream_day ? `יום ${m.stream_day}` : ''].filter(Boolean).join('  |  ')),
+          h(
+            'div',
+            { className: 'row' },
+            h('a', { className: 'pill pill--solid', href: `#m-${cur + 1}` }, ico(MapPin, 18), 'במפה'),
+            h('button', { className: 'pill', type: 'button', onclick: () => openComments('stop', m.id, m.title) }, ico(MessageCircle, 18), commentCount('stop', m.id) ? `${commentCount('stop', m.id)} תגובות` : 'להגיב'),
+          ),
         ),
       )
     : null;
@@ -440,94 +507,94 @@ function renderHome() {
   const l = live;
   const quick = h(
     'a',
-    { class: 'ap-quick', href: '#stats', ariaLabel: 'לכל המספרים' },
-    h('span', { class: 'ap-quick__item ap-quick__item--play' }, h('b', {}, l ? fmtPlay(playMs(l)) : '–'), h('small', {}, 'שעות משחק')),
-    h('span', { class: 'ap-quick__item' }, h('b', {}, l ? num(countOf(l, 'deaths')) : '–'), h('small', {}, 'מיתות')),
-    h('span', { class: 'ap-quick__item' }, h('b', {}, num(ms.length)), h('small', {}, 'עצירות')),
-  );
-
-  const poll = (ex?.polls ?? []).find((p) => pollOpen(p));
-  const pollBlock = poll ? h('section', { class: 'ap-block' }, h('div', { class: 'ap-block__head' }, h('h3', {}, 'הצ׳אט מחליט')), pollCard(poll, { store, toast, voting: true, onLocate: poll.x != null ? () => (location.hash = '#map') : undefined })) : null;
-
-  const recentC = [...comments].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at)).slice(0, 3);
-  const chatBlock = h(
-    'section',
-    { class: 'ap-block' },
-    h('div', { class: 'ap-block__head' }, h('h3', {}, 'מהצ׳אט של האתר'), comments.length ? btn('ap-link', 'הכול', openChat) : null),
-    recentC.length ? chatList(recentC) : h('p', { class: 'ap-muted' }, 'עוד אין תגובות. פותחים עצירה או סטורי ומגיבים שם.'),
+    { className: 'quick', href: '#stats', ariaLabel: 'לכל המספרים' },
+    h('div', { className: 'quick__item quick__item--play' }, h('b', {}, l ? fmtPlay(playMs(l)) : '–'), h('span', {}, 'שעות משחק')),
+    h('div', { className: 'quick__item' }, h('b', {}, l ? num(countOf(l, 'deaths')) : '–'), h('span', {}, '💀 מיתות')),
+    h('div', { className: 'quick__item' }, h('b', {}, l ? num(countOf(l, 'cats')) : '–'), h('span', {}, '🐈 חתולים')),
   );
 
   const clips = (l?.clips ?? []).slice(0, 8);
   const clipRow = clips.length
     ? h(
         'section',
-        { class: 'ap-block' },
-        h('div', { class: 'ap-block__head' }, h('h3', {}, 'קליפים אחרונים'), h('a', { class: 'ap-link', href: '#clips' }, 'הכול')),
-        h('div', { class: 'ap-mini-clips' }, ...clips.map((c) => h('a', { class: 'ap-mini-clip', href: `#clip-${encodeURIComponent(c.id)}` }, c.thumbnail_url ? h('img', { src: c.thumbnail_url, alt: '', loading: 'lazy' }) : null, h('span', { class: 'ap-mini-clip__play', ariaHidden: 'true' }, svg('play', 14)), h('span', { class: 'ap-mini-clip__t' }, c.title || 'קליפ')))),
+        { className: 'block' },
+        h('div', { className: 'block__head' }, h('h3', {}, 'קליפים אחרונים'), h('a', { href: '#clips' }, 'הכול')),
+        h(
+          'div',
+          { className: 'mini-clips' },
+          ...clips.map((c) =>
+            h(
+              'a',
+              { className: 'mini-clip', href: `#clip-${encodeURIComponent(c.id)}` },
+              c.thumbnail_url ? h('img', { src: c.thumbnail_url, alt: '', loading: 'lazy' }) : null,
+              h('span', { className: 'mini-clip__t' }, c.title || 'קליפ'),
+            ),
+          ),
+        ),
       )
     : null;
 
-  const recent = ms.map((x, i) => ({ x, i })).slice(-6).reverse();
+  const recent = ms
+    .map((x, i) => ({ x, i }))
+    .slice(-6)
+    .reverse();
   const recentList = h(
     'section',
-    { class: 'ap-block' },
-    h('div', { class: 'ap-block__head' }, h('h3', {}, 'העצירות האחרונות'), h('a', { class: 'ap-link', href: '#map' }, 'למפה')),
+    { className: 'block' },
+    h('div', { className: 'block__head' }, h('h3', {}, 'העצירות האחרונות'), h('a', { href: '#map' }, 'למפה')),
     h(
       'ol',
-      { class: 'ap-stops' },
+      { className: 'stops' },
       ...recent.map(({ x, i }) =>
         h(
           'li',
           {},
           h(
             'a',
-            { href: x.is_milestone ? `#story-${i + 1}` : `#m-${i + 1}`, class: `ap-stop ${i === cur ? 'is-now' : ''} ${freshIds.has(x.id) ? 'is-fresh' : ''}` },
-            h('span', { class: `ap-stop__no ${x.is_milestone ? 'is-ms' : ''}` }, String(i + 1)),
-            h('span', { class: 'ap-stop__txt' }, h('strong', {}, x.title || `עצירה ${i + 1}`), h('small', {}, i === cur ? 'כאן אנחנו עכשיו' : [x.is_milestone ? 'מיילסטון' : '', ago(x.happened_at)].filter(Boolean).join('  |  '))),
-            commentCount('stop', x.id) ? h('span', { class: 'ap-stop__c' }, svg('chat', 14), String(commentCount('stop', x.id))) : null,
+            { href: x.is_milestone ? `#story-${i + 1}` : `#m-${i + 1}`, className: `stop-row ${i === cur ? 'is-now' : ''} ${freshIds.has(x.id) ? 'is-fresh' : ''}` },
+            h('span', { className: `stop-row__no ${x.is_milestone ? 'is-ms' : ''}` }, String(i + 1)),
+            h('span', { className: 'stop-row__txt' }, h('strong', {}, x.title || `עצירה ${i + 1}`), h('small', {}, i === cur ? 'כאן אנחנו עכשיו' : [x.is_milestone ? 'מיילסטון' : '', ago(x.happened_at)].filter(Boolean).join('  |  '))),
+            commentCount('stop', x.id) ? h('span', { className: 'stop-row__c' }, ico(MessageCircle, 14), String(commentCount('stop', x.id))) : null,
           ),
         ),
       ),
     ),
   );
 
-  fill(home, h('h1', { class: 'ap-hello' }, d.settings.title || 'סאבתון GTA 6'), ringRow, liveCard, nowCard, quick, pollBlock, chatBlock, clipRow, recentList, h('p', { class: 'ap-foot' }, 'אתר מעריצים לא רשמי. אינו קשור ל-Rockstar Games.'));
-  home.querySelector<HTMLElement>('.ap-rings')!.scrollLeft = keep;
-  home.scrollTop = keepY;
-  // הבר העליון: "בלייב"
+  fill(
+    home,
+    h('h1', { className: 'hello' }, d.settings.title || 'סאבתון GTA 6'),
+    rings,
+    liveCard,
+    nowCard,
+    quick,
+    clipRow,
+    recentList,
+    h('p', { className: 'foot' }, 'אתר מעריצים לא רשמי. אינו קשור ל-Rockstar Games.'),
+  );
+  home.querySelector<HTMLElement>('.rings')!.scrollLeft = keep;
+  // הבר העליון: נקודת "בלייב"
   const lb = $<HTMLButtonElement>('[data-live]');
   lb.hidden = !liveNow;
   lb.textContent = onGame() ? 'GTA 6 בלייב' : 'בלייב';
   lb.onclick = watchLive;
-  // נקודה על "בית" כשיש סקר פתוח
-  document.querySelector('[data-tab="home"]')?.classList.toggle('has-dot', !!poll && tab !== 'home');
-}
-
-// ══════════════ מספרים ══════════════
-const statsEl = $('#view-stats');
-function renderStats() {
-  if (!data || tab !== 'stats') return;
-  if (statsEl.querySelector('.is-playing')) return;
-  const keep = statsEl.scrollTop;
-  fill(statsEl, h('h1', { class: 'ap-hello' }, 'המספרים'), h('div', { class: 'ap-stats' }, ...statsView(data, live, ex, { openStop: (i) => (location.hash = `#m-${i + 1}`), openMarker: () => (location.hash = '#map') })));
-  statsEl.scrollTop = keep;
 }
 
 // ══════════════ פיד קליפים ══════════════
-const feedEl = $('#view-clips');
+const feedView = $('#view-clips');
+let feedStops: Array<() => void> = [];
 let muted = true;
 let feedIO: IntersectionObserver | null = null;
 let feedKey = '';
-const reelStops = new WeakMap<HTMLElement, () => void>();
-let playing: Array<() => void> = [];
 function pauseFeed() {
-  playing.forEach((f) => f());
-  playing = [];
+  feedStops.forEach((f) => f());
+  feedStops = [];
+  feedView.querySelectorAll('.reel__media video').forEach((v) => v.remove());
 }
 function renderClips(focusId?: string) {
   const clips = live?.clips ?? [];
   const key = clips.map((c) => c.id).join();
-  if (key === feedKey && feedEl.firstChild && !focusId) {
+  if (key === feedKey && feedView.firstChild && !focusId) {
     observe();
     return;
   }
@@ -535,12 +602,16 @@ function renderClips(focusId?: string) {
   pauseFeed();
   feedIO?.disconnect();
   if (!clips.length) {
-    fill(feedEl, h('div', { class: 'ap-empty' }, svg('clips', 36), h('p', {}, 'עוד אין קליפים מ-GTA 6. עושים קליפ בלייב והוא מופיע כאן תוך כמה דקות.')));
+    fill(feedView, h('div', { className: 'empty' }, h('p', {}, 'עוד אין קליפים מ-GTA 6. עושים קליפ בלייב והוא מופיע כאן תוך כמה דקות.')));
     return;
   }
-  fill(feedEl, h('div', { class: 'ap-feed' }, live?.demoClips ? h('p', { class: 'ap-feed__note' }, 'תצוגה מקדימה: קליפים מהערוץ מכל המשחקים') : null, ...clips.map((c, k) => reel(c, k))));
+  const items = clips.map((c, k) => reel(c, k));
+  fill(feedView, h('div', { className: 'feed' }, live?.demoClips ? h('p', { className: 'feed__note' }, 'תצוגה מקדימה: קליפים מהערוץ מכל המשחקים') : null, ...items));
   observe();
-  if (focusId) feedEl.querySelector<HTMLElement>(`[data-clip="${CSS.escape(focusId)}"]`)?.scrollIntoView({ block: 'start' });
+  if (focusId) {
+    const el = feedView.querySelector<HTMLElement>(`[data-clip="${CSS.escape(focusId)}"]`);
+    el?.scrollIntoView({ block: 'start' });
+  }
 }
 function observe() {
   feedIO?.disconnect();
@@ -549,19 +620,21 @@ function observe() {
       for (const e of es) {
         const el = e.target as HTMLElement;
         if (e.isIntersecting && e.intersectionRatio > 0.6) startReel(el);
-        else reelStops.get(el)?.();
+        else stopReel(el);
       }
     },
-    { root: feedEl, threshold: [0, 0.6, 1] },
+    { root: feedView, threshold: [0, 0.6, 1] },
   );
-  feedEl.querySelectorAll('.ap-reel').forEach((r) => feedIO!.observe(r));
+  feedView.querySelectorAll('.reel').forEach((r) => feedIO!.observe(r));
 }
+const reelStops = new WeakMap<HTMLElement, () => void>();
 function startReel(el: HTMLElement) {
   if (tab !== 'clips' || reelStops.has(el)) return;
   const c = (live?.clips ?? []).find((x) => x.id === el.dataset.clip);
   if (!c) return;
-  const holder = h('div', { class: 'ap-reel__video' });
-  el.querySelector('.ap-reel__media')!.append(holder);
+  const media = el.querySelector<HTMLElement>('.reel__media')!;
+  const holder = h('div', { className: 'reel__video' });
+  media.append(holder);
   const stop = playClip(holder, c);
   const v = holder.querySelector('video')!;
   v.muted = muted;
@@ -573,150 +646,106 @@ function startReel(el: HTMLElement) {
     stop();
     holder.remove();
     reelStops.delete(el);
-    playing = playing.filter((f) => f !== s);
   };
   reelStops.set(el, s);
-  playing.push(s);
+  feedStops.push(s);
+}
+function stopReel(el: HTMLElement) {
+  reelStops.get(el)?.();
 }
 function reel(c: Clip, k: number) {
   const n = commentCount('clip', c.id);
-  const muteBtn = btn('ap-reel__btn ap-reel__mute', [svg(muted ? 'mute' : 'volume', 24)], () => toggleMute(), muted ? 'הפעלת קול' : 'השתקה');
-  const media = h(
-    'div',
-    { class: 'ap-reel__media' },
-    c.thumbnail_url ? h('img', { class: 'ap-reel__bg', src: c.thumbnail_url, alt: '', loading: k < 2 ? 'eager' : 'lazy' }) : null,
-    c.thumbnail_url ? h('img', { class: 'ap-reel__poster', src: c.thumbnail_url, alt: '', loading: k < 2 ? 'eager' : 'lazy' }) : null,
-  );
+  const muteBtn = h('button', { className: 'reel__btn reel__mute', type: 'button', ariaLabel: muted ? 'הפעלת קול' : 'השתקה' }, ico(muted ? VolumeX : Volume2, 24));
+  const media = h('div', { className: 'reel__media' }, c.thumbnail_url ? h('img', { className: 'reel__bg', src: c.thumbnail_url, alt: '', loading: k < 2 ? 'eager' : 'lazy' }) : null, c.thumbnail_url ? h('img', { className: 'reel__poster', src: c.thumbnail_url, alt: '', loading: k < 2 ? 'eager' : 'lazy' }) : null);
   const toggleMute = () => {
     muted = !muted;
-    feedEl.querySelectorAll('video').forEach((v) => (v.muted = muted));
-    feedEl.querySelectorAll('.ap-reel__mute').forEach((b) => {
-      b.replaceChildren(svg(muted ? 'mute' : 'volume', 24));
+    feedView.querySelectorAll('video').forEach((v) => (v.muted = muted));
+    feedView.querySelectorAll('.reel__mute').forEach((b) => {
+      b.replaceChildren(ico(muted ? VolumeX : Volume2, 24));
       b.setAttribute('aria-label', muted ? 'הפעלת קול' : 'השתקה');
     });
   };
+  muteBtn.onclick = toggleMute;
   media.onclick = toggleMute;
   const stopIdx = data ? data.missions.reduce((b, m, i) => (m.happened_at && Date.parse(m.happened_at) <= Date.parse(c.created_at) ? i : b), -1) : -1;
   const art = h(
     'article',
-    { class: 'ap-reel' },
+    { className: 'reel' },
     media,
     h(
       'div',
-      { class: 'ap-reel__side' },
-      btn('ap-reel__btn', [svg('chat', 24), h('span', {}, n ? String(n) : '')], () => openComments('clip', c.id, c.title), 'תגובות'),
-      btn('ap-reel__btn', [svg('share', 24)], () => share(`${location.origin}${location.pathname}#clip-${encodeURIComponent(c.id)}`, c.title), 'שיתוף'),
-      stopIdx >= 0 && !live?.demoClips ? h('a', { class: 'ap-reel__btn', href: `#m-${stopIdx + 1}`, ariaLabel: `לעצירה ${stopIdx + 1}` }, svg('pin', 24)) : null,
+      { className: 'reel__side' },
+      h('button', { className: 'reel__btn', type: 'button', ariaLabel: 'תגובות', onclick: () => openComments('clip', c.id, c.title) }, ico(MessageCircle, 24), h('span', {}, n ? String(n) : '')),
+      h('button', { className: 'reel__btn', type: 'button', ariaLabel: 'שיתוף', onclick: () => share(`${location.origin}${location.pathname}#clip-${encodeURIComponent(c.id)}`, c.title) }, ico(Share2, 24)),
+      stopIdx >= 0 && !live?.demoClips ? h('a', { className: 'reel__btn', href: `#m-${stopIdx + 1}`, ariaLabel: `לעצירה ${stopIdx + 1}` }, ico(MapPin, 24)) : null,
       muteBtn,
     ),
-    h('div', { class: 'ap-reel__info' }, h('strong', {}, c.title || 'קליפ'), h('small', {}, [c.creator ? `קליפ של ${c.creator}` : '', `${num(c.views)} צפיות`, ago(c.created_at)].filter(Boolean).join('  |  '))),
+    h('div', { className: 'reel__info' }, h('strong', {}, c.title || 'קליפ'), h('small', {}, [c.creator ? `קליפ של ${c.creator}` : '', `${num(c.views)} צפיות`, ago(c.created_at)].filter(Boolean).join('  |  '))),
   );
   art.dataset.clip = c.id;
   return art;
 }
 
-// ══════════════ כותרת: התקנה (PWA) ══════════════
-let deferred: (Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> }) | null = null;
-const standalone = matchMedia('(display-mode: standalone)').matches || (navigator as unknown as { standalone?: boolean }).standalone === true;
-const ios = /iphone|ipad|ipod/i.test(navigator.userAgent) && !/crios|fxios/i.test(navigator.userAgent);
-const install = $<HTMLButtonElement>('[data-install]');
-install.hidden = !(ios && !standalone);
-addEventListener('beforeinstallprompt', (e) => {
-  e.preventDefault();
-  deferred = e as typeof deferred;
-  install.hidden = standalone;
-});
-addEventListener('appinstalled', () => {
-  install.hidden = true;
-  toast('הותקן. הסאבתון מחכה לך במסך הבית.');
-});
-install.onclick = async () => {
-  if (deferred) {
-    await deferred.prompt();
-    const { outcome } = await deferred.userChoice;
-    if (outcome === 'accepted') install.hidden = true;
-    deferred = null;
-    return;
-  }
-  openSheet('התקנה באייפון', h('ol', { class: 'ap-ios' }, h('li', {}, 'לוחצים על כפתור השיתוף של Safari (הריבוע עם החץ, למטה).'), h('li', {}, 'בוחרים "הוספה למסך הבית".'), h('li', {}, 'לוחצים "הוספה". האייקון של הסאבתון מופיע במסך הבית ונפתח כמו אפליקציה.')));
-};
-$<HTMLButtonElement>('[data-upload]').onclick = openUpload;
-onViewer(() => {
-  // התחברות / התנתקות בזמן שגיליון ההעלאה פתוח – בונים אותו מחדש
-  const head = sheetWrap.querySelector('.ap-sheet__head h3');
-  if (head?.textContent === 'סטורי חדש') openUpload();
-});
-
 // ══════════════ טעינה ══════════════
+
 fetch(`${B}trail.json`)
   .then((r) => (r.ok ? r.json() : null))
   .then((t) => (trailRaw = t))
   .catch(() => {})
   .finally(() => {
     mapImg.onload = () => {
-      computePoints();
+      computePositions();
       renderHome();
     };
-    mapImg.src = `${B}map-original.webp`;
+    mapImg.src = `${B}map.webp`;
   });
 
 store
   .load()
   .then((d) => {
     data = d;
-    computePoints();
+    computePositions();
     renderHome();
     route();
     store.subscribe((nd) => {
       const known = new Set(data!.missions.map((m) => m.id));
       const added = nd.missions.filter((m) => !known.has(m.id));
       data = nd;
-      computePoints();
+      computePositions();
       if (added.length) {
         added.forEach((m) => freshIds.add(m.id));
         const a = added[added.length - 1];
         toast(a.is_milestone ? `מיילסטון חדש: ${a.title}` : `עצירה חדשה: ${a.title}`);
       }
-      renderHome();
-      renderStats();
+      if (story.hidden) renderHome();
     });
     store.loadLive().then((l) => {
       live = l;
       renderHome();
-      renderStats();
       if (tab === 'clips') renderClips();
     });
     store.subscribeLive((l) => {
       live = l;
-      renderHome();
-      renderStats();
+      if (story.hidden) renderHome();
       if (tab === 'clips') renderClips();
     });
-    const onExtras = (e: Extras) => {
-      const before = new Set((ex ? liveStories(ex.stories) : []).map((s) => `s-${s.id}`));
-      const now = liveStories(e.stories).map((s) => `s-${s.id}`);
-      if (ex) now.filter((k) => !before.has(k)).forEach((k) => (freshIds.add(k), toast('סטורי חדש בשורת הסטוריז')));
-      ex = e;
-      renderHome();
-      renderStats();
-    };
-    store.loadExtras(false).then(onExtras).catch(console.error);
-    store.subscribeExtras(onExtras, false);
-    initComments(store, (list) => {
-      comments = list;
-      renderHome();
+    initComments(store, () => {
+      if (story.hidden && !document.body.classList.contains('is-sheet')) renderHome();
     });
   })
   .catch((e) => {
     console.error(e);
-    fill(home, h('p', { class: 'ap-empty' }, 'הנתונים לא נטענו. נסו לרענן.'));
+    fill(home, h('p', { className: 'empty' }, 'הנתונים לא נטענו. נסו לרענן.'));
   });
 
 if (loginError) setTimeout(() => toast('ההתחברות עם Kick לא הצליחה. נסו שוב.'), 600);
+
 // זמן המשחק מתקתק
 setInterval(() => {
-  const b = home.querySelector('.ap-quick__item--play b');
+  const b = home.querySelector('.quick__item--play b');
   if (b && live) b.textContent = fmtPlay(playMs(live));
 }, 15_000);
 
+
+// PWA: אפשר להתקין לבית; Service Worker שומר את מעטפת האפליקציה
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register(`${B}sw.js`, { scope: B }).catch(() => {});

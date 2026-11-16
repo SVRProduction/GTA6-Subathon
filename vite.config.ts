@@ -12,6 +12,7 @@ export default defineConfig({
         stats: resolve(__dirname, 'stats.html'),
         overlay: resolve(__dirname, 'overlay.html'),
         phone: resolve(__dirname, 'phone.html'),
+        phoneStats: resolve(__dirname, 'phone-stats.html'),
       },
     },
   },
