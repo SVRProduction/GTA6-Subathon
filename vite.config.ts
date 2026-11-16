@@ -9,6 +9,7 @@ export default defineConfig({
       input: {
         main: resolve(__dirname, 'index.html'),
         admin: resolve(__dirname, 'admin.html'),
+        journey: resolve(__dirname, 'journey.html'),
         stats: resolve(__dirname, 'stats.html'),
       },
     },
