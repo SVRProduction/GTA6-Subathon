@@ -611,3 +611,9 @@ button.pc__opt:active { transform: scale(0.985); }
 
 /* ‎?embed – המפה בתוך אפליקציית הטלפון: בלי פתיחה, בלי כפתור הטלפון ובלי תג הלייב (יש אותם באפליקציה) */
 .is-embed .opening, .is-embed .tb, .is-embed .phone-btn, .is-embed .phone, .is-embed .onair, .is-embed .poll-chip, .is-embed .mh, .is-embed .tb__btn--more, .is-embed [data-key="feed"], .is-embed [data-key="stats"], .is-embed .tb__gap { display: none !important; }
+/* בתוך הטלפון: הכפתורים של המפה (כמו בגרסה 4) – "כל העצירות" ו"לטייל חופשי" מימין למטה, מיני-מפה משמאל */
+.is-embed .hud__actions { display: flex !important; position: absolute; right: 14px; left: auto; bottom: calc(14px + var(--safe-b, 0px)); flex-direction: column; align-items: flex-end; gap: 8px; z-index: 6; }
+.is-embed .hud__actions [data-cinema] { display: none !important; }
+.is-embed .hud__actions .btn { min-height: 44px; padding: 0 16px; font-size: 15px; }
+.is-embed .locator { display: block !important; position: absolute; left: 14px; right: auto; bottom: calc(14px + var(--safe-b, 0px)); z-index: 6; }
+.is-embed .is-free .hud__actions { display: none !important; }

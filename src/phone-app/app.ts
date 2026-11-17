@@ -108,7 +108,8 @@ const frames: Partial<Record<Tab, HTMLIFrameElement>> = {};
 function frame(t: 'map' | 'stats', hash = '') {
   const view = $(`#view-${t}`);
   let f = frames[t];
-  const src = t === 'map' ? `${B}index.html?embed${hash}` : `${B}phone-stats.html?embed&app${hash}`;
+  const demo = new URLSearchParams(location.search).has('demo') ? '&demo' : '';
+  const src = t === 'map' ? `${B}index.html?embed${demo}${hash}` : `${B}phone-stats.html?embed&app${demo}${hash}`;
   if (!f) {
     f = h('iframe', { className: 'frame', src, title: t === 'map' ? 'המפה' : 'המספרים', allow: 'autoplay; fullscreen' }) as HTMLIFrameElement;
     frames[t] = f;
