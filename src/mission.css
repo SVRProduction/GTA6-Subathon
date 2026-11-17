@@ -149,7 +149,7 @@ body { color: var(--m-txt); background: var(--m-bg); font: 400 16px/1.6 var(--m-
 .pin__teaser { color: var(--m-txt-2); }
 .pin__meta { color: var(--m-txt-3); }
 .player i { border-color: var(--m-pink); }
-.player b { background: var(--m-pink); border-color: #fff; }
+.player > b { background: var(--m-pink); border-color: #fff; }
 .ahead-tag { font: 700 24px/1 var(--m-display); border: 1px dashed var(--m-edge-2); border-radius: 10px; }
 .route-casing { stroke: #05080f; }
 
@@ -365,7 +365,8 @@ kbd { display: inline-grid; place-items: center; min-width: 26px; height: 24px; 
 /* הדמות עומדת על העצירה הנוכחית: הסיכה שלה לא מסתירה את הלוגו */
 .journey__pins:has(.player.is-live, .player.is-asleep) .pin--now .pin__disc { opacity: 0.35; }
 .player i { left: -30px; top: -30px; width: 60px; height: 60px; border: 3px solid var(--m-gold); opacity: 0; }
-.player b { display: none; }
+/* רק הנקודה של הדמות עצמה – לא ה-<b> של הכוכבים בתוך תג ה-WANTED */
+.player > b { display: none; }
 .player__face { position: absolute; left: -22px; top: -22px; width: 44px; height: 44px; border-radius: 50%; background: #308bd4; border: 3px solid var(--m-gold); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55); transition: filter 0.6s, transform 0.3s; }
 .player.is-live i { opacity: 1; animation: here 2s ease-out infinite; }
 .player.is-live .player__face { box-shadow: 0 0 0 4px rgba(246, 200, 30, 0.25), 0 6px 18px rgba(0, 0, 0, 0.55); }

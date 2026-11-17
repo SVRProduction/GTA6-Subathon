@@ -129,12 +129,14 @@ export function createWorld(stage: HTMLElement, onSize: (w: number, h: number) =
 
   // אריחי HD בכמה רמות: כל רמה נטענת רק כשהזום עובר את מה שהרמה שמתחתיה נותנת, ורק האריחים שנראים על המסך
   type HdSet = { tiles: string[]; grid: number; w: number };
-  let hdSets: Array<{ set: HdSet; els: HTMLImageElement[]; from: number }> = [];
+  let hdSets: Array<{ set: HdSet; els: HTMLImageElement[]; below: number | null }> = [];
   function updateHd(c: Camera, w: number, h: number) {
     const need = c.z * devicePixelRatio; // פיקסלי מסך לכל פיקסל של המפה הרגילה
     const hx = (w / 2 / c.z) * 1.1;
     const hy = (h / 2 / c.z) * (1.1 + tilt / 60); // במבט מוטה רואים רחוק יותר קדימה
-    for (const { set, els, from } of hdSets) {
+    for (const { set, els, below } of hdSets) {
+      // הסף מחושב כאן ולא ב-setHd: רוחב המפה (W) ידוע רק אחרי שהתמונה נטענה
+      const from = below === null ? 0.9 : (below / W) * 1.15; // הרמה הגבוהה רק בזום עמוק באמת
       if (need < from) continue;
       const g = set.grid;
       for (let i = 0; i < els.length; i++) {
@@ -309,7 +311,7 @@ export function createWorld(stage: HTMLElement, onSize: (w: number, h: number) =
       const key = sets.map((x) => x.tiles.join()).join('|');
       if (hd.dataset.src === key) return;
       hd.dataset.src = key;
-      let below = W; // הרזולוציה של הרמה שמתחת (מתחילים מהמפה הרגילה)
+      let below: number | null = null; // הרזולוציה של הרמה שמתחת (null = המפה הרגילה)
       hdSets = sets.map((set) => {
         const g = set.grid;
         const els = set.tiles.map((_, i) => {
@@ -321,9 +323,9 @@ export function createWorld(stage: HTMLElement, onSize: (w: number, h: number) =
           t.addEventListener('load', () => t.classList.add('is-loaded'));
           return t;
         });
-        const from = (below / W) * (below === W ? 0.9 : 1.15); // הרמה הגבוהה רק בזום עמוק באמת
+        const level = { set, els, below };
         below = set.w;
-        return { set, els, from };
+        return level;
       });
       hd.replaceChildren(...hdSets.flatMap((x) => x.els));
     },

@@ -173,7 +173,7 @@ html:not(.flat-root), html:not(.flat-root) body { height: 100%; overflow: hidden
 /* "אנחנו כאן" */
 .player { position: absolute; left: 0; top: 0; width: 0; height: 0; pointer-events: none; z-index: -1; }
 .player i { position: absolute; left: -13px; top: -13px; width: 26px; height: 26px; border-radius: 50%; border: 3px solid var(--red); animation: here 2.2s ease-out infinite; }
-.player b { position: absolute; left: -6px; top: -6px; width: 12px; height: 12px; border-radius: 50%; background: var(--red); border: 2.5px solid var(--ink); }
+.player > b { position: absolute; left: -6px; top: -6px; width: 12px; height: 12px; border-radius: 50%; background: var(--red); border: 2.5px solid var(--ink); }
 @keyframes here { from { transform: scale(0.6); opacity: 1; } to { transform: scale(2.2); opacity: 0; } }
 
 /* ── HUD ── */
