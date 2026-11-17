@@ -910,7 +910,9 @@ function frame(force = false) {
     tag.style.transform = `translate3d(${e.x.toFixed(1)}px, ${e.y.toFixed(1)}px, 0) translate(${ax}, ${ay})`;
   }
   const me = pinsEl.querySelector<HTMLElement>('.player');
-  if (me && cur >= 0) {
+  // בלי עצירות אין איפה לעמוד – אחרת הסמן נתקע בפינה השמאלית העליונה
+  if (me) me.style.display = cur >= 0 && curve.stops[cur] ? '' : 'none';
+  if (me && cur >= 0 && curve.stops[cur]) {
     const s = world.project(curve.stops[cur]);
     me.style.transform = `translate3d(${s.x.toFixed(1)}px, ${s.y.toFixed(1)}px, 0)`;
   }
@@ -919,7 +921,7 @@ function frame(force = false) {
   const idx = Math.max(0, Math.min(n - 1, near));
   const m = data.missions[idx];
   q('[data-odo-day]').textContent = `יום ${m?.stream_day ?? 1}`;
-  q('[data-odo-stop]').textContent = `משימה ${idx + 1}`;
+  q('[data-odo-stop]').textContent = `משימה ${n ? idx + 1 : 0}`;
   q('[data-odo-ms]').textContent = `${data.missions.slice(0, idx + 1).filter((x) => x.is_milestone).length} מיילסטונים`;
   const pct = Math.max(0, Math.min(1, shown / Math.max(n, 1)));
   q('[data-progress-now]').style.insetInlineStart = `${pct * 100}%`;

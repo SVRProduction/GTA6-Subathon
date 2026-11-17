@@ -1,3 +1,5 @@
+@import '../styles.css';
+@import '../stats.css';
 /* דף המספרים בתוך הטלפון (phone-stats.html) – החוקים של גרסה 4 כמו שהם */
 /* בתוך האפליקציה (טאב סטטיסטיקות) */
 .is-embed .sx-nav { display: none; }
