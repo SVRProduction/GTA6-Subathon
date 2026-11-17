@@ -79,8 +79,8 @@ function likeBtn(t: LikeTarget, id: string, cls: string, size = 22) {
     e.stopPropagation();
     const v = getViewer();
     if (!v) {
-      toast('מתחברים עם Kick כדי לעשות לייק');
-      setTimeout(() => login(store), 900);
+      // לא מחובר: ישר להתחברות עם Kick (חוזרים לאותו מקום)
+      login(store);
       return;
     }
     const k = likeKey(t, id);
@@ -99,7 +99,10 @@ function likeBtn(t: LikeTarget, id: string, cls: string, size = 22) {
       if (was) mine.add(k);
       else mine.delete(k);
       likes[k] = Math.max(0, likesOf(t, id) + (was ? 1 : -1));
-      toast((err as Error).message);
+      const msg = (err as Error).message;
+      // השרת עוד לא עודכן (supabase/update-likes-counters.sql + פריסת kick-viewer)
+      toast(/לא מוכרת|toggle_like|like_totals|function/i.test(msg) ? 'הלייקים נפתחים ממש בקרוב ❤️' : msg);
+      if (/להתחבר מחדש/.test(msg)) login(store);
     }
     document.querySelectorAll<HTMLElement>(`[data-like="${CSS.escape(k)}"]`).forEach(paintLike);
   };
@@ -115,11 +118,40 @@ const GTA_CLIPS: Clip[] = [
   ['N-xHcvug3WI', 'GTA V · סרטון הגיימפליי הרשמי', '2013-07-09T00:00:00Z'],
   ['QkkoHAzjnUs', 'GTA V · הטריילר', '2012-11-14T00:00:00Z'],
 ].map(([id, title, at]) => ({ id: `yt-${id}`, title, thumbnail_url: `https://i.ytimg.com/vi/${id}/hqdefault.jpg`, video_url: `youtube:${id}`, duration: null, views: 0, creator: 'Rockstar Games', created_at: at }));
-/** כל הקליפים בפיד: מהלייב + של Rockstar, מסודרים לפי לייקים וטריות */
+// ── קליפים נבחרים מהערוץ של עודד (מכל המשחקים). רשימה ידנית: כאן מוסיפים/מורידים לפי ה-id מ-Kick ──
+const CHANNEL_PICKS = [
+  'clip_01KSZ43CTQQ94BN1E17F6PBN67', // דה לגנדרי דו פותחים בוסטר גיימס
+  'clip_01JANV81GGEGY0ZEWG7QRATM10', // בושות
+  'clip_01JANV7ZGH653CWYNKVPGCHB3Y', // איזה ביזוי
+  'clip_01JADEDQBD9HFRHYMWRNNST1VP', // המסך שלי
+  'clip_01JAJSYN64286MMSXS9PGA9RSZ', // תודה רבה עודד
+  'clip_01KM4MHBDP67T8WBDSX56Z48JK', // עודד חושף איך יקרא לילד שלו
+  'clip_01KNM7V83JKQ2Y4WE4RYYCSVQ0', // אשתו של עודד
+];
+let channelClips: Clip[] = [];
+/** הקליפים נמשכים ישר מ-Kick (כדי שהקישור לווידאו יהיה טרי) */
+async function loadChannelClips(slug: string) {
+  try {
+    const r = await fetch(`https://kick.com/api/v2/channels/${slug}/clips?sort=view&time=all`, { headers: { Accept: 'application/json' } });
+    const j = await r.json();
+    const byId = new Map<string, Record<string, any>>((j.clips ?? []).map((c: Record<string, any>) => [c.id, c]));
+    channelClips = CHANNEL_PICKS.map((id) => byId.get(id))
+      .filter((c): c is Record<string, any> => !!c && !!(c.video_url ?? c.clip_url))
+      .map((c) => ({ id: c.id, title: c.title ?? '', thumbnail_url: c.thumbnail_url ?? null, video_url: c.video_url ?? c.clip_url, duration: c.duration ?? null, views: c.views ?? c.view_count ?? 0, creator: c.creator?.username ?? null, created_at: c.created_at }));
+    if (tab === 'clips') renderClips();
+    if (story.hidden) renderHome();
+  } catch {
+    /* Kick לא ענה – נשארים עם מה שיש */
+  }
+}
+const isPick = (c: Clip) => channelClips.some((x) => x.id === c.id);
+/** כל הקליפים בפיד: מהלייב (GTA 6), נבחרים מהערוץ, ואז הטריילרים של Rockstar – לפי לייקים וטריות */
 function allClips(): Clip[] {
   const lv = (live?.clips ?? []).map((c, k) => ({ c, s: score('clip', c.id, c.created_at) + 1 - k * 0.01 }));
+  const seen = new Set(lv.map((x) => x.c.id));
+  const ch = channelClips.filter((c) => !seen.has(c.id)).map((c, k) => ({ c, s: likesOf('clip', c.id) - 0.2 - k * 0.01 }));
   const yt = GTA_CLIPS.map((c, k) => ({ c, s: likesOf('clip', c.id) - 0.5 - k * 0.01 }));
-  return [...lv, ...yt].sort((a, b) => b.s - a.s).map((x) => x.c);
+  return [...lv, ...ch, ...yt].sort((a, b) => b.s - a.s).map((x) => x.c);
 }
 const isLive = () => !!data && !!live && (statusFresh(live.status) ? !!live.status?.is_live : data.settings.is_live);
 const onGame = () => !!live && statusFresh(live.status) && !!live.status?.on_category;
@@ -733,7 +765,7 @@ function startReel(el: HTMLElement) {
   // טריילר ביוטיוב: נגן מוטמע (מתחיל מושתק, כמו כל הפיד)
   const yt = c.video_url?.startsWith('youtube:') ? c.video_url.slice(8) : null;
   if (yt) {
-    holder.append(h('iframe', { className: 'reel__yt', src: `https://www.youtube-nocookie.com/embed/${yt}?autoplay=1&mute=${muted ? 1 : 0}&playsinline=1&loop=1&playlist=${yt}&rel=0&modestbranding=1`, allow: 'autoplay; encrypted-media; fullscreen', title: c.title }));
+    holder.append(h('iframe', { className: 'reel__yt', src: `https://www.youtube-nocookie.com/embed/${yt}?autoplay=1&mute=${muted ? 1 : 0}&playsinline=1&loop=1&playlist=${yt}&rel=0&modestbranding=1&controls=0`, allow: 'autoplay; encrypted-media; fullscreen', title: c.title }));
     const s = () => {
       holder.remove();
       reelStops.delete(el);
@@ -788,7 +820,7 @@ function reel(c: Clip, k: number) {
       stopIdx >= 0 && !live?.demoClips ? h('a', { className: 'reel__btn', href: `#m-${stopIdx + 1}`, ariaLabel: `לעצירה ${stopIdx + 1}` }, ico(MapPin, 24)) : null,
       muteBtn,
     ),
-    h('div', { className: 'reel__info' }, h('strong', {}, c.title || 'קליפ'), h('small', {}, c.id.startsWith('yt-') ? 'הטריילר הרשמי של Rockstar Games' : [c.creator ? `קליפ של ${c.creator}` : '', `${num(c.views)} צפיות`, ago(c.created_at)].filter(Boolean).join('  |  '))),
+    h('div', { className: 'reel__info' }, h('strong', {}, c.title || 'קליפ'), h('small', {}, c.id.startsWith('yt-') ? 'הטריילר הרשמי של Rockstar Games' : isPick(c) ? `מהערוץ של עודד  |  ${num(c.views)} צפיות` : [c.creator ? `קליפ של ${c.creator}` : '', `${num(c.views)} צפיות`, ago(c.created_at)].filter(Boolean).join('  |  '))),
   );
   art.dataset.clip = c.id;
   return art;
@@ -812,6 +844,7 @@ store
   .load()
   .then((d) => {
     data = d;
+    void loadChannelClips(kickSlug(d.settings.kick_channel) || 'odedsvr');
     computePositions();
     renderHome();
     route();
