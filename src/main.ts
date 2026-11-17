@@ -554,34 +554,52 @@ lamps.setAttribute('class', 'lamps');
 world.svg.prepend(lamps);
 {
   const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
-  defs.innerHTML = '<radialGradient id="lamp-g"><stop offset="0" stop-color="#fff6d6" stop-opacity="1"/><stop offset="0.25" stop-color="#ffd27a" stop-opacity="0.9"/><stop offset="1" stop-color="#ffb347" stop-opacity="0"/></radialGradient>';
+  defs.innerHTML = '<radialGradient id="lamp-g"><stop offset="0" stop-color="#fff6d6" stop-opacity="1"/><stop offset="0.18" stop-color="#ffe7a6" stop-opacity="1"/><stop offset="0.4" stop-color="#ffc861" stop-opacity="0.55"/><stop offset="1" stop-color="#ffb347" stop-opacity="0"/></radialGradient>';
   world.svg.prepend(defs);
 }
 let lampsFor: unknown = null;
+let cityLamps: Array<[number, number]> | null = null;
+// מיקומי הפנסים בעיר (מחושבים מראש מצבעי המפה: אזורים בנויים, לא ים ולא הרים)
+fetch(`${import.meta.env.BASE_URL}lamps.json`)
+  .then((r) => (r.ok ? r.json() : []))
+  .then((l: Array<[number, number]>) => {
+    cityLamps = l;
+    lampsFor = null;
+    if (liveTrail !== undefined) buildLamps(liveTrail);
+  })
+  .catch(() => {});
+/** פנסי רחוב בכל העיר (ומעט לאורך הכביש). לכל פנס סף משלו, כך שהם נדלקים אחד-אחד עד שכולם דולקים */
 function buildLamps(trail: ReturnType<typeof makeTrail> | null) {
-  if (!trail || lampsFor === trail.path) return;
-  lampsFor = trail.path;
+  const { w: W, h: H } = world.size();
+  if (W <= 1 || !cityLamps) return;
+  const key = `${W}:${trail?.path ?? ''}:${cityLamps.length}`;
+  if (lampsFor === key) return;
+  lampsFor = key;
   const ns = 'http://www.w3.org/2000/svg';
-  const out: SVGCircleElement[] = [];
   let seed = 7;
-  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-  const step = lite ? 110 : 46; // בטלפון פחות פנסים
-  for (let s = step; s < trail.total; s += step) {
-    const a = trail.at(s - 2);
-    const b = trail.at(s + 2);
-    const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
-    const nx = -(b.y - a.y) / len;
-    const ny = (b.x - a.x) / len;
-    // פנס משני צידי הכביש, לסירוגין
-    for (const side of [1, -1]) {
-      if (rnd() < 0.25) continue;
-      const p = trail.at(s + (side > 0 ? 0 : step / 2));
-      const c = document.createElementNS(ns, 'circle');
-      c.setAttribute('cx', (p.x + nx * side * 13).toFixed(1));
-      c.setAttribute('cy', (p.y + ny * side * 13).toFixed(1));
-      c.setAttribute('r', (20 + rnd() * 8).toFixed(1));
-      c.style.setProperty('--on', (0.08 + rnd() * 0.8).toFixed(3));
-      out.push(c);
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const out: SVGCircleElement[] = [];
+  const add = (x: number, y: number, r: number) => {
+    const c = document.createElementNS(ns, 'circle');
+    c.setAttribute('cx', x.toFixed(1));
+    c.setAttribute('cy', y.toFixed(1));
+    c.setAttribute('r', r.toFixed(1));
+    c.style.setProperty('--on', (0.04 + rnd() * 0.9).toFixed(3));
+    out.push(c);
+  };
+  // בעיר: בטלפון פחות פנסים (ביצועים)
+  const n = lite ? 260 : cityLamps.length;
+  for (let i = 0; i < n; i++) add(cityLamps[i][0] * W, cityLamps[i][1] * H, 10 + rnd() * 6);
+  // כמה לאורך הכביש של המסע
+  if (trail) {
+    const step = lite ? 320 : 150;
+    for (let s = step / 2; s < trail.total; s += step) {
+      const a = trail.at(s - 2);
+      const b = trail.at(s + 2);
+      const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+      const side = rnd() < 0.5 ? 1 : -1;
+      const p = trail.at(s);
+      add(p.x - ((b.y - a.y) / len) * side * 14, p.y + ((b.x - a.x) / len) * side * 14, 11 + rnd() * 4);
     }
   }
   lamps.replaceChildren(...out);
@@ -1218,8 +1236,10 @@ fetch(`${import.meta.env.BASE_URL}map.json`)
   });
 function setMap() {
   const custom = safeUrl(data.settings.map_image_url);
-  const url = custom || DEFAULT_MAP;
-  world.setImage(url);
+  // בטלפון: מפה קלה (2400px במקום 3400 – חצי זיכרון), עם אותן קואורדינטות של המפה המלאה
+  const url = custom || (lite ? `${import.meta.env.BASE_URL}map-lite.webp` : DEFAULT_MAP);
+  world.setImage(url, !custom && lite ? { w: 3400, h: 4182 } : undefined);
+  // צילומי המפה לסטוריז: אותה תמונה בדיוק (בלי עותק נוסף בזיכרון)
   if (snapImg.getAttribute('src') !== url) snapImg.src = url;
   // ים מסביב: למפה המקורית יש קובץ מוכן; למפה שהועלתה – צבע הים מסביב
   world.setPad(!custom && padMeta ? `${import.meta.env.BASE_URL}${padMeta.pad}` : null, padMeta?.mx, padMeta?.my);
@@ -1243,7 +1263,8 @@ function setMap() {
   const hadTrail = useTrail;
   useTrail = !custom;
   if (hadTrail !== useTrail) rebuild();
-  locImg.src = url;
+  // המפה הקטנה בפינה: תמונה קטנה (420px) במקום כל המפה
+  locImg.src = custom ? url : `${import.meta.env.BASE_URL}map-thumb.webp`;
 }
 
 store

@@ -170,7 +170,16 @@ function computePositions() {
   const trail = trailRaw ? makeTrail(trailRaw, mapImg.naturalWidth, mapImg.naturalHeight) : null;
   pos = placeAll(data.missions, trail);
 }
-function snapshot(i: number, w: number, hgt: number, span = 0.2): HTMLCanvasElement {
+// כל צילום נשמר פעם אחת (כתמונה) – בלי ליצור קנבסים חדשים בכל רענון של הבית (זיכרון בטלפון)
+const snapCache = new Map<string, { src: string; px?: string; py?: string }>();
+function snapshot(i: number, w: number, hgt: number, span = 0.2): HTMLElement {
+  const key = `${i}:${w}:${hgt}:${span}:${mapImg.naturalWidth}`;
+  const hit = snapCache.get(key);
+  if (hit) {
+    const im = h('img', { className: 'snap', src: hit.src, alt: '' });
+    if (hit.px) (im.dataset.px = hit.px), (im.dataset.py = hit.py);
+    return im;
+  }
   const c = document.createElement('canvas');
   c.width = w;
   c.height = hgt;
@@ -190,6 +199,13 @@ function snapshot(i: number, w: number, hgt: number, span = 0.2): HTMLCanvasElem
     g.drawImage(mapImg, sx, sy, sw, sh, 0, 0, w, hgt);
     c.dataset.px = String(((p.x * W - sx) / sw) * 100);
     c.dataset.py = String(((p.y * H - sy) / sh) * 100);
+  }
+  if (mapImg.naturalWidth) {
+    try {
+      snapCache.set(key, { src: c.toDataURL('image/jpeg', 0.82), px: c.dataset.px, py: c.dataset.py });
+    } catch {
+      /* בלי CORS – פשוט לא שומרים */
+    }
   }
   return c;
 }
@@ -844,7 +860,8 @@ fetch(`${B}trail.json`)
       computePositions();
       renderHome();
     };
-    mapImg.src = `${B}map.webp`;
+    // מפה קלה (2400px): לצילומים הקטנים בטלפון היא חדה מספיק, ובחצי זיכרון
+    mapImg.src = `${B}map-lite.webp`;
   });
 
 store
