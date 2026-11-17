@@ -324,3 +324,6 @@ body[data-tab]:not([data-tab='home']) .app { grid-template-rows: 1fr calc(var(--
 .cmts__who { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cmts .btn--primary { flex: none; }
 .cmt__body, .cmts__input { overflow-wrap: anywhere; }
+/* אזור השעון למעלה בצבע התוכן (ולא פס בהיר) */
+body[data-tab='map'] .app { background: #0b2a45; }
+body[data-tab='clips'] .app { background: #0b0814; }
