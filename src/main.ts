@@ -516,7 +516,12 @@ const control = createControl({
   mapImage: snapImg,
   clipComments,
 });
-void openList;
+// בתוך הטלפון (‎?embed): כפתור "כל העצירות"
+const listBtn = q<HTMLButtonElement>('[data-list]');
+if (listBtn) {
+  listBtn.hidden = !embed;
+  listBtn.onclick = () => openList();
+}
 // תגובות: נטענות פעם אחת; עצירה עם תגובות מקבלת סימן קטן בסיכה
 initComments(store, (list) => {
   control.setComments(list);
