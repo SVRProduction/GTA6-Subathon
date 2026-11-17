@@ -1,6 +1,6 @@
 // גרסה "Mission": שכבת המשחק מעל המפה – שעון משחק ומונה מיתות בפינה, כרזת "משימה הושלמה",
 // הבזק "מתת", ומקרא המפה לתפריט העצירה. כל הנתונים מגיעים מה-store הקיים.
-import { countOf, playMs, statusFresh, type LiveData } from './data/types';
+import { COUNTERS, countOf, playMs, statusFresh, type CounterName, type LiveData } from './data/types';
 import { h } from './dom';
 import { fmtPlay } from './live';
 
@@ -20,10 +20,43 @@ export function createMissionHud(stage: HTMLElement, opts: { reduce: boolean }) 
   // ── כרזה והבזק ──
   const banner = h('div', { class: 'mbanner', role: 'status', ariaLive: 'polite' });
   const flash = h('div', { class: 'mflash', ariaHidden: 'true' }, h('span', {}, 'מתת'));
-  stage.append(banner, flash);
+  // "MISSION FAILED" בסגנון GTA
+  const failed = h('div', { class: 'mfailed', ariaHidden: 'true' }, h('span', {}, 'MISSION FAILED'), h('small', {}, 'עודד פישל את המשימה'));
+  stage.append(banner, flash, failed);
 
   let live: LiveData | null = null;
   let lastDeaths = -1;
+  const last: Partial<Record<CounterName, number>> = {};
+  // אירוע אחד בכל רגע: השאר נכנסים לתור
+  const queue: CounterName[] = [];
+  let busy = false;
+  function play(kind: CounterName) {
+    busy = true;
+    // הדמות על המפה (main.ts) מציגה את האפקט שלה – גולגולת / אורות משטרה
+    window.dispatchEvent(new CustomEvent('oded:fx', { detail: kind }));
+    if (kind === 'fails') {
+      failed.classList.remove('is-on');
+      void failed.offsetWidth;
+      failed.classList.add('is-on');
+      window.setTimeout(() => failed.classList.remove('is-on'), 2600);
+    }
+    if (kind === 'deaths' && !opts.reduce) {
+      stage.classList.remove('is-shake');
+      void stage.offsetWidth;
+      stage.classList.add('is-shake');
+      window.setTimeout(() => stage.classList.remove('is-shake'), 600);
+    }
+    window.setTimeout(() => {
+      busy = false;
+      const next = queue.shift();
+      if (next) play(next);
+    }, kind === 'arrests' ? 3200 : 2700);
+  }
+  function fx(kind: CounterName) {
+    if (busy) {
+      if (queue.length < 4) queue.push(kind);
+    } else play(kind);
+  }
   let bannerTimer = 0;
 
   function tick() {
@@ -42,6 +75,13 @@ export function createMissionHud(stage: HTMLElement, opts: { reduce: boolean }) 
       const d = countOf(l, 'deaths');
       if (lastDeaths >= 0 && d > lastDeaths) this.flash();
       lastDeaths = d;
+      // עלה מספר (מהצ'אט או מהכפתורים) → אפקט על המפה אצל כל הצופים
+      for (const c of COUNTERS) {
+        const n = countOf(l, c.key);
+        const was = last[c.key];
+        if (was !== undefined && n > was) fx(c.key);
+        last[c.key] = n;
+      }
       tick();
     },
     /** "משימה הושלמה": המשימה שנגמרה, והבאה שנוספה עכשיו */
@@ -53,6 +93,11 @@ export function createMissionHud(stage: HTMLElement, opts: { reduce: boolean }) 
       void banner.offsetWidth;
       banner.classList.add('is-on');
       bannerTimer = window.setTimeout(() => banner.classList.remove('is-on'), opts.reduce ? 4000 : 5200);
+    },
+    /** לבדיקה (‎?fx): מפעיל אפקט כאילו הגיע מהצ'אט */
+    test(kind: CounterName) {
+      if (kind === 'deaths') this.flash();
+      fx(kind);
     },
     flash() {
       flash.classList.remove('is-on');

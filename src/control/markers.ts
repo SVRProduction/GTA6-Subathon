@@ -69,6 +69,16 @@ export function createMarkerLayer(opts: { stage: HTMLElement; world: World; onOp
     if (poll && pollEl) {
       const p = poll;
       pollEl.querySelector('.mk__title')!.textContent = p.question;
+      // פסים לכל אפשרות – גדלים בזמן אמת לפי הקולות
+      const total = p.votes.reduce((a, b) => a + b, 0);
+      const bars = h('span', { class: 'mk__bars' }, ...p.options.map((o, k) => {
+        const pct = total ? Math.round(((p.votes[k] ?? 0) / total) * 100) : 0;
+        const row = h('span', { class: 'mk__bar' }, h('span', { class: 'mk__bar-t' }, `!${k + 1} ${o}`), h('span', { class: 'mk__bar-n' }, `${pct}%`), h('i', {}));
+        row.style.setProperty('--p', `${pct}%`);
+        return row;
+      }));
+      pollEl.querySelector('.mk__bars')?.remove();
+      pollEl.querySelector('.mk__card')!.append(bars);
       pollEl.onclick = () => opts.onPoll(p);
     }
     applyHidden();
@@ -81,6 +91,7 @@ export function createMarkerLayer(opts: { stage: HTMLElement; world: World; onOp
     opts.stage.classList.toggle('is-route-off', hidden.has('route'));
   }
 
+  let pollAt: { x: number; y: number } | null = null;
   function place() {
     const { w, h: hh } = opts.world.size();
     if (w <= 1) return;
@@ -101,13 +112,20 @@ export function createMarkerLayer(opts: { stage: HTMLElement; world: World; onOp
       const d = drag.get(m.id);
       pos(d?.x ?? m.x, d?.y ?? m.y, el);
     }
-    if (poll && pollEl) pos(poll.x!, poll.y!, pollEl);
+    pollAt = null;
+    if (poll && pollEl) {
+      pos(poll.x!, poll.y!, pollEl);
+      const s = opts.world.project({ x: poll.x! * w, y: poll.y! * hh });
+      pollAt = { x: s.x, y: s.y };
+    }
   }
 
   return {
     el: layer,
     set,
     place,
+    /** מיקום הסקר על המסך (לקו מהדמות), או null */
+    pollAt: () => pollAt,
     list: () => list,
     elFor: (id: string) => els.get(id) ?? null,
     setDrag(id: string, p: { x: number; y: number } | null) {

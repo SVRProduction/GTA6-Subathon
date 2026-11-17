@@ -356,3 +356,85 @@ kbd { display: inline-grid; place-items: center; min-width: 26px; height: 24px; 
 .panel:not(.is-menu) .msec__title { font-size: 24px; }
 .msec .stop__clips, .msec .cmts { margin-top: 0; }
 .msec .cmts { border-top: 0; padding-top: 0; }
+/* תיבת התגובה באתר: שום דבר לא נדחף החוצה */
+.cmts__form > *, .cmts__bar > *, .cmt__main { min-width: 0; }
+.cmt__body { overflow-wrap: anywhere; }
+
+/* ── הדמות של עודד (הסמן "אנחנו כאן") ── */
+.player { z-index: 100002 !important; }
+/* הדמות עומדת על העצירה הנוכחית: הסיכה שלה לא מסתירה את הלוגו */
+.journey__pins:has(.player.is-live, .player.is-asleep) .pin--now .pin__disc { opacity: 0.35; }
+.player i { left: -30px; top: -30px; width: 60px; height: 60px; border: 3px solid var(--m-gold); opacity: 0; }
+.player b { display: none; }
+.player__face { position: absolute; left: -22px; top: -22px; width: 44px; height: 44px; border-radius: 50%; background: #308bd4; border: 3px solid var(--m-gold); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55); transition: filter 0.6s, transform 0.3s; }
+.player.is-live i { opacity: 1; animation: here 2s ease-out infinite; }
+.player.is-live .player__face { box-shadow: 0 0 0 4px rgba(246, 200, 30, 0.25), 0 6px 18px rgba(0, 0, 0, 0.55); }
+.player.is-asleep .player__face { filter: saturate(0.4) brightness(0.8); }
+.player__zz { position: absolute; left: 10px; top: -44px; font-size: 18px; display: none; animation: zz 3s ease-in-out infinite; }
+.player.is-asleep .player__zz { display: block; }
+@keyframes zz { 0%, 100% { transform: translateY(0); opacity: 0.9; } 50% { transform: translateY(-6px); opacity: 0.5; } }
+.player.is-driving .player__face { animation: drive 0.35s ease-in-out infinite alternate; }
+@keyframes drive { from { transform: translateY(0) rotate(-3deg); } to { transform: translateY(-3px) rotate(3deg); } }
+/* אפקטים מעל הדמות */
+.player__fx { position: absolute; left: 0; top: 0; }
+.pfx { position: absolute; left: 0; top: -40px; translate: -50% -100%; white-space: nowrap; pointer-events: none; }
+.pfx--skull { font-size: 46px; animation: skull 2.4s cubic-bezier(0.2, 1.3, 0.4, 1) both; filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.6)); }
+@keyframes skull { 0% { transform: scale(0) translateY(20px); opacity: 0; } 18% { transform: scale(1.25); opacity: 1; } 30% { transform: scale(1); } 80% { transform: translateY(-14px); opacity: 1; } 100% { transform: translateY(-34px); opacity: 0; } }
+.pfx--wanted { display: grid; justify-items: center; gap: 2px; padding: 6px 12px; border-radius: 10px; background: rgba(0, 0, 0, 0.75); animation: wanted 3.2s ease both; }
+.pfx--wanted b { color: #f6c81e; font-size: 16px; letter-spacing: 2px; text-shadow: 0 0 10px rgba(246, 200, 30, 0.7); }
+.pfx--wanted small { color: #fff; font: 700 11px/1 var(--m-body); letter-spacing: 3px; }
+@keyframes wanted { 0% { transform: scale(0.4); opacity: 0; } 10% { transform: scale(1.1); opacity: 1; } 18%, 85% { transform: scale(1); opacity: 1; } 100% { opacity: 0; } }
+.pfx--fail { font: 900 46px/1 var(--m-body); color: #ff4d4d; text-shadow: 0 0 14px rgba(255, 60, 60, 0.7); animation: skull 2.4s ease both; }
+/* אורות משטרה סביב הדמות */
+.player.is-busted i { opacity: 1; width: 90px; height: 90px; left: -45px; top: -45px; border: 0; animation: siren 0.5s steps(1) infinite; }
+@keyframes siren { 0% { background: radial-gradient(circle, rgba(255, 40, 60, 0.75), transparent 70%); } 50% { background: radial-gradient(circle, rgba(40, 110, 255, 0.75), transparent 70%); } }
+/* MISSION FAILED */
+.mfailed { position: absolute; inset: 0; z-index: 40; display: grid; place-content: center; justify-items: center; gap: 8px; pointer-events: none; opacity: 0; background: linear-gradient(transparent 38%, rgba(0, 0, 0, 0.72) 44%, rgba(0, 0, 0, 0.72) 56%, transparent 62%); }
+.mfailed span { font: 900 clamp(38px, 7vw, 84px)/1 'Rubik', var(--m-body); letter-spacing: 0.04em; color: #e8333b; text-shadow: 0 3px 0 #000, 0 0 30px rgba(232, 51, 59, 0.5); }
+.mfailed small { font: 600 16px/1 var(--m-body); color: #fff; }
+.mfailed.is-on { animation: failed 2.6s ease both; }
+@keyframes failed { 0% { opacity: 0; transform: scale(1.3); } 12% { opacity: 1; transform: scale(1); } 80% { opacity: 1; } 100% { opacity: 0; } }
+.journey__stage.is-shake .world { animation: shake 0.5s linear; }
+@keyframes shake { 0%, 100% { translate: 0 0; } 20% { translate: -6px 3px; } 40% { translate: 5px -4px; } 60% { translate: -4px 2px; } 80% { translate: 3px -2px; } }
+@media (prefers-reduced-motion: reduce) {
+  .pfx, .mfailed.is-on, .player.is-busted i, .player.is-driving .player__face { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
+}
+
+/* ── בועות על המפה ── */
+.bubbles { position: absolute; inset: 0; z-index: 12; pointer-events: none; overflow: hidden; }
+.bubble { position: absolute; translate: -50% -100%; display: flex; align-items: center; gap: 8px; max-width: 260px; padding: 7px 12px 7px 8px; border-radius: 18px 18px 18px 4px; background: rgba(8, 12, 22, 0.86); border: 1px solid var(--m-edge); color: var(--m-txt); box-shadow: 0 8px 22px rgba(0, 0, 0, 0.45); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); animation: bubble 5.6s ease both; }
+.bubble img, .bubble__pic { flex: none; width: 28px; height: 28px; border-radius: 50%; object-fit: cover; }
+.bubble__pic { display: grid; place-items: center; background: var(--m-gold); color: var(--m-gold-ink); font: 700 14px/1 var(--m-body); }
+.bubble p { margin: 0; font: 400 13px/1.35 var(--m-body); overflow-wrap: anywhere; }
+.bubble strong { color: var(--m-gold); font-weight: 700; }
+@keyframes bubble { 0% { opacity: 0; transform: translateY(14px) scale(0.85); } 8% { opacity: 1; transform: none; } 85% { opacity: 1; transform: translateY(-30px); } 100% { opacity: 0; transform: translateY(-44px); } }
+.journey__stage:has(.panel.is-menu[data-open]) .bubbles { display: none; }
+
+/* ── זריחה / יום / שקיעה / לילה (שכבת צבע מעל המפה, מתחת לסיכות) ── */
+.tod { position: absolute; inset: 0; z-index: 1; pointer-events: none; overflow: hidden; }
+.tod i { position: absolute; inset: 0; opacity: 0; transition: opacity 4s ease; }
+.tod__tint { mix-blend-mode: multiply; }
+.world > .tod__tint { position: absolute; inset: 0; z-index: 0; pointer-events: none; opacity: 0; transition: opacity 4s ease; }
+.tod__sky { mix-blend-mode: screen; }
+.tod__sun { mix-blend-mode: screen; }
+.tod__neon { mix-blend-mode: screen; }
+/* זריחה: ורוד-סגול רך */
+[data-tod='dawn'] .tod__tint { opacity: 1; background: linear-gradient(180deg, rgba(190, 150, 220, 0.45), rgba(255, 190, 200, 0.35) 55%, rgba(255, 225, 200, 0.2)); }
+[data-tod='dawn'] .tod__sun { opacity: 0.7; background: radial-gradient(60% 40% at 85% 8%, rgba(255, 200, 170, 0.55), transparent 70%); }
+/* יום: חם קל */
+[data-tod='day'] .tod__tint { opacity: 1; background: rgba(255, 244, 225, 0.12); }
+/* שקיעה – הווייב של Vice City: כתום, ורוד וסגול, שמש נמוכה שמשתקפת במים */
+[data-tod='sunset'] .tod__tint { opacity: 1; background: linear-gradient(180deg, rgba(110, 60, 170, 0.55) 0%, rgba(230, 80, 140, 0.5) 38%, rgba(255, 130, 70, 0.48) 70%, rgba(255, 180, 90, 0.42) 100%); }
+[data-tod='sunset'] .tod__sky { opacity: 1; background: linear-gradient(180deg, rgba(255, 90, 160, 0.35), transparent 35%); }
+[data-tod='sunset'] .tod__sun { opacity: 1; background: radial-gradient(38% 26% at 82% 14%, rgba(255, 210, 120, 0.85), rgba(255, 120, 80, 0.35) 45%, transparent 75%), radial-gradient(12% 60% at 82% 60%, rgba(255, 170, 90, 0.28), transparent 70%); animation: sunbreath 9s ease-in-out infinite; }
+@keyframes sunbreath { 50% { filter: brightness(1.15); } }
+/* לילה: כחול כהה עם ניאון ורוד/טורקיז בעיר */
+[data-tod='night'] .tod__tint { opacity: 1; background: linear-gradient(180deg, rgba(8, 12, 50, 0.8), rgba(16, 24, 70, 0.72)); }
+[data-tod='night'] .tod__neon { opacity: 1; background: radial-gradient(22% 16% at 58% 46%, rgba(255, 60, 170, 0.32), transparent 70%), radial-gradient(18% 14% at 44% 58%, rgba(40, 230, 220, 0.26), transparent 70%), radial-gradient(14% 10% at 66% 30%, rgba(170, 90, 255, 0.24), transparent 70%); animation: neon 6s ease-in-out infinite; }
+@keyframes neon { 50% { opacity: 0.75; } }
+.is-cinema .tod i { transition-duration: 1s; }
+@media (prefers-reduced-motion: reduce) { .tod i { transition: none; animation: none !important; } }
+.fx-test { position: absolute; z-index: 60; top: 80px; left: 12px; display: grid; gap: 6px; }
+
+/* ── פנסי רחוב: נדלקים בהדרגה כשמחשיך (--dark עולה כל דקה, לכל פנס סף --on משלו) ── */
+.lamps circle { fill: url(#lamp-g); filter: brightness(1.2); opacity: clamp(0, calc((var(--dark, 0) - var(--on, 1)) * 14), 1); transition: opacity 2.5s ease; mix-blend-mode: screen; }
