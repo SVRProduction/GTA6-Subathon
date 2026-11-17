@@ -43,12 +43,23 @@ export function createPhone(opts: {
   const tabsEl = h('nav', { class: 'phone__tabs', ariaLabel: 'הטלפון' });
   const closeBtn = h('button', { type: 'button', class: 'phone__close', ariaLabel: 'סגירת הטלפון' }, svg('close', 20));
   // בפופאפ במפה: קישור לעמוד הטלפון המלא (שאפשר להתקין כאפליקציה)
-  const pageLink = h('a', { class: 'phone__pagelink', href: `${import.meta.env.BASE_URL}phone.html`, title: 'לפתוח כעמוד מלא ולהתקין כאפליקציה' }, svg('upload', 16), h('span', {}, 'להתקין כאפליקציה'));
+  const pageLink = h('a', { class: 'phone__pagelink', href: `${import.meta.env.BASE_URL}phone.html`, target: '_blank', rel: 'noopener', title: 'לפתוח את הטלפון כעמוד מלא ולהתקין כאפליקציה' }, svg('upload', 16), h('span', {}, 'להתקין כאפליקציה'));
+  // בפופאפ במפה: בתוך המכשיר רץ אותו הטלפון בדיוק (phone.html), כדי שיהיה טלפון אחד
+  const frameBox = h('div', { class: 'phone__framebox' });
+  let frame: HTMLIFrameElement | null = null;
+  const loadFrame = () => {
+    if (frame) return;
+    const demo = new URLSearchParams(location.search).has('demo') ? '&demo' : '';
+    frame = h('iframe', { class: 'phone__frame', src: `${import.meta.env.BASE_URL}phone.html?inapp${demo}`, title: 'הטלפון', allow: 'autoplay; fullscreen; clipboard-write; web-share' }) as HTMLIFrameElement;
+    frameBox.append(frame);
+  };
   const statusbar = h('div', { class: 'phone__status', ariaHidden: 'true' }, h('span', { class: 'phone__clock' }), h('span', { class: 'phone__notch' }), h('span', { class: 'phone__bat' }, '100%'));
   const phone = h(
     'aside',
     { class: 'phone', id: 'phone', hidden: true, ariaLabel: 'הטלפון: סטוריז, צ׳אט וסקר' },
-    h('div', { class: 'phone__device' }, statusbar, h('header', { class: 'phone__head' }, h('strong', {}, 'הטלפון'), opts.page ? null : pageLink, closeBtn), screen, tabsEl),
+    opts.page
+      ? h('div', { class: 'phone__device' }, statusbar, h('header', { class: 'phone__head' }, h('strong', {}, 'הטלפון'), closeBtn), screen, tabsEl)
+      : h('div', { class: 'phone__device phone__device--frame' }, statusbar, h('header', { class: 'phone__head phone__head--slim' }, pageLink, closeBtn), frameBox),
   );
   opts.stage.append(btn, phone);
   const clock = statusbar.querySelector<HTMLElement>('.phone__clock')!;
@@ -75,6 +86,7 @@ export function createPhone(opts: {
     btn.setAttribute('aria-expanded', String(on));
     document.body.classList.toggle('is-phone', on);
     if (on) {
+      loadFrame();
       phone.hidden = false;
       requestAnimationFrame(() => phone.classList.add('is-open'));
       if (location.hash !== '#phone') history.replaceState(null, '', '#phone');
