@@ -186,18 +186,30 @@ export function createWorld(stage: HTMLElement, onSize: (w: number, h: number) =
   const coarse = matchMedia('(max-width: 760px), (pointer: coarse)').matches;
   const maxZ = () => (coarse ? fitZ() * 6 : Math.max(fitZ() * 2.5, Math.min(fitZ() * 10, ((hdSets[hdSets.length - 1]?.set.w ?? W) / W) / devicePixelRatio)));
 
-  /** גבולות: מרכז המצלמה נשאר בתוך המפה */
-  // בטיול חופשי מותר לצאת גם אל הים שמסביב למפה (עד שליש מפה לכל צד)
-  const ROAM = matchMedia('(pointer: coarse)').matches ? 0.12 : 0.35;
-  const bound = (v: number, max: number) => Math.min(max * (1 + ROAM), Math.max(-max * ROAM, v));
+  /** גבולות לפי הזום: המפה לא יוצאת מהמסך (גרירה רחוקה החוצה הראתה ים ריק וגרמה להבהובים בטלפון).
+   *  כשהמפה קטנה מהמסך בציר מסוים - היא ננעלת במרכז; כשהיא גדולה ממנו - הקצה שלה לא נכנס יותר משוליים קטנים פנימה. */
+  const EDGE = 0; // בלי שוליים: מעבר לקצה המפה רואים את קצה שכבת הלילה/השקיעה (מלבן חד)
+  function axis(v: number, size: number, z: number, dim: number) {
+    if (size * z <= dim) return size / 2;
+    const half = dim / 2 / z;
+    const m = (dim * EDGE) / z;
+    return Math.min(size - half + m, Math.max(half - m, v));
+  }
+  function bounded(c: Camera): Camera {
+    const { w, h } = view();
+    return { ...c, x: axis(c.x, W, c.z, w), y: axis(c.y, H, c.z, h) };
+  }
   function soft(c: Camera): Camera {
     const { w, h } = view();
-    const ox = c.x - bound(c.x, W);
-    const oy = c.y - bound(c.y, H);
-    return { ...c, x: bound(c.x, W) + rubberband(ox * c.z, w) / c.z, y: bound(c.y, H) + rubberband(oy * c.z, h) / c.z };
+    const b = bounded(c);
+    return { ...c, x: b.x + rubberband((c.x - b.x) * c.z, w) / c.z, y: b.y + rubberband((c.y - b.y) * c.z, h) / c.z };
   }
 
   let raw: Camera | null = null; // מיקום "אמיתי" לפני התנגדות הגומי
+  // סיבוב/שינוי גודל במצב חופשי: מחזירים את המפה לתוך הגבולות (אחרי שהגודל החדש נמדד; לא באמצע גרירה)
+  new ResizeObserver(() => {
+    if (free && !pointers.size && vsize.w) free = raw = bounded(free);
+  }).observe(stage);
 
   function zoomAt(sx: number, sy: number, factor: number) {
     if (!raw) return;
@@ -225,7 +237,7 @@ export function createWorld(stage: HTMLElement, onSize: (w: number, h: number) =
     }
     const z = raw.z;
     const from = { ...raw };
-    const to = { x: bound(raw.x - project(vx) / z, W), y: bound(raw.y - project(vy) / z, H) };
+    const to = bounded({ x: raw.x - project(vx) / z, y: raw.y - project(vy) / z, z });
     // קפיץ בלי קפיצות-יתר (damping 1), response ≈ 0.4s; מתחיל במהירות האצבע
     const start = performance.now();
     const v0x = -vx / z;
@@ -370,7 +382,7 @@ export function createWorld(stage: HTMLElement, onSize: (w: number, h: number) =
       cancelAnimationFrame(glide);
       const from = { ...free };
       const z1 = Math.min(maxZ(), Math.max(minZ(), t.z));
-      const to = { x: bound(t.x, W), y: bound(t.y, H) };
+      const to = bounded({ x: t.x, y: t.y, z: z1 });
       const start = performance.now();
       const step = () => {
         const k = Math.min(1, (performance.now() - start) / ms);
