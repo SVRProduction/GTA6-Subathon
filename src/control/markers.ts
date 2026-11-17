@@ -73,7 +73,7 @@ export function createMarkerLayer(opts: { stage: HTMLElement; world: World; onOp
       const total = p.votes.reduce((a, b) => a + b, 0);
       const bars = h('span', { class: 'mk__bars' }, ...p.options.map((o, k) => {
         const pct = total ? Math.round(((p.votes[k] ?? 0) / total) * 100) : 0;
-        const row = h('span', { class: 'mk__bar' }, h('span', { class: 'mk__bar-t' }, `!${k + 1} ${o}`), h('span', { class: 'mk__bar-n' }, `${pct}%`), h('i', {}));
+        const row = h('span', { class: 'mk__bar' }, h('span', { class: 'mk__bar-t' }, h('span', { dir: 'ltr' }, `!${k + 1}`), ` ${o}`), h('span', { class: 'mk__bar-n' }, `${pct}%`), h('i', {}));
         row.style.setProperty('--p', `${pct}%`);
         return row;
       }));
