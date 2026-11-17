@@ -2,10 +2,10 @@
 // דפים: רשת קודם, תמיד בבדיקה מול השרת (הגרסה העדכנית מיד), מטמון רק כשאין רשת.
 // קבצי קוד/פונטים/אייקונים: מהמטמון, ומתעדכנים ברקע. אריחי המפה הכבדים (map-hd-*) – רק מהרשת.
 // בקשות לשרתים אחרים (Supabase, Kick) לא נוגעים בהן.
-const CACHE = 'subathon-v8';
+const CACHE = 'subathon-v9';
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(['./', './phone.html', './install.html', './manifest.webmanifest', './phone.webmanifest', './icons/icon-192.png'])).catch(() => {}));
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(['./', './phone.html', './install.html', './manifest.webmanifest', './phone.webmanifest', './icons/icon-192.png', './icons/oded-96.png'])).catch(() => {}));
   self.skipWaiting();
 });
 self.addEventListener('activate', (e) => {
