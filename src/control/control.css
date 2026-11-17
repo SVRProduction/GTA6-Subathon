@@ -628,3 +628,5 @@ button.pc__opt:active { transform: scale(0.985); }
 .is-embed .hud__actions .btn { min-height: 44px; padding: 0 16px; font-size: 15px; }
 .is-embed .locator { display: block !important; position: absolute; left: 14px; right: auto; bottom: calc(14px + var(--safe-b, 0px)); z-index: 6; }
 .is-embed .is-free .hud__actions { display: none !important; }
+/* עמוד עצירה פתוח (מסך מלא): הכפתורים הצפים לא מסתירים את התוכן */
+.journey__stage:has(.panel.is-menu[data-open]) :is(.phone-btn, .poll-chip) { display: none !important; }

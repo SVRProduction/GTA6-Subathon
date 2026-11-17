@@ -208,6 +208,37 @@ body { color: var(--m-txt); background: var(--m-bg); font: 400 16px/1.6 var(--m-
 .panel.is-menu .panel__close { top: 18px; left: 18px; width: 48px; height: 48px; }
 .panel.is-menu .panel__nav { justify-content: center; gap: 12px; border-top: 1px solid var(--m-edge); background: rgba(5, 8, 15, 0.6); }
 .panel.is-menu .clips--row { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+/* עמוד אחד (בלי לשוניות ובלי מקרא): עמודה אחת במרכז */
+.panel.is-menu .panel__scroll { grid-template-columns: minmax(0, 860px); gap: 0; }
+.panel.is-menu .mlegend { display: none !important; }
+.panel.is-menu .mhead, .panel.is-menu .msec { grid-column: 1; }
+.panel.is-menu .stop__media { max-width: none; }
+.msec { display: grid; gap: 14px; margin-top: 30px; }
+.msec__title { font: 700 30px/1 var(--m-display); letter-spacing: 0.01em; color: var(--m-txt); }
+/* עד הרגע הזה – מספרים גדולים */
+.mnow { margin-top: 6px; }
+.mnow__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.mnow__t { display: grid; gap: 6px; align-content: end; min-height: 108px; padding: 14px 16px; border-radius: 14px; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--m-edge); }
+.mnow__t b { font: 700 54px/0.9 var(--m-display); letter-spacing: 0.02em; font-variant-numeric: tabular-nums; color: var(--m-txt); }
+.mnow__t span { font: 500 15px/1.25 var(--m-body); color: var(--m-txt-2); }
+.mnow__t--play { background: linear-gradient(140deg, rgba(246, 200, 30, 0.16), rgba(246, 200, 30, 0.03)); border-color: rgba(246, 200, 30, 0.35); }
+.mnow__t--play b { color: var(--m-gold); }
+.mnow__t--deaths b { color: #ff8fae; }
+.mnow__here { margin: 0; font: 500 15px/1.4 var(--m-body); color: var(--m-txt-2); }
+/* קליפים מהרגע הזה: במרכז, כרטיסים גדולים */
+.panel.is-menu .msec--clips .stop__clips > h3 { display: none; }
+.panel.is-menu .msec--clips .clips--row { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); justify-content: center; gap: 16px; }
+.panel.is-menu .mempty { padding: 22px; border: 1px dashed var(--m-edge-2, rgba(255, 255, 255, 0.18)); border-radius: 14px; text-align: center; color: var(--m-txt-3); }
+/* מיילסטון: המסך משתנה – הילה זהובה, תג וכותרת ענקית */
+.panel.is-menu.is-ms { background: radial-gradient(120% 70% at 50% -10%, rgba(246, 200, 30, 0.28), transparent 60%), rgba(8, 7, 3, 0.82); }
+.panel.is-menu.is-ms .stop__title { color: var(--m-gold); text-shadow: 0 6px 40px rgba(246, 200, 30, 0.35); }
+.mbadge { justify-self: start; display: inline-flex; align-items: center; gap: 6px; margin: 0 0 6px; padding: 6px 14px; border-radius: 999px; background: var(--m-gold); color: var(--m-gold-ink); font: 700 14px/1 var(--m-body); }
+@media (max-width: 760px) {
+  .mnow__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mnow__t--play { grid-column: span 2; }
+  .mnow__t b { font-size: 46px; }
+  .msec__title { font-size: 26px; }
+}
 .mlegend__title { font: 500 12px/1 var(--m-body); color: var(--m-txt-3); letter-spacing: 0.06em; margin-top: 6px; }
 .mlegend ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 9px; font-size: 14px; color: var(--m-txt-2); }
 .mlegend li { display: flex; align-items: center; gap: 10px; }
@@ -315,3 +346,11 @@ kbd { display: inline-grid; place-items: center; min-width: 26px; height: 24px; 
 @media (max-width: 760px) {
   .journey__stage:has(.panel[data-open]) .onair { display: none; }
 }
+/* בפאנל הצד הצר (בזמן גלילה במסע): שתי עמודות ומספרים קטנים יותר */
+.panel:not(.is-menu) .mnow__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.panel:not(.is-menu) .mnow__t { min-height: 84px; padding: 10px 12px; }
+.panel:not(.is-menu) .mnow__t b { font-size: 38px; }
+.panel:not(.is-menu) .mnow__t--play { grid-column: span 2; }
+.panel:not(.is-menu) .msec__title { font-size: 24px; }
+.msec .stop__clips, .msec .cmts { margin-top: 0; }
+.msec .cmts { border-top: 0; padding-top: 0; }

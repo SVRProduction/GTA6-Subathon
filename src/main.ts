@@ -14,7 +14,7 @@ import { commentCount, commentsBox, initComments } from './comments';
 import { loginError } from './auth';
 import { createMissionHud, legend } from './mission';
 import { createControl } from './control';
-import { countOf, kickSlug, playMs, type Clip, type LiveData } from './data/types';
+import { COUNTERS, countOf, kickSlug, playMs, type Clip, type CounterName, type LiveData } from './data/types';
 
 const store = createStore();
 const q = <T extends HTMLElement = HTMLElement>(sel: string) => document.querySelector(sel) as T;
@@ -538,11 +538,35 @@ initComments(store, (list) => {
 if (loginError) setTimeout(() => toast('ההתחברות עם Kick לא הצליחה. נסו שוב.'), 600);
 
 // ── פאנל הצד: פתיחה וסגירה באותו מסלול, וניתן לעצור באמצע ──
-let menuTab: 'story' | 'clips' | 'talk' = 'story';
 /**
  * תפריט עצירה. בגלילה (auto) – כרטיס צד קטן; בלחיצה על סיכה – תפריט במסך מלא עם לשוניות ומקרא.
  * refresh = רענון נתונים של מה שכבר פתוח (שומר מצב ולשונית)
  */
+/** "עד הרגע הזה": מה קרה מתחילת הסאבתון ועד העצירה – מספרים גדולים וברורים */
+function untilHere(i: number) {
+  const m = data.missions[i];
+  const upto = new Set(data.missions.slice(0, i + 1).map((x) => x.id));
+  const sum = (k: CounterName) => [...upto].reduce((a, id) => a + (liveData ? countOf(liveData, k, id) : 0), 0);
+  const until = i === cur || !m.happened_at ? Date.now() : Date.parse(m.happened_at);
+  const hrs = liveData ? playMs(liveData, until) : 0;
+  const clipsSoFar = [...clipsByStop.entries()].filter(([k]) => k <= i).reduce((a, [, l]) => a + l.length, 0);
+  const tile = (n: string, label: string, cls = '') => h('div', { class: `mnow__t ${cls}` }, h('b', {}, n), h('span', {}, label));
+  const here = COUNTERS.map((c) => ({ c, n: liveData ? countOf(liveData, c.key, m.id) : 0 })).filter((x) => x.n);
+  return h(
+    'section',
+    { class: 'msec mnow', ariaLabel: 'עד הרגע הזה' },
+    h('h3', { class: 'msec__title' }, 'עד הרגע הזה'),
+    h(
+      'div',
+      { class: 'mnow__grid' },
+      tile(fmtHours(hrs) || '0', 'שעות משחק', 'mnow__t--play'),
+      tile(String(i + 1), i === 0 ? 'עצירה ראשונה' : 'עצירות במסע'),
+      ...COUNTERS.map((c) => tile(String(sum(c.key)), `${c.emoji} ${c.long}`, c.key === 'deaths' ? 'mnow__t--deaths' : '')),
+      tile(String(clipsSoFar), '🎬 קליפים'),
+    ),
+    here.length ? h('p', { class: 'mnow__here' }, 'במשימה הזאת: ', here.map((x) => `${x.c.emoji} ${x.n}`).join('   ')) : null,
+  );
+}
 function openPanel(i: number, auto = false, refresh = false) {
   if (!auto) userClosed = false;
   const m = data.missions[i];
@@ -555,39 +579,22 @@ function openPanel(i: number, auto = false, refresh = false) {
   }
   if (!refresh) {
     panel.classList.toggle('is-menu', !auto);
-    if (active !== i) menuTab = 'story';
   }
   active = i;
   const [media, ...rest] = stopBody(m, i, toast, { embed: true, snapshot: mapSnapshot(i) });
   const clips = stopClips(i);
   const nClips = clipsByStop.get(i)?.length ?? 0;
   const nTalk = commentCount('stop', m.id);
-  const pane = (key: typeof menuTab, ...kids: Array<Node | string | null | false | undefined>) => {
-    const el = h('div', { class: `mtab-pane ${menuTab === key ? 'is-on' : ''}`, id: `mtab-${key}` }, ...kids);
-    el.setAttribute('role', 'tabpanel');
-    el.dataset.tab = key;
-    return el;
-  };
-  const tab = (key: typeof menuTab, label: string, n = 0) => {
-    const b = h('button', { type: 'button', class: 'mtab' }, label, n ? h('span', { class: 'mtab__n' }, String(n)) : null);
-    b.setAttribute('role', 'tab');
-    b.setAttribute('aria-selected', String(menuTab === key));
-    b.setAttribute('aria-controls', `mtab-${key}`);
-    b.onclick = () => {
-      menuTab = key;
-      panelBody.querySelectorAll<HTMLElement>('.mtab').forEach((x) => x.setAttribute('aria-selected', String(x === b)));
-      panelBody.querySelectorAll<HTMLElement>('.mtab-pane').forEach((x) => x.classList.toggle('is-on', x.dataset.tab === key));
-    };
-    return b;
-  };
+  // עמוד אחד: כותרת, "עד הרגע הזה", הסיפור, הקליפים מהרגע הזה ותגובות – בלי לשוניות ובלי מקרא
+  const section = (cls: string, title: string | null, ...kids: Array<Node | string | null | false | undefined>) => h('section', { class: `msec ${cls}` }, title ? h('h3', { class: 'msec__title' }, title) : null, ...kids);
   fill(
     panelBody,
     h(
       'header',
       { class: 'mhead' },
-      h('p', { class: 'stop__meta stamp' }, [kindLabel(m), metaText(m)].filter(Boolean).join('  |  ')),
+      m.is_milestone ? h('p', { class: 'mbadge' }, '🏆 מיילסטון') : null,
+      h('p', { class: 'stop__meta stamp' }, [m.is_milestone ? '' : kindLabel(m), metaText(m)].filter(Boolean).join('  |  ')),
       h('h2', { class: 'stop__title', id: 'panel-title' }, m.title),
-      stopStats(i),
       control.isMod()
         ? (() => {
             const b = h('button', { type: 'button', class: 'btn btn--small mod-edit' }, 'עריכת העצירה');
@@ -595,17 +602,13 @@ function openPanel(i: number, auto = false, refresh = false) {
             return b;
           })()
         : null,
-      (() => {
-        const t = h('div', { class: 'mtabs', ariaLabel: 'תפריט העצירה' }, tab('story', 'סיפור'), tab('clips', 'קליפים', nClips), tab('talk', 'תגובות', nTalk));
-        t.setAttribute('role', 'tablist');
-        return t;
-      })(),
     ),
-    pane('story', media, m.body && m.summary ? h('p', { class: 'stop__teaser' }, m.summary) : null, ...rest, i === cur && kickChannel ? livePlayer(kickChannel) : null),
-    pane('clips', clips ?? h('p', { class: 'mempty' }, 'עוד אין קליפים מהקטע הזה. קליפ שנעשה בלייב בזמן המשימה יופיע כאן לבד.')),
-    pane('talk', commentsBox(store, 'stop', m.id, { toast, title: false })),
-    legend(),
+    untilHere(i),
+    section('msec--story', null, media, m.body && m.summary ? h('p', { class: 'stop__teaser' }, m.summary) : null, ...rest, i === cur && kickChannel ? livePlayer(kickChannel) : null),
+    section('msec--clips', nClips ? `קליפים מהרגע הזה (${nClips})` : 'קליפים מהרגע הזה', clips ?? h('p', { class: 'mempty' }, 'עוד אין קליפים מהקטע הזה. קליפ שנעשה בלייב בזמן המשימה יופיע כאן לבד.')),
+    section('msec--talk', nTalk ? `תגובות (${nTalk})` : 'תגובות', commentsBox(store, 'stop', m.id, { toast, title: false })),
   );
+  panel.classList.toggle('is-ms', !!m.is_milestone);
   panelBody.classList.toggle('has-media', !!media);
   panel.hidden = false;
   if (!refresh) panelBody.scrollTop = 0;
