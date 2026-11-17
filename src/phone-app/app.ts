@@ -161,7 +161,8 @@ const ago = (iso: string | null) => {
   const m = Math.max(1, Math.round((Date.now() - Date.parse(iso)) / 60_000));
   if (m < 60) return `לפני ${m} דק'`;
   if (m < 1440) return `לפני ${Math.round(m / 60)} שע'`;
-  return `לפני ${Math.round(m / 1440)} ימים`;
+  const d = Math.round(m / 1440);
+  return d === 1 ? 'אתמול' : `לפני ${d} ימים`;
 };
 
 // ── צילום המפה במקום של עצירה (רקע לסטורי ולכרטיסים) ──
@@ -633,7 +634,7 @@ function renderHome() {
         h(
           'div',
           { className: 'card--now__body' },
-          h('p', { className: 'eyebrow' }, 'אנחנו עכשיו ב'),
+          h('p', { className: 'eyebrow' }, 'איפה אנחנו עכשיו'),
           h('h2', {}, m.title || `עצירה ${cur + 1}`),
           h('p', { className: 'muted' }, [`עצירה ${cur + 1}`, m.chapter, m.stream_day ? `יום ${m.stream_day}` : ''].filter(Boolean).join('  |  ')),
           h(

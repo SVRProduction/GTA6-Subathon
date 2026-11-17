@@ -29,7 +29,7 @@ export function createLive(stage: HTMLElement, opts: { onWatch: (channel: string
     const onGame = fresh ? !!s?.on_category : data.settings.is_live;
     badge.hidden = !isLive || !kickSlug(data.settings.kick_channel);
     badge.className = `onair ${onGame ? 'is-game' : ''}`;
-    badge.textContent = onGame ? 'משחק GTA 6 עכשיו' : 'בלייב עכשיו';
+    badge.textContent = onGame ? 'משחק GTA 6 עכשיו · צפו ▶' : 'בלייב עכשיו · צפו ▶';
     badge.title = s?.title ?? '';
     badge.dataset.viewers = fresh && s?.viewers ? `${s.viewers.toLocaleString('he-IL')} צופים` : '';
     stage.classList.toggle('is-onair', isLive);

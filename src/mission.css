@@ -77,6 +77,8 @@ body { color: var(--m-txt); background: var(--m-bg); font: 400 16px/1.6 var(--m-
 .opening .stamp:has(.opening__logo)::before { display: none; }
 .opening__logo { width: 40px; height: 40px; border-radius: 50%; background: #308bd4; box-shadow: 0 0 0 2px var(--m-gold); }
 .opening__title { font: 700 clamp(60px, 7vw, 92px)/0.88 var(--m-display); letter-spacing: 0.01em; text-wrap: balance; }
+.opening__count { font: 700 15px/1.3 var(--m-body); color: var(--m-gold); }
+.opening__count b { font: 700 26px/1 var(--m-display); letter-spacing: 0.04em; margin-inline-start: 6px; }
 .opening__how { color: var(--m-txt-2); font-size: 16px; line-height: 1.55; max-width: 36ch; }
 .opening__hint { font: 500 14px/1.3 var(--m-body); color: var(--m-gold); }
 .opening__hint::before { border-color: var(--m-gold); color: var(--m-gold); }
@@ -415,7 +417,7 @@ kbd { display: inline-grid; place-items: center; min-width: 26px; height: 24px; 
 .tod { position: absolute; inset: 0; z-index: 1; pointer-events: none; overflow: hidden; }
 .tod i { position: absolute; inset: 0; opacity: 0; transition: opacity 4s ease; }
 .tod__tint { mix-blend-mode: multiply; }
-.world > .tod__tint { position: absolute; inset: 0; z-index: 0; pointer-events: none; opacity: 0; transition: opacity 4s ease; }
+.world > .tod__tint { position: absolute; inset: -140%; z-index: 0; pointer-events: none; opacity: 0; transition: opacity 4s ease; }
 .tod__sky { mix-blend-mode: screen; }
 .tod__sun { mix-blend-mode: screen; }
 .tod__neon { mix-blend-mode: screen; }
