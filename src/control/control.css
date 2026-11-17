@@ -660,3 +660,7 @@ button.pc__opt:active { transform: scale(0.985); }
 @keyframes march { to { stroke-dashoffset: -12; } }
 @media (prefers-reduced-motion: reduce) { .poll-line path { animation: none; } }
 @media (max-width: 760px) { .journey__stage:has(.poll-chip:not([hidden])) .ticker { display: none; } }
+@media (max-width: 760px), (pointer: coarse) {
+  .poll-line path { filter: none; animation: none; }
+  .ticker__win { mask-image: none; -webkit-mask-image: none; }
+}

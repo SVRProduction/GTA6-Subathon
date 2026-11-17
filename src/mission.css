@@ -438,3 +438,19 @@ kbd { display: inline-grid; place-items: center; min-width: 26px; height: 24px; 
 
 /* ── פנסי רחוב: נדלקים בהדרגה כשמחשיך (--dark עולה כל דקה, לכל פנס סף --on משלו) ── */
 .lamps circle { fill: url(#lamp-g); filter: brightness(1.2); opacity: clamp(0, calc((var(--dark, 0) - var(--on, 1)) * 14), 1); transition: opacity 2.5s ease; mix-blend-mode: screen; }
+
+/* ── טלפון / מסך מגע: גרסה קלה (FPS וזיכרון) ──
+   בלי טשטוש מאחורי לוחות, בלי מצבי מיזוג (blend) ובלי אנימציות רקע שמציירות מסך מלא כל פריים */
+@media (max-width: 760px), (pointer: coarse) {
+  *, *::before, *::after { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+  :root { --m-glass: rgba(8, 12, 22, 0.9); }
+  .tod i, .world > .tod__tint { mix-blend-mode: normal !important; animation: none !important; transition: opacity 3s linear; }
+  .tod__sky, .tod__sun, .tod__neon { display: none !important; }
+  [data-tod='dawn'] .world > .tod__tint { background: rgba(190, 140, 210, 0.18); }
+  [data-tod='day'] .world > .tod__tint { background: transparent; }
+  [data-tod='sunset'] .world > .tod__tint { background: linear-gradient(180deg, rgba(120, 50, 170, 0.32), rgba(240, 90, 140, 0.26) 45%, rgba(255, 140, 70, 0.24)); }
+  [data-tod='night'] .world > .tod__tint { background: rgba(6, 10, 40, 0.58); }
+  .lamps circle { mix-blend-mode: normal; filter: none; transition: none; }
+  .player.is-live i, .player__zz { animation: none; }
+  .bubble { animation-duration: 4.5s; }
+}

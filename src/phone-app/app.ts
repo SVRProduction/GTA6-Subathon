@@ -214,6 +214,13 @@ type Tab = 'home' | 'map' | 'clips' | 'stats';
 let tab: Tab = 'home';
 const frames: Partial<Record<Tab, HTMLIFrameElement>> = {};
 function frame(t: 'map' | 'stats', hash = '') {
+  // בתוך הטלפון שבאתר: לא טוענים עוד עותק של המפה (כפול זיכרון = קריסה בטלפון) – סוגרים את הטלפון ועוברים למפה של האתר
+  if (t === 'map' && new URLSearchParams(location.search).has('inapp') && window.parent !== window) {
+    window.parent.postMessage({ type: 'oded:map', hash }, location.origin);
+    history.replaceState(null, '', '#home');
+    show('home');
+    return;
+  }
   const view = $(`#view-${t}`);
   let f = frames[t];
   const demo = new URLSearchParams(location.search).has('demo') ? '&demo' : '';
