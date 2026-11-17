@@ -1,0 +1,24 @@
+{
+  "id": "./phone.html",
+  "name": "הסאבתון של עודד · GTA 6",
+  "short_name": "הסאבתון",
+  "description": "סטוריז, קליפים, המפה והמספרים מהסאבתון של OdedSVR.",
+  "lang": "he",
+  "dir": "rtl",
+  "start_url": "./phone.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#fff7ef",
+  "theme_color": "#fff7ef",
+  "icons": [
+    { "src": "icons/oded-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/oded-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/oded-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "קליפים", "url": "./phone.html#clips" },
+    { "name": "מספרים", "url": "./phone.html#stats" },
+    { "name": "המפה", "url": "./" }
+  ]
+}
