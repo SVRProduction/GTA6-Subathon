@@ -1,6 +1,6 @@
 import { $, fill, fmtDate, h } from '../dom';
 import { createStore } from '../data/store';
-import { countOf, currentIndex, newMission, statusFresh, type Comment, type CounterName, type Data, type Extras, type LiveData, type Mission, type ModEntry } from '../data/types';
+import { COUNTERS, countOf, currentIndex, newMission, statusFresh, type Comment, type CounterName, type Data, type Extras, type LiveData, type Mission, type ModEntry } from '../data/types';
 import { getViewer, login, loginError, logout } from '../auth';
 import { getModSession, kickName, onModChange } from '../data/modSession';
 import { safeUrl } from '../dom';
@@ -359,8 +359,8 @@ function countersPanel(compact: boolean) {
     { class: `panel counters ${compact ? 'counters--full' : ''}` },
     h('div', { class: 'panel-head' }, h('h2', {}, 'ספירות'), compact ? h('a', { class: 'btn', href: '#' }, 'לכל הניהול') : h('a', { class: 'btn', href: '#counters' }, 'מסך ספירות מלא')),
     h('p', { class: 'live-line' }, status),
-    h('div', { class: 'counters__row' }, box('deaths', '💀', 'מוות'), box('cats', '🐈', 'חתול')),
-    h('small', { class: 'counters__hint' }, cur ? `נספר על: ${cur.title || 'המשימה הנוכחית'}. מודרטורים יכולים גם לכתוב בצ'אט !מוות או !חתול (אחרי חיבור האפליקציה של Kick).` : ''),
+    h('div', { class: 'counters__row' }, ...COUNTERS.map((c) => box(c.key, c.emoji, c.short))),
+    h('small', { class: 'counters__hint' }, cur ? `נספר על: ${cur.title || 'המשימה הנוכחית'}. מודרטורים יכולים גם לכתוב בצ'אט ${COUNTERS.map((c) => c.cmd).join(' / ')} (ועם - בסוף לביטול).` : ''),
   );
 }
 

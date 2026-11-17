@@ -1,8 +1,8 @@
-// דף הסטטיסטיקות: זמן משחק, מיתות, חתולים, המשימות הקשות, שעות לפי יום והקליפים הנצפים.
+// דף המספרים (בתוך הטלפון): זמן משחק, כמה פעמים עודד מת / נעצר / פישל, עובדות מצחיקות, שעות לפי יום והקליפים הנצפים.
 import { clipCard, playClip } from './clips';
 import { commentCount, commentsBox, initComments } from './comments';
 import { createStore } from './data/store';
-import { countOf, currentIndex, kickSlug, playMs, statusFresh, type Clip, type Data, type LiveData } from './data/types';
+import { countOf, currentIndex, kickSlug, playMs, statusFresh, type Clip, type Data, type Extras, type LiveData } from './data/types';
 import { fill, h } from './dom';
 import { fmtPlay } from './live';
 
@@ -11,6 +11,8 @@ const root = document.querySelector<HTMLElement>('[data-root]')!;
 const statusEl = document.querySelector<HTMLElement>('[data-status]')!;
 let data: Data | null = null;
 let live: LiveData | null = null;
+let ex: Extras | null = null;
+let nComments = 0;
 
 let toastTimer = 0;
 function toast(text: string) {
@@ -80,11 +82,16 @@ function render() {
   const ms = playMs(l);
   const hrs = ms / 3600_000;
   const deaths = countOf(l, 'deaths');
-  const cats = countOf(l, 'cats');
+  const arrests = countOf(l, 'arrests');
+  const fails = countOf(l, 'fails');
+  const decisions = (ex?.polls ?? []).filter((p) => p.status === 'closed').length;
+  const days = new Set(d.missions.map((m) => m.stream_day).filter(Boolean)).size;
+  const dayRows = perDay(l);
+  const peak = dayRows.reduce<[string, number] | null>((b, r) => (!b || r[1] > b[1] ? r : b), null);
   const missions = d.missions;
   const milestones = missions.filter((m) => m.is_milestone).length;
   const hardest = missions
-    .map((m, i) => ({ m, i, n: countOf(l, 'deaths', m.id), c: countOf(l, 'cats', m.id) }))
+    .map((m, i) => ({ m, i, n: countOf(l, 'deaths', m.id), c: countOf(l, 'arrests', m.id) }))
     .filter((x) => x.n > 0)
     .sort((a, b) => b.n - a.n || b.i - a.i)
     .slice(0, 5);
@@ -102,30 +109,34 @@ function render() {
       'section',
       { class: 'sx-tiles', ariaLabel: 'המספרים הגדולים' },
       tile(fmtPlay(ms), 'שעות משחק ב-GTA 6', 'sx-tile--play', !!playing),
-      tile(num(deaths), '💀 מיתות', 'sx-tile--deaths'),
-      tile(num(cats), '🐈 חתולים שנדרסו', 'sx-tile--cats'),
+      tile(num(deaths), '💀 כמה פעמים עודד מת', 'sx-tile--deaths'),
+      tile(num(arrests), '🚔 כמה פעמים עודד נעצר', 'sx-tile--cats'),
+      tile(num(fails), '❌ משימות שעודד פישל', 'sx-tile--fails'),
       tile(num(missions.length), 'עצירות על המפה'),
       tile(num(milestones), 'מיילסטונים'),
-      tile(num(l.clips.length), 'קליפים מ-GTA 6'),
+      tile(num(decisions), 'החלטות של הצ׳אט'),
+      tile(num(nComments), 'תגובות של צופים'),
     ),
     h(
       'section',
       { class: 'sx-card sx-rates' },
-      h('h2', {}, 'הקצב'),
+      h('h2', {}, 'עודד במספרים'),
       h(
         'dl',
         {},
-        h('div', {}, h('dt', {}, 'מיתות לשעת משחק'), h('dd', {}, hrs > 0.05 ? num(deaths / hrs, 1) : '–')),
-        h('div', {}, h('dt', {}, 'חתולים לשעת משחק'), h('dd', {}, hrs > 0.05 ? num(cats / hrs, 2) : '–')),
-        h('div', {}, h('dt', {}, 'מיתות למשימה בממוצע'), h('dd', {}, missions.length ? num(deaths / missions.length, 1) : '–')),
+        h('div', {}, h('dt', {}, 'עודד מת בממוצע כל'), h('dd', {}, deaths && hrs > 0.05 ? `${num(Math.max(1, Math.round((hrs * 60) / deaths)))} דקות משחק` : 'עוד לא מת. חכו.')),
+        h('div', {}, h('dt', {}, 'משימה חדשה על המפה כל'), h('dd', {}, missions.length > 1 && hrs > 0.05 ? `${num(Math.max(1, Math.round((hrs * 60) / missions.length)))} דקות` : '–')),
+        h('div', {}, h('dt', {}, 'המשימה שהכי שברה אותו'), h('dd', {}, hardest[0] ? h('a', { href: `./#m-${hardest[0].i + 1}` }, `${hardest[0].m.title || `עצירה ${hardest[0].i + 1}`} · ${num(hardest[0].n)} מיתות`) : '–')),
+        h('div', {}, h('dt', {}, 'יום השיא'), h('dd', {}, peak ? `${peak[0]}: ${num(peak[1] / 3600_000, 1)} שעות משחק` : '–')),
+        h('div', {}, h('dt', {}, 'ימים בסאבתון'), h('dd', {}, days ? num(days) : '–')),
         h('div', {}, h('dt', {}, 'אנחנו עכשיו ב'), h('dd', {}, missions[cur] ? h('a', { href: `./#m-${cur + 1}` }, `עצירה ${cur + 1}: ${missions[cur].title}`) : '–')),
       ),
     ),
-    h('section', { class: 'sx-card' }, h('h2', {}, 'שעות משחק לפי יום'), bars(perDay(l))),
+    h('section', { class: 'sx-card' }, h('h2', {}, 'שעות משחק לפי יום'), bars(dayRows)),
     h(
       'section',
       { class: 'sx-card' },
-      h('h2', {}, 'המשימות הקשות ביותר'),
+      h('h2', {}, 'המשימות שהכי שברו את עודד'),
       hardest.length
         ? h(
             'ol',
@@ -136,7 +147,7 @@ function render() {
                 {},
                 h('span', { class: 'sx-hard__rank' }, String(k + 1)),
                 h('a', { class: 'sx-hard__name', href: `./#m-${x.i + 1}` }, h('strong', {}, x.m.title || `עצירה ${x.i + 1}`), h('small', {}, `עצירה ${x.i + 1}${x.m.chapter ? `, ${x.m.chapter}` : ''}`)),
-                h('span', { class: 'sx-hard__n' }, `💀 ${num(x.n)}`, x.c ? h('small', {}, ` 🐈 ${num(x.c)}`) : null),
+                h('span', { class: 'sx-hard__n' }, `💀 ${num(x.n)}`, x.c ? h('small', {}, ` 🚔 ${num(x.c)}`) : null),
               ),
             ),
           )
@@ -199,7 +210,16 @@ Promise.all([store.load(), store.loadLive()])
       live = nl;
       if (!busy()) render();
     });
-    initComments(store, () => {
+    initComments(store, (list) => {
+      nComments = list.length;
+      if (!busy()) render();
+    });
+    store.loadExtras().then((e) => {
+      ex = e;
+      if (!busy()) render();
+    }, () => {});
+    store.subscribeExtras((e) => {
+      ex = e;
       if (!busy()) render();
     });
   })

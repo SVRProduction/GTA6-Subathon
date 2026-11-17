@@ -1,7 +1,7 @@
-// פיד הפעילות: כל מה שקורה במסע, בציר זמן אחד – עצירות, מיילסטונים, מוות וחתולים, מרקרים, קליפים,
+// פיד הפעילות: כל מה שקורה במסע, בציר זמן אחד – עצירות, מיילסטונים, מוות ומעצרים, מרקרים, קליפים,
 // תגובות, סטוריז וסקרים. "מה פספסת" – סיכום מאז הביקור הקודם.
 import { clipStop } from '../clips';
-import { liveStories, MARKER_TYPES, type Clip, type Comment, type Data, type Extras, type LiveData, type Marker, type Poll, type Story } from '../data/types';
+import { COUNTERS, liveStories, MARKER_TYPES, type Clip, type Comment, type Data, type Extras, type LiveData, type Marker, type Poll, type Story } from '../data/types';
 import { h } from '../dom';
 import { markerIcon, svg } from './icons';
 
@@ -22,7 +22,7 @@ const LABEL: Record<FeedKind, string> = {
   ms: 'מיילסטון',
   stop: 'עצירה',
   death: 'מוות',
-  cat: 'חתול',
+  cat: 'ספירה',
   marker: 'מרקר',
   clip: 'קליפ',
   comment: 'תגובה',
@@ -71,7 +71,7 @@ export function feedEvents(d: Data, live: LiveData | null, comments: Comment[], 
     if (e.delta < 0) return;
     const t = Date.parse(e.created_at);
     if (e.counter === 'deaths' && deathMarkers.some((x) => Math.abs(x - t) < 5000)) return;
-    out.push({ key: `c:${e.counter}:${e.created_at}:${k}`, t, kind: e.counter === 'deaths' ? 'death' : 'cat', title: e.counter === 'deaths' ? 'מת' : 'דרס חתול', sub: stopName(e.mission_id), stop: e.mission_id ? idx.get(e.mission_id) : undefined });
+    out.push({ key: `c:${e.counter}:${e.created_at}:${k}`, t, kind: e.counter === 'deaths' ? 'death' : 'cat', title: COUNTERS.find((x) => x.key === e.counter)?.feed ?? 'ספירה', sub: stopName(e.mission_id), stop: e.mission_id ? idx.get(e.mission_id) : undefined });
   });
   (ex?.markers ?? []).forEach((m) => out.push({ key: `mk:${m.id}`, t: Date.parse(m.created_at), kind: m.type === 'death' ? 'death' : 'marker', title: m.title || MARKER_TYPES[m.type].label, sub: `${MARKER_TYPES[m.type].label}${m.mission_id && idx.has(m.mission_id) ? `, ${stopName(m.mission_id)}` : ''}`, marker: m }));
   if (!live?.demoClips)

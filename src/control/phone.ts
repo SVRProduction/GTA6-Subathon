@@ -43,7 +43,7 @@ export function createPhone(opts: {
   const tabsEl = h('nav', { class: 'phone__tabs', ariaLabel: 'הטלפון' });
   const closeBtn = h('button', { type: 'button', class: 'phone__close', ariaLabel: 'סגירת הטלפון' }, svg('close', 20));
   // בפופאפ במפה: קישור לעמוד הטלפון המלא (שאפשר להתקין כאפליקציה)
-  const pageLink = h('a', { class: 'phone__pagelink', href: `${import.meta.env.BASE_URL}phone.html`, target: '_blank', rel: 'noopener', title: 'לפתוח את הטלפון כעמוד מלא ולהתקין כאפליקציה' }, svg('upload', 16), h('span', {}, 'להתקין כאפליקציה'));
+  const pageLink = h('a', { class: 'phone__pagelink', href: `${import.meta.env.BASE_URL}install.html`, target: '_blank', rel: 'noopener', title: 'איך מתקינים את הטלפון כאפליקציה' }, svg('upload', 16), h('span', {}, 'להתקין כאפליקציה'));
   // בפופאפ במפה: בתוך המכשיר רץ אותו הטלפון בדיוק (phone.html), כדי שיהיה טלפון אחד
   const frameBox = h('div', { class: 'phone__framebox' });
   let frame: HTMLIFrameElement | null = null;

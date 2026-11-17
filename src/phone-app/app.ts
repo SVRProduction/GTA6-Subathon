@@ -1,11 +1,11 @@
 // גרסה 4 · Stories – האתר כאפליקציה לטלפון: בית עם סטוריז, מפה, פיד קליפים ומספרים.
 // המפה והמספרים הם הדפים הקיימים (index.html?embed / phone-stats.html) בתוך הטאבים, כך שהמנוע לא משוכפל.
-import { ChartColumnBig, Clapperboard, ExternalLink, House, Map as MapIco, MapPin, MessageCircle, Play, Share2, Volume2, VolumeX, X, createElement, type IconNode } from 'lucide';
-import { loginError } from '../auth';
+import { ChartColumnBig, Clapperboard, ExternalLink, Heart, House, Map as MapIco, MapPin, MessageCircle, Play, Share2, Volume2, VolumeX, X, createElement, type IconNode } from 'lucide';
+import { getViewer, login, loginError, onViewer } from '../auth';
 import { playClip } from '../clips';
 import { commentCount, commentsBox, initComments } from '../comments';
 import { createStore } from '../data/store';
-import { countOf, currentIndex, kickSlug, playMs, statusFresh, type Clip, type Data, type LiveData, type Mission } from '../data/types';
+import { COUNTERS, countOf, currentIndex, kickSlug, playMs, statusFresh, type Clip, type Data, type LikeTarget, type LiveData, type Mission } from '../data/types';
 import { fill, h, safeUrl } from '../dom';
 import { videoEmbed } from '../journey/content';
 import { makeTrail, placeAll, type Pt } from '../journey/route';
@@ -45,6 +45,82 @@ function toast(t: string) {
 }
 
 const num = (n: number) => n.toLocaleString('he-IL');
+
+// ── לייקים: כל מי שמחובר עם Kick. מה שאהבו יותר עולה למעלה (כמו פיד של טיקטוק) ──
+let likes: Record<string, number> = {};
+let mine = new Set<string>();
+const likeKey = (t: LikeTarget, id: string) => `${t}:${id}`;
+const likesOf = (t: LikeTarget, id: string) => likes[likeKey(t, id)] ?? 0;
+/** ציון לסידור: לייקים, ובונוס קטן לחדש שדועך תוך יום-יומיים */
+const score = (t: LikeTarget, id: string, iso: string | null) => {
+  const age = Date.now() - Date.parse(iso ?? '');
+  return likesOf(t, id) + (Number.isFinite(age) ? 4 * Math.exp(-Math.max(0, age) / (36 * 3600_000)) : 0);
+};
+async function refreshLikes() {
+  likes = await store.loadLikes().catch(() => likes);
+  const v = getViewer();
+  mine = new Set(v ? await store.myLikes(v).catch(() => [...mine]) : []);
+  document.querySelectorAll<HTMLElement>('[data-like]').forEach(paintLike);
+}
+function paintLike(b: HTMLElement) {
+  const [t, ...rest] = b.dataset.like!.split(':');
+  const id = rest.join(':');
+  const on = mine.has(likeKey(t as LikeTarget, id));
+  b.classList.toggle('is-liked', on);
+  b.setAttribute('aria-pressed', String(on));
+  const n = likesOf(t as LikeTarget, id);
+  const span = b.querySelector('span');
+  if (span) span.textContent = n ? num(n) : b.classList.contains('pill') ? 'לייק' : '';
+}
+function likeBtn(t: LikeTarget, id: string, cls: string, size = 22) {
+  const b = h('button', { className: `${cls} like`, type: 'button', ariaLabel: 'לייק' }, ico(Heart, size), h('span', {}, ''));
+  b.dataset.like = likeKey(t, id);
+  b.onclick = async (e) => {
+    e.stopPropagation();
+    const v = getViewer();
+    if (!v) {
+      toast('מתחברים עם Kick כדי לעשות לייק');
+      setTimeout(() => login(store), 900);
+      return;
+    }
+    const k = likeKey(t, id);
+    const was = mine.has(k);
+    // מיד על המסך, ואז מהשרת
+    if (was) mine.delete(k);
+    else mine.add(k);
+    likes[k] = Math.max(0, likesOf(t, id) + (was ? -1 : 1));
+    document.querySelectorAll<HTMLElement>(`[data-like="${CSS.escape(k)}"]`).forEach(paintLike);
+    try {
+      const r = await store.toggleLike(v, t, id);
+      likes[k] = r.n;
+      if (r.liked) mine.add(k);
+      else mine.delete(k);
+    } catch (err) {
+      if (was) mine.add(k);
+      else mine.delete(k);
+      likes[k] = Math.max(0, likesOf(t, id) + (was ? 1 : -1));
+      toast((err as Error).message);
+    }
+    document.querySelectorAll<HTMLElement>(`[data-like="${CSS.escape(k)}"]`).forEach(paintLike);
+  };
+  paintLike(b);
+  return b;
+}
+onViewer(() => void refreshLikes());
+
+// ── קליפים כלליים של GTA (הטריילרים הרשמיים של Rockstar ביוטיוב), אחרי הקליפים מהלייב ──
+const GTA_CLIPS: Clip[] = [
+  ['VQRLujxTm3c', 'Grand Theft Auto VI · טריילר 2', '2025-05-06T15:00:00Z'],
+  ['QdBZY2fkU-0', 'Grand Theft Auto VI · טריילר 1', '2023-12-05T00:00:00Z'],
+  ['N-xHcvug3WI', 'GTA V · סרטון הגיימפליי הרשמי', '2013-07-09T00:00:00Z'],
+  ['QkkoHAzjnUs', 'GTA V · הטריילר', '2012-11-14T00:00:00Z'],
+].map(([id, title, at]) => ({ id: `yt-${id}`, title, thumbnail_url: `https://i.ytimg.com/vi/${id}/hqdefault.jpg`, video_url: `youtube:${id}`, duration: null, views: 0, creator: 'Rockstar Games', created_at: at }));
+/** כל הקליפים בפיד: מהלייב + של Rockstar, מסודרים לפי לייקים וטריות */
+function allClips(): Clip[] {
+  const lv = (live?.clips ?? []).map((c, k) => ({ c, s: score('clip', c.id, c.created_at) + 1 - k * 0.01 }));
+  const yt = GTA_CLIPS.map((c, k) => ({ c, s: likesOf('clip', c.id) - 0.5 - k * 0.01 }));
+  return [...lv, ...yt].sort((a, b) => b.s - a.s).map((x) => x.c);
+}
 const isLive = () => !!data && !!live && (statusFresh(live.status) ? !!live.status?.is_live : data.settings.is_live);
 const onGame = () => !!live && statusFresh(live.status) && !!live.status?.on_category;
 const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
@@ -190,10 +266,11 @@ function groups(): Group[] {
     const sl = today.slice(-12);
     out.push({ key: `today-${now.toDateString()}-${sl.length}`, title: 'היום', ring: sl[sl.length - 1].i, slides: sl.map((x) => ({ stop: x.i, label: 'היום' })) });
   }
-  // מיילסטונים, החדש קודם
+  // מיילסטונים: מה שאהבו יותר קודם, ובשוויון – החדש קודם
   ms.map((m, i) => ({ m, i }))
     .filter((x) => x.m.is_milestone)
     .reverse()
+    .sort((a, b) => score('stop', b.m.id, b.m.happened_at) - score('stop', a.m.id, a.m.happened_at))
     .forEach((x) => out.push({ key: `ms-${x.m.id}`, title: x.m.title, ring: x.i, slides: [{ stop: x.i, label: `מיילסטון ${x.i + 1}` }], isNew: freshIds.has(x.m.id) }));
   return out;
 }
@@ -277,17 +354,16 @@ function renderSlide() {
   history.replaceState(null, '', `#story-${i + 1}`);
   const url = safeUrl(m.recap_url);
   const nC = commentCount('stop', m.id);
-  const deaths = live ? countOf(live, 'deaths', m.id) : 0;
-  const cats = live ? countOf(live, 'cats', m.id) : 0;
+  const counts = COUNTERS.map((c) => ({ c, n: live ? countOf(live, c.key, m.id) : 0 })).filter((x) => x.n);
   const close = h('button', { className: 'st-close', type: 'button', ariaLabel: 'סגירה' }, ico(X, 26));
   close.onclick = closeStory;
   const actions = h(
     'div',
     { className: 'st-actions' },
     url ? h('button', { className: 'pill pill--solid', type: 'button', onclick: () => watch(m) }, ico(Play, 18), 'לצפייה בקטע') : null,
-    h('button', { className: 'pill', type: 'button', onclick: () => openComments('stop', m.id, m.title) }, ico(MessageCircle, 18), nC ? `${nC} תגובות` : 'תגובות'),
+    likeBtn('stop', m.id, 'pill', 18),
+    h('button', { className: 'pill', type: 'button', onclick: () => openComments('stop', m.id, m.title) }, ico(MessageCircle, 18), nC ? `${nC}` : 'תגובות'),
     h('button', { className: 'pill pill--icon', type: 'button', ariaLabel: 'במפה', onclick: () => { closeStory(); location.hash = `#m-${i + 1}`; } }, ico(MapPin, 18)),
-    h('button', { className: 'pill pill--icon', type: 'button', ariaLabel: 'שיתוף', onclick: () => share(`${location.origin}${location.pathname}#story-${i + 1}`, m.title) }, ico(Share2, 18)),
   );
   // את הלחיצות "קדימה/אחורה" תופסים שני אזורים שקופים מעל התמונה (בעברית: שמאל = קדימה)
   const back = h('button', { className: 'st-zone st-zone--back', type: 'button', ariaLabel: 'הקודם' });
@@ -309,7 +385,7 @@ function renderSlide() {
       h('h2', { className: 'st-title' }, m.title || `עצירה ${i + 1}`),
       m.summary ? h('p', { className: 'st-sum' }, m.summary) : null,
       m.quote ? h('blockquote', { className: 'st-quote' }, `“${m.quote}”`, m.quote_by ? h('cite', {}, m.quote_by) : null) : null,
-      deaths || cats ? h('p', { className: 'st-stats' }, deaths ? `💀 ${deaths}` : '', cats ? `  🐈 ${cats}` : '') : null,
+      counts.length ? h('p', { className: 'st-stats' }, counts.map((x) => `${x.c.emoji} ${x.n}`).join('   ')) : null,
       actions,
     ),
   );
@@ -450,33 +526,11 @@ async function share(url: string, title: string) {
 // בתוך הטלפון שבאתר (‎?inapp) הכפתור של האתר מטפל בזה
 const inapp = new URLSearchParams(location.search).has('inapp');
 if (inapp) document.documentElement.classList.add('is-inapp');
-let deferredInstall: (Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> }) | null = null;
 const standalone = matchMedia('(display-mode: standalone)').matches || (navigator as unknown as { standalone?: boolean }).standalone === true;
-const ios = /iphone|ipad|ipod/i.test(navigator.userAgent) && !/crios|fxios/i.test(navigator.userAgent);
 const installBtn = $<HTMLButtonElement>('[data-install]');
-installBtn.hidden = inapp || standalone || !ios;
-addEventListener('beforeinstallprompt', (e) => {
-  e.preventDefault();
-  deferredInstall = e as typeof deferredInstall;
-  installBtn.hidden = inapp || standalone;
-});
-addEventListener('appinstalled', () => {
-  installBtn.hidden = true;
-  toast('הותקן. הסאבתון מחכה במסך הבית.');
-});
-installBtn.onclick = async () => {
-  if (deferredInstall) {
-    await deferredInstall.prompt();
-    const { outcome } = await deferredInstall.userChoice;
-    if (outcome === 'accepted') installBtn.hidden = true;
-    deferredInstall = null;
-    return;
-  }
-  openSheet(
-    'התקנה באייפון',
-    h('ol', { className: 'ios-steps' }, h('li', {}, 'לוחצים על כפתור השיתוף של Safari (הריבוע עם החץ).'), h('li', {}, 'בוחרים "הוספה למסך הבית".'), h('li', {}, 'לוחצים "הוספה". הסאבתון יופיע במסך הבית ויפתח כמו אפליקציה.')),
-  );
-};
+installBtn.hidden = inapp || standalone;
+// עמוד הסבר פשוט (עם כפתור "להתקין עכשיו" כשהדפדפן מאפשר)
+installBtn.onclick = () => (location.href = `${B}install.html`);
 
 // ══════════════ בית ══════════════
 const home = $('#view-home');
@@ -542,16 +596,16 @@ function renderHome() {
     'a',
     { className: 'quick', href: '#stats', ariaLabel: 'לכל המספרים' },
     h('div', { className: 'quick__item quick__item--play' }, h('b', {}, l ? fmtPlay(playMs(l)) : '–'), h('span', {}, 'שעות משחק')),
-    h('div', { className: 'quick__item' }, h('b', {}, l ? num(countOf(l, 'deaths')) : '–'), h('span', {}, '💀 מיתות')),
-    h('div', { className: 'quick__item' }, h('b', {}, l ? num(countOf(l, 'cats')) : '–'), h('span', {}, '🐈 חתולים')),
+    h('div', { className: 'quick__item' }, h('b', {}, l ? num(countOf(l, 'deaths')) : '–'), h('span', {}, '💀 עודד מת')),
+    h('div', { className: 'quick__item' }, h('b', {}, l ? num(countOf(l, 'arrests')) : '–'), h('span', {}, '🚔 עודד נעצר')),
   );
 
-  const clips = (l?.clips ?? []).slice(0, 8);
+  const clips = allClips().slice(0, 8);
   const clipRow = clips.length
     ? h(
         'section',
         { className: 'block' },
-        h('div', { className: 'block__head' }, h('h3', {}, 'קליפים אחרונים'), h('a', { href: '#clips' }, 'הכול')),
+        h('div', { className: 'block__head' }, h('h3', {}, 'הקליפים הכי אהובים'), h('a', { href: '#clips' }, 'הכול')),
         h(
           'div',
           { className: 'mini-clips' },
@@ -599,17 +653,25 @@ function renderHome() {
     h('h1', { className: 'hello' }, d.settings.title || 'סאבתון GTA 6'),
     rings,
     liveCard,
-    nowCard,
+    nowCard ??
+      h(
+        'article',
+        { className: 'card card--start' },
+        h('p', { className: 'eyebrow' }, 'המסע עוד לא התחיל'),
+        h('h2', {}, 'נוחתים ב-Vice City ב-19.11'),
+        h('p', { className: 'muted' }, 'מהרגע שהמשחק נפתח, כל משימה של עודד נכנסת למפה ולסטוריז. בינתיים: הטריילרים בקליפים.'),
+        h('div', { className: 'row' }, h('a', { className: 'pill pill--solid', href: '#clips' }, ico(Play, 18), 'לטריילרים'), h('a', { className: 'pill', href: `https://kick.com/${kickSlug(d.settings.kick_channel)}`, target: '_blank', rel: 'noopener' }, 'לעקוב ב-Kick')),
+      ),
     quick,
     clipRow,
-    recentList,
+    ms.length ? recentList : null,
     h('p', { className: 'foot' }, 'אתר מעריצים לא רשמי. אינו קשור ל-Rockstar Games.'),
   );
   home.querySelector<HTMLElement>('.rings')!.scrollLeft = keep;
   // הבר העליון: נקודת "בלייב"
   const lb = $<HTMLButtonElement>('[data-live]');
   lb.hidden = !liveNow;
-  lb.textContent = onGame() ? 'GTA 6 בלייב' : 'בלייב';
+  lb.textContent = 'בלייב';
   lb.onclick = watchLive;
 }
 
@@ -625,7 +687,7 @@ function pauseFeed() {
   feedView.querySelectorAll('.reel__media video').forEach((v) => v.remove());
 }
 function renderClips(focusId?: string) {
-  const clips = live?.clips ?? [];
+  const clips = allClips();
   const key = clips.map((c) => c.id).join();
   if (key === feedKey && feedView.firstChild && !focusId) {
     observe();
@@ -663,11 +725,23 @@ function observe() {
 const reelStops = new WeakMap<HTMLElement, () => void>();
 function startReel(el: HTMLElement) {
   if (tab !== 'clips' || reelStops.has(el)) return;
-  const c = (live?.clips ?? []).find((x) => x.id === el.dataset.clip);
+  const c = allClips().find((x) => x.id === el.dataset.clip);
   if (!c) return;
   const media = el.querySelector<HTMLElement>('.reel__media')!;
   const holder = h('div', { className: 'reel__video' });
   media.append(holder);
+  // טריילר ביוטיוב: נגן מוטמע (מתחיל מושתק, כמו כל הפיד)
+  const yt = c.video_url?.startsWith('youtube:') ? c.video_url.slice(8) : null;
+  if (yt) {
+    holder.append(h('iframe', { className: 'reel__yt', src: `https://www.youtube-nocookie.com/embed/${yt}?autoplay=1&mute=${muted ? 1 : 0}&playsinline=1&loop=1&playlist=${yt}&rel=0&modestbranding=1`, allow: 'autoplay; encrypted-media; fullscreen', title: c.title }));
+    const s = () => {
+      holder.remove();
+      reelStops.delete(el);
+    };
+    reelStops.set(el, s);
+    feedStops.push(s);
+    return;
+  }
   const stop = playClip(holder, c);
   const v = holder.querySelector('video')!;
   v.muted = muted;
@@ -708,12 +782,13 @@ function reel(c: Clip, k: number) {
     h(
       'div',
       { className: 'reel__side' },
+      likeBtn('clip', c.id, 'reel__btn', 24),
       h('button', { className: 'reel__btn', type: 'button', ariaLabel: 'תגובות', onclick: () => openComments('clip', c.id, c.title) }, ico(MessageCircle, 24), h('span', {}, n ? String(n) : '')),
       h('button', { className: 'reel__btn', type: 'button', ariaLabel: 'שיתוף', onclick: () => share(`${location.origin}${location.pathname}#clip-${encodeURIComponent(c.id)}`, c.title) }, ico(Share2, 24)),
       stopIdx >= 0 && !live?.demoClips ? h('a', { className: 'reel__btn', href: `#m-${stopIdx + 1}`, ariaLabel: `לעצירה ${stopIdx + 1}` }, ico(MapPin, 24)) : null,
       muteBtn,
     ),
-    h('div', { className: 'reel__info' }, h('strong', {}, c.title || 'קליפ'), h('small', {}, [c.creator ? `קליפ של ${c.creator}` : '', `${num(c.views)} צפיות`, ago(c.created_at)].filter(Boolean).join('  |  '))),
+    h('div', { className: 'reel__info' }, h('strong', {}, c.title || 'קליפ'), h('small', {}, c.id.startsWith('yt-') ? 'הטריילר הרשמי של Rockstar Games' : [c.creator ? `קליפ של ${c.creator}` : '', `${num(c.views)} צפיות`, ago(c.created_at)].filter(Boolean).join('  |  '))),
   );
   art.dataset.clip = c.id;
   return art;
@@ -772,6 +847,10 @@ store
   });
 
 if (loginError) setTimeout(() => toast('ההתחברות עם Kick לא הצליחה. נסו שוב.'), 600);
+
+// לייקים: בהתחלה ואז כל דקה (הסידור מתעדכן בבנייה הבאה של הבית)
+refreshLikes().then(() => story.hidden && renderHome());
+setInterval(() => void refreshLikes(), 60_000);
 
 // זמן המשחק מתקתק
 setInterval(() => {

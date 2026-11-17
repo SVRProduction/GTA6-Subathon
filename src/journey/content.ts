@@ -84,12 +84,13 @@ export function stopBody(m: Mission, i: number, toast: (t: string) => void, opts
             : null,
     text ? h('p', { class: 'stop__body' }, text) : null,
     m.quote ? h('blockquote', { class: 'stop__quote' }, h('p', {}, m.quote), m.quote_by ? h('cite', {}, m.quote_by) : null) : null,
-    h(
-      'div',
-      { class: 'stop__actions' },
-      url && !embed ? h('a', { class: 'btn btn--primary', href: url, target: '_blank', rel: 'noopener' }, ico.play(), 'צפייה בקטע') : null,
-      dl ? h('a', { class: 'btn', href: dl, download: '', target: '_blank', rel: 'noopener' }, ico.download(), 'הורדה') : null,
-      h('button', { class: 'btn btn--quiet', type: 'button', onclick: () => share(m, i, toast) }, ico.share(), 'שיתוף'),
-    ),
+    (url && !embed) || dl
+      ? h(
+          'div',
+          { class: 'stop__actions' },
+          url && !embed ? h('a', { class: 'btn btn--primary', href: url, target: '_blank', rel: 'noopener' }, ico.play(), 'צפייה בקטע') : null,
+          dl ? h('a', { class: 'btn', href: dl, download: '', target: '_blank', rel: 'noopener' }, ico.download(), 'הורדה') : null,
+        )
+      : null,
   ];
 }

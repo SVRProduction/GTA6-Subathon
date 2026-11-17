@@ -1,0 +1,29 @@
+/* עמוד ההתקנה – בשפה של הטלפון (בהיר, ורוד) */
+:root { --bg: #fff7ef; --surface: #fff; --ink: #1c1530; --mute: #6f6886; --pink: #f0306f; --sun: linear-gradient(120deg, #ff3d7f 0%, #ff7a45 52%, #ffc23d 100%); --shadow: 0 1px 2px rgba(60, 20, 70, 0.06), 0 10px 30px rgba(60, 20, 70, 0.1); }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; }
+body { min-height: 100dvh; background: var(--bg); color: var(--ink); font: 400 16px/1.5 'Rubik', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+button { font: inherit; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--pink); outline-offset: 2px; border-radius: 10px; }
+.in { max-width: 480px; margin: 0 auto; padding: max(16px, env(safe-area-inset-top)) 16px max(28px, env(safe-area-inset-bottom)); display: grid; gap: 14px; justify-items: center; text-align: center; }
+.in__back { justify-self: start; display: inline-flex; align-items: center; min-height: 44px; color: var(--mute); font-weight: 600; text-decoration: none; }
+.in__icon { width: 84px; height: 84px; border-radius: 22px; box-shadow: var(--shadow); }
+.in__title { margin: 0; font-size: 28px; font-weight: 900; line-height: 1.1; letter-spacing: -0.02em; background: var(--sun); -webkit-background-clip: text; background-clip: text; color: transparent; text-wrap: balance; }
+.in__sub { margin: 0; color: var(--mute); font-size: 16px; max-width: 34ch; }
+.in__now { width: 100%; min-height: 56px; border: 0; border-radius: 999px; background: var(--pink); color: #fff; font-size: 18px; font-weight: 800; box-shadow: 0 8px 20px rgba(240, 48, 111, 0.3); }
+.in__now[hidden], .in__done[hidden], [data-steps][hidden], .in__note[hidden] { display: none; }
+.in__done { margin: 0; padding: 12px 16px; border-radius: 16px; background: #e7f8ec; color: #17633a; font-weight: 700; }
+.in__tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; width: 100%; padding: 4px; border-radius: 999px; background: #f3eef6; }
+.in__tabs button { min-height: 44px; border: 0; border-radius: 999px; background: none; color: var(--mute); font-weight: 700; }
+.in__tabs button[aria-pressed='true'] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(60, 20, 70, 0.1); }
+.in__steps { width: 100%; text-align: start; }
+.in__steps ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.in__steps li { display: grid; grid-template-columns: 40px 1fr auto; gap: 12px; align-items: center; padding: 14px; border-radius: 20px; background: var(--surface); box-shadow: var(--shadow); }
+.in__steps li div { display: grid; gap: 2px; }
+.in__steps li b { font-size: 17px; font-weight: 800; }
+.in__steps li small { color: var(--mute); font-size: 14px; line-height: 1.4; }
+.in__n { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: var(--sun); color: #fff; font-weight: 900; font-size: 18px; }
+.in__ico { font-size: 24px; }
+.in__note { margin: 0 0 10px; padding: 12px 14px; border-radius: 16px; background: #fff1d2; font-size: 15px; }
+.in__open { display: inline-flex; align-items: center; min-height: 48px; padding: 0 22px; border-radius: 999px; background: #f3eef6; color: var(--ink); font-weight: 700; text-decoration: none; }
+.in__foot { margin: 6px 0 0; color: var(--mute); font-size: 12px; }

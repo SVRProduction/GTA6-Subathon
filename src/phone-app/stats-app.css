@@ -33,3 +33,25 @@
 .is-app .clips__note { border: 0; background: #f8f4fa; font-family: 'Rubik', sans-serif; }
 .is-app, .is-app * { scrollbar-width: none; }
 .is-app ::-webkit-scrollbar { display: none; }
+
+/* מספרים גדולים וברורים (rework) */
+.is-app .sx-tiles { grid-template-columns: repeat(6, 1fr); gap: 10px; }
+.is-app .sx-tile { min-height: 110px; padding: 16px; gap: 8px; }
+.is-app .sx-tile b { font-size: 46px; }
+.is-app .sx-tile span { font-size: 15px; line-height: 1.25; color: #4b4460; }
+.is-app .sx-tile--play { grid-column: span 6; min-height: 130px; }
+.is-app .sx-tile--play b { font-size: 64px; color: #fff; }
+.is-app .sx-tile--play span { color: rgba(255, 255, 255, 0.78); }
+.is-app .sx-tile--deaths { grid-column: span 6; }
+.is-app .sx-tile--deaths b { font-size: 60px; }
+.is-app .sx-tiles .sx-tile.sx-tile--cats, .is-app .sx-tiles .sx-tile.sx-tile--fails { grid-column: span 3; min-height: 110px; padding: 16px; }
+.is-app .sx-tile--fails { background: #ffe9ef; }
+.is-app .sx-tiles .sx-tile.sx-tile:nth-child(n + 5) { grid-column: span 3; min-height: 0; padding: 14px 16px; }
+.is-app .sx-tiles .sx-tile.sx-tile--fails b { font-size: 46px; }
+.is-app .sx-tiles .sx-tile.sx-tile--fails span { font-size: 15px; }
+.is-app .sx-tiles .sx-tile.sx-tile:nth-child(n + 5) b { font-size: 32px; }
+.is-app .sx-tiles .sx-tile.sx-tile:nth-child(n + 5) span { font-size: 14px; }
+.is-app .sx-rates dl { grid-template-columns: 1fr; }
+.is-app .sx-rates dt { font-size: 14px; color: #6f6886; }
+.is-app .sx-rates dd { font-size: 22px; }
+.is-app .sx-card h2 { font-size: 22px; }
