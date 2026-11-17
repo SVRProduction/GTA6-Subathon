@@ -319,3 +319,8 @@ body[data-tab]:not([data-tab='home']) .app { grid-template-rows: 1fr calc(var(--
 .sheet { grid-template-columns: minmax(0, 1fr); }
 .sheet__head h3 { flex: 1; min-width: 0; }
 .st-head strong, .st-head small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* תיבת התגובה: שום דבר לא נדחף החוצה (שם ארוך, מילה ארוכה) */
+.cmts__form > *, .cmts__bar > *, .cmt__main { min-width: 0; }
+.cmts__who { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cmts .btn--primary { flex: none; }
+.cmt__body, .cmts__input { overflow-wrap: anywhere; }

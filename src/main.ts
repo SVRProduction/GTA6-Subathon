@@ -132,6 +132,7 @@ function rebuild() {
   trailBase.setAttribute('d', trail ? trail.path : '');
   liveTrail = trail;
   life?.setTrail(trail);
+  buildLamps(trail);
 
   const sNow = cur >= 0 ? curve.stopS[cur] : 0;
   const done = curve.path(0, sNow || 0.01);
@@ -176,7 +177,7 @@ function rebuild() {
       card,
     );
   });
-  fill(pinsEl, ...pins, h('span', { class: 'player', ariaHidden: 'true' }, h('i'), h('b')), h('span', { class: 'ahead-tag' }, 'ההמשך עוד לא נכתב'));
+  fill(pinsEl, ...pins, playerEl(), h('span', { class: 'ahead-tag' }, 'ההמשך עוד לא נכתב'));
 
   renderHud();
   renderLog();
@@ -529,8 +530,127 @@ if (listBtn) {
   listBtn.onclick = () => openList();
 }
 // תגובות: נטענות פעם אחת; עצירה עם תגובות מקבלת סימן קטן בסיכה
+// ── שעה ביום של Vice City: זריחה, יום, שקיעה ולילה – לפי השעה בישראל (‎?time=18 לבדיקה) ──
+const tod = h('div', { class: 'tod', ariaHidden: 'true' }, h('i', { class: 'tod__tint' }), h('i', { class: 'tod__sky' }), h('i', { class: 'tod__sun' }), h('i', { class: 'tod__neon' }));
+pinsEl.before(tod);
+// הגוון (כהה בלילה, כתום בשקיעה) עובר לתוך המפה עצמה – מתחת לכביש ולפנסים, כדי שהפנסים יאירו מעליו
+world.svg.before(tod.querySelector('.tod__tint')!);
+function israelHour() {
+  const forced = Number(new URLSearchParams(location.search).get('time'));
+  if (Number.isFinite(forced) && new URLSearchParams(location.search).has('time')) return forced;
+  const p = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Jerusalem', hour: 'numeric', minute: 'numeric', hourCycle: 'h23' }).formatToParts(new Date());
+  return Number(p.find((x) => x.type === 'hour')?.value ?? 12) + Number(p.find((x) => x.type === 'minute')?.value ?? 0) / 60;
+}
+/** כמה חשוך (0–1): מתחיל להחשיך ב-17:30, חשוך לגמרי ב-19:30, ומתבהר בין 05:00 ל-06:30 */
+function darkness(t: number) {
+  if (t >= 19.5 || t < 5) return 1;
+  if (t >= 17.5) return (t - 17.5) / 2;
+  if (t < 6.5) return 1 - (t - 5) / 1.5;
+  return 0;
+}
+// ── פנסי רחוב לאורך הכביש: נדלקים אחד-אחד כשמחשיך (כל פנס עם סף משלו) ──
+const lamps = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+lamps.setAttribute('class', 'lamps');
+world.svg.prepend(lamps);
+{
+  const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+  defs.innerHTML = '<radialGradient id="lamp-g"><stop offset="0" stop-color="#fff6d6" stop-opacity="1"/><stop offset="0.25" stop-color="#ffd27a" stop-opacity="0.9"/><stop offset="1" stop-color="#ffb347" stop-opacity="0"/></radialGradient>';
+  world.svg.prepend(defs);
+}
+let lampsFor: unknown = null;
+function buildLamps(trail: ReturnType<typeof makeTrail> | null) {
+  if (!trail || lampsFor === trail.path) return;
+  lampsFor = trail.path;
+  const ns = 'http://www.w3.org/2000/svg';
+  const out: SVGCircleElement[] = [];
+  let seed = 7;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const step = 46;
+  for (let s = step; s < trail.total; s += step) {
+    const a = trail.at(s - 2);
+    const b = trail.at(s + 2);
+    const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    const nx = -(b.y - a.y) / len;
+    const ny = (b.x - a.x) / len;
+    // פנס משני צידי הכביש, לסירוגין
+    for (const side of [1, -1]) {
+      if (rnd() < 0.25) continue;
+      const p = trail.at(s + (side > 0 ? 0 : step / 2));
+      const c = document.createElementNS(ns, 'circle');
+      c.setAttribute('cx', (p.x + nx * side * 13).toFixed(1));
+      c.setAttribute('cy', (p.y + ny * side * 13).toFixed(1));
+      c.setAttribute('r', (20 + rnd() * 8).toFixed(1));
+      c.style.setProperty('--on', (0.08 + rnd() * 0.8).toFixed(3));
+      out.push(c);
+    }
+  }
+  lamps.replaceChildren(...out);
+}
+function setTimeOfDay() {
+  const t = israelHour();
+  stage.style.setProperty('--dark', darkness(t).toFixed(3));
+  const phase = t >= 5.5 && t < 7.5 ? 'dawn' : t >= 7.5 && t < 16.5 ? 'day' : t >= 16.5 && t < 19 ? 'sunset' : 'night';
+  if (stage.dataset.tod !== phase) stage.dataset.tod = phase;
+}
+if (!flat) {
+  setTimeOfDay();
+  setInterval(setTimeOfDay, 60_000);
+}
+
+// ‎?fx: כפתורי בדיקה לאפקטים (בלי לייב)
+if (new URLSearchParams(location.search).has('fx')) {
+  const b = (label: string, go: () => void) => h('button', { type: 'button', class: 'btn btn--small', onclick: go }, label);
+  stage.append(
+    h(
+      'div',
+      { class: 'fx-test' },
+      b('💀 מת', () => mission.test('deaths')),
+      b('🚔 נעצר', () => mission.test('arrests')),
+      b('❌ פישל', () => mission.test('fails')),
+      b('💬 תגובה', () => bubble({ name: 'צופה_בדיקה', text: 'איזה מוות מטורף 😂', stop: cur >= 0 ? cur : undefined })),
+      b('🚗 עצירה חדשה', () => curve && cur > 0 && (playerS = curve.sOf(Math.max(0, cur - 3)))),
+    ),
+  );
+}
+
+// בועות על המפה: תגובה חדשה (או סטורי שאושר) צפה לרגע מהעצירה שלה / מהדמות
+const bubbles = h('div', { class: 'bubbles', ariaHidden: 'true' });
+stage.append(bubbles);
+function bubble(b: { name: string; text: string; pic?: string | null; stop?: number }) {
+  if (document.hidden || embed) return;
+  const rs = stage.getBoundingClientRect();
+  let at = playerPt;
+  const pin = b.stop != null ? pins[b.stop] : null;
+  if (pin && !pin.hidden) {
+    const r = pin.getBoundingClientRect();
+    if (r.width) at = { x: r.left + r.width / 2 - rs.left, y: r.top - rs.top };
+  }
+  if (!at) at = { x: rs.width * 0.5, y: rs.height * 0.45 };
+  while (bubbles.children.length >= 3) bubbles.firstElementChild!.remove();
+  const el = h(
+    'div',
+    { class: 'bubble' },
+    b.pic ? h('img', { src: b.pic, alt: '', referrerPolicy: 'no-referrer' }) : h('span', { class: 'bubble__pic' }, b.name.slice(0, 1).toUpperCase()),
+    h('p', {}, h('strong', {}, b.name), ' ', b.text.length > 70 ? `${b.text.slice(0, 70)}…` : b.text),
+  );
+  el.style.left = `${Math.max(120, Math.min(rs.width - 120, at.x))}px`;
+  el.style.top = `${Math.max(90, at.y - 30)}px`;
+  bubbles.append(el);
+  window.setTimeout(() => el.remove(), 5600);
+}
+window.addEventListener('oded:bubble', (e) => bubble((e as CustomEvent).detail));
+let seenComments: Set<string> | null = null;
 initComments(store, (list) => {
   control.setComments(list);
+  // רק תגובות חדשות (לא את כל מה שנטען בהתחלה)
+  if (seenComments) {
+    for (const c of list) {
+      if (seenComments.has(c.id) || c.hidden) continue;
+      const stop = c.target_type === 'stop' && data ? data.missions.findIndex((m) => m.id === c.target_id) : -1;
+      bubble({ name: c.username, text: c.body, pic: c.avatar, stop: stop >= 0 ? stop : undefined });
+    }
+  }
+  seenComments = new Set(list.map((c) => c.id));
   if (!data) return;
   const talked = new Set(list.filter((c) => c.target_type === 'stop').map((c) => c.target_id));
   pins.forEach((p, i) => p.classList.toggle('pin--talk', talked.has(data.missions[i]?.id)));
@@ -820,6 +940,47 @@ stage.addEventListener('pointerdown', () => cinema && stopCinema());
 function onScroll() {}
 addEventListener('resize', () => frame(true));
 
+// קו לסקר על המפה
+const pollLine = (() => {
+  const svgNs = 'http://www.w3.org/2000/svg';
+  const s = document.createElementNS(svgNs, 'svg');
+  s.setAttribute('class', 'poll-line');
+  s.setAttribute('aria-hidden', 'true');
+  s.append(document.createElementNS(svgNs, 'path'));
+  return s as unknown as HTMLElement;
+})();
+pinsEl.before(pollLine);
+// ── הדמות של עודד: הסמן "אנחנו כאן" ──
+let playerS: number | null = null;
+let playerPt: { x: number; y: number } | null = null;
+function playerEl() {
+  return h(
+    'span',
+    { class: 'player is-asleep', ariaHidden: 'true' },
+    h('i'),
+    h('img', { class: 'player__face', src: `${import.meta.env.BASE_URL}icons/oded-96.png`, alt: '', width: 44, height: 44 }),
+    h('span', { class: 'player__zz' }, '😴'),
+    h('span', { class: 'player__fx' }),
+  );
+}
+/** אפקט מעל הדמות: גולגולת / אורות משטרה ו-WANTED / ✗ */
+window.addEventListener('oded:fx', (e) => {
+  const kind = (e as CustomEvent<CounterName>).detail;
+  const box = pinsEl.querySelector<HTMLElement>('.player__fx');
+  const me = pinsEl.querySelector<HTMLElement>('.player');
+  if (!box || !me) return;
+  const el =
+    kind === 'deaths' ? h('span', { class: 'pfx pfx--skull' }, '💀')
+    : kind === 'arrests' ? h('span', { class: 'pfx pfx--wanted' }, h('b', {}, '⭐⭐⭐'), h('small', {}, 'WANTED'))
+    : h('span', { class: 'pfx pfx--fail' }, '✗');
+  box.append(el);
+  if (kind === 'arrests') me.classList.add('is-busted');
+  window.setTimeout(() => {
+    el.remove();
+    me.classList.remove('is-busted');
+  }, kind === 'arrests' ? 3200 : 2400);
+});
+
 let last = performance.now();
 function frame(force = false) {
   if (!curve || !data) return;
@@ -921,10 +1082,28 @@ function frame(force = false) {
   const me = pinsEl.querySelector<HTMLElement>('.player');
   // בלי עצירות אין איפה לעמוד – אחרת הסמן נתקע בפינה השמאלית העליונה
   if (me) me.style.display = cur >= 0 && curve.stops[cur] ? '' : 'none';
+  playerPt = null;
   if (me && cur >= 0 && curve.stops[cur]) {
-    const s = world.project(curve.stops[cur]);
+    // הדמות "נוסעת" לאורך הכביש לעצירה הנוכחית (כשנוספת עצירה – רואים אותה מגיעה)
+    const want = curve.sOf(cur);
+    if (playerS === null || Math.abs(want - playerS) > curve.total * 0.6) playerS = want;
+    else playerS += (want - playerS) * Math.min(1, dt * (reduce ? 20 : 1.6));
+    const s = world.project(Math.abs(want - playerS) < 0.5 ? curve.stops[cur] : curve.atSmooth(playerS));
+    playerPt = s;
     me.style.transform = `translate3d(${s.x.toFixed(1)}px, ${s.y.toFixed(1)}px, 0)`;
+    const onAir = liveUi.isLive();
+    if (me.classList.contains('is-live') !== onAir) {
+      me.classList.toggle('is-live', onAir);
+      me.classList.toggle('is-asleep', !onAir);
+    }
+    me.classList.toggle('is-driving', Math.abs(want - playerS) > 2);
   }
+  // קו מקווקו מהדמות אל מיקום הסקר הפתוח ("לאן נוסעים?")
+  const pa = control.pollAt();
+  if (pa && playerPt) {
+    pollLine.style.display = '';
+    pollLine.querySelector('path')!.setAttribute('d', `M${playerPt.x.toFixed(1)} ${playerPt.y.toFixed(1)} Q${((playerPt.x + pa.x) / 2).toFixed(1)} ${(Math.min(playerPt.y, pa.y) - 80).toFixed(1)} ${pa.x.toFixed(1)} ${pa.y.toFixed(1)}`);
+  } else pollLine.style.display = 'none';
 
   // HUD
   const idx = Math.max(0, Math.min(n - 1, near));

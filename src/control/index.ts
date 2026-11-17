@@ -10,6 +10,7 @@ import { getViewer, onViewer } from '../auth';
 import { onModChange } from '../data/modSession';
 import { createEditor } from './edit';
 import { ago, feedEvents, feedView, missedSummary, type FeedEv } from './feed';
+import { createTicker } from './ticker';
 import { guideSeen, openGuide } from './guide';
 import { markerIcon, svg } from './icons';
 import { createMarkerLayer } from './markers';
@@ -113,6 +114,8 @@ export function createControl(o: {
   });
 
   // ── שכבת המרקרים ──
+  // סרגל החדשות (openEvent מוגדרת בהמשך – נקראת רק בלחיצה)
+  const ticker = createTicker(stage, (e) => openEvent(e));
   const layer = createMarkerLayer({ stage, world: o.world, onOpen: (m) => (editor.isOn() ? editor.markerForm(m) : openMarker(m)), onPoll: () => openPoll() });
 
   // ── עורך (למודים) ──
@@ -541,6 +544,7 @@ export function createControl(o: {
     const d = o.data();
     if (!d || !o.live()) return;
     const all = feedEvents(d, o.live(), comments, ex);
+    ticker.set(all);
     const keys = new Set(all.map((e) => e.key));
     if (feedReady) {
       freshKeys = new Set(all.filter((e) => !seenFeed.has(e.key) && e.t > Date.now() - 5 * 60_000).map((e) => e.key));
@@ -557,7 +561,12 @@ export function createControl(o: {
     }
   }
 
+  let seenStories: Set<string> | null = null;
   function setExtras(e: Extras) {
+    // סטורי שאושר עכשיו → בועה על המפה
+    const approved = e.stories.filter((x) => x.status === 'approved');
+    if (seenStories) for (const st of approved) if (!seenStories.has(st.id)) window.dispatchEvent(new CustomEvent('oded:bubble', { detail: { name: st.username, text: st.caption ? `📸 ${st.caption}` : '📸 העלה סטורי', pic: st.avatar } }));
+    seenStories = new Set(approved.map((x) => x.id));
     ex = e;
     layer.set(e.markers, activePoll());
     phone.setExtras(e);
@@ -584,6 +593,7 @@ export function createControl(o: {
       trackFeed();
     },
     place: () => layer.place(),
+    pollAt: () => layer.pollAt(),
     isMod: () => mod,
     editStop: (m: Mission) => editor.stopForm(m),
     isEditing: () => editor.isOn(),
