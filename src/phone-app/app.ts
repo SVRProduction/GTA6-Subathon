@@ -446,6 +446,38 @@ async function share(url: string, title: string) {
   }
 }
 
+// ══════════════ התקנה כאפליקציה ══════════════
+// בתוך הטלפון שבאתר (‎?inapp) הכפתור של האתר מטפל בזה
+const inapp = new URLSearchParams(location.search).has('inapp');
+if (inapp) document.documentElement.classList.add('is-inapp');
+let deferredInstall: (Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> }) | null = null;
+const standalone = matchMedia('(display-mode: standalone)').matches || (navigator as unknown as { standalone?: boolean }).standalone === true;
+const ios = /iphone|ipad|ipod/i.test(navigator.userAgent) && !/crios|fxios/i.test(navigator.userAgent);
+const installBtn = $<HTMLButtonElement>('[data-install]');
+installBtn.hidden = inapp || standalone || !ios;
+addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstall = e as typeof deferredInstall;
+  installBtn.hidden = inapp || standalone;
+});
+addEventListener('appinstalled', () => {
+  installBtn.hidden = true;
+  toast('הותקן. הסאבתון מחכה במסך הבית.');
+});
+installBtn.onclick = async () => {
+  if (deferredInstall) {
+    await deferredInstall.prompt();
+    const { outcome } = await deferredInstall.userChoice;
+    if (outcome === 'accepted') installBtn.hidden = true;
+    deferredInstall = null;
+    return;
+  }
+  openSheet(
+    'התקנה באייפון',
+    h('ol', { className: 'ios-steps' }, h('li', {}, 'לוחצים על כפתור השיתוף של Safari (הריבוע עם החץ).'), h('li', {}, 'בוחרים "הוספה למסך הבית".'), h('li', {}, 'לוחצים "הוספה". הסאבתון יופיע במסך הבית ויפתח כמו אפליקציה.')),
+  );
+};
+
 // ══════════════ בית ══════════════
 const home = $('#view-home');
 function renderHome() {

@@ -51,6 +51,11 @@ img { display: block; max-width: 100%; }
 }
 .bar__live::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: #fff; animation: pulse 1.6s ease-out infinite; }
 .bar__live[hidden] { display: none; }
+/* כפתור התקנה (רק כשאפשר להתקין, ולא בתוך הטלפון שבאתר) */
+.bar__end { display: flex; align-items: center; gap: 8px; }
+.bar__install { display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border: 0; border-radius: 999px; background: var(--surface); color: var(--ink); font-weight: 700; font-size: 14px; box-shadow: var(--shadow-sm); }
+.bar__install[hidden], .is-inapp .bar__install { display: none; }
+.ios-steps { margin: 0; padding-inline-start: 22px; display: grid; gap: 10px; font-size: 16px; line-height: 1.45; }
 @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7); } 100% { box-shadow: 0 0 0 9px rgba(255, 255, 255, 0); } }
 
 .views { position: relative; min-height: 0; }
