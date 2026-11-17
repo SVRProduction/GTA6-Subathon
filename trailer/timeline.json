@@ -268,22 +268,22 @@
         "logo": true
       },
       {
-        "beat": 86,
+        "beat": 85,
         "text": "GTA 6",
         "style": "game"
       },
       {
-        "beat": 88,
+        "beat": 86,
         "text": "19.11 · יום חמישי",
         "style": "date"
       },
       {
-        "beat": 90,
+        "beat": 87,
         "text": "kick.com/odedsvr",
         "style": "link"
       },
       {
-        "beat": 91,
+        "beat": 88,
         "text": "svrproduction.github.io/GTA6-Subathon",
         "style": "url"
       }
@@ -423,10 +423,10 @@
         "y1": 1420
       },
       "phone": {
-        "x": 0,
-        "y": 0,
-        "w": 1080,
-        "h": 1920
+        "x": 216,
+        "y": 400,
+        "w": 648,
+        "h": 1152
       }
     }
   }

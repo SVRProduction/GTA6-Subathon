@@ -7,7 +7,7 @@
   שוט אחד של GTA מתמונת סטילס, מצויר כפונקציה טהורה של מספר הפריים (בלי שעון, בלי אנימציות CSS):
   make-shots.cjs קורא ל-window.setup(plan) פעם אחת, ואז ל-window.seek(frame, total) לפני כל פריים.
   שכבות, מלמטה למעלה: התמונה (שלושה עותקים, ערוץ צבע בכל אחד, בקנה מידה מעט שונה = שוליים כרומטיים של עדשה),
-  גוון ניאון עדין, וינייטה, גרעין פילם (רעש קבוע לפי זרע השוט ומספר הפריים).
+  גוון ניאון עדין, זליגת אור (שני כתמי ניאון רכים שנודדים לאט על פני הפריים), וינייטה, גרעין פילם (רעש קבוע לפי זרע השוט ומספר הפריים).
   ה-transform יושב רק על ה-<img> עצמו, והפילטרים על עטיפות שלא זזות: כך כרום מצייר את התמונה מחדש בכל פריים
   (ולא מותח שכבה שכבר צוירה), והתנועה חלקה ברמת תת-פיקסל.
 -->
@@ -17,8 +17,9 @@
   #pic { position: absolute; inset: 0; overflow: hidden; background: #000; isolation: isolate; }
   .chan { position: absolute; inset: 0; overflow: hidden; }
   .chan img { position: absolute; left: 0; top: 0; max-width: none; transform-origin: 0 0; image-rendering: auto; image-rendering: high-quality; }
-  #tone, #vig { position: absolute; inset: 0; pointer-events: none; }
+  #tone, #leak, #vig { position: absolute; inset: 0; pointer-events: none; }
   #tone { mix-blend-mode: soft-light; }
+  #leak { mix-blend-mode: screen; }
   #grain { position: absolute; left: 0; top: 0; width: 100%; height: 100%; mix-blend-mode: overlay; pointer-events: none; }
   #dbg, #dbgc { position: absolute; top: 0; width: 48px; height: 48px; display: none; }
   #dbg { left: 0; }
@@ -35,6 +36,7 @@
 <div id="stage">
   <div id="pic"></div>
   <div id="tone"></div>
+  <div id="leak"></div>
   <div id="vig"></div>
   <canvas id="grain"></canvas>
   <div id="dbg"></div>
@@ -85,6 +87,9 @@
     $('tone').style.display = tone > 0 ? 'block' : 'none';
     $('tone').style.background = `linear-gradient(168deg, rgba(0,214,255,${(0.34 * tone).toFixed(3)}) 0%, rgba(120,60,255,${(0.1 * tone).toFixed(3)}) 48%, rgba(255,0,150,${(0.4 * tone).toFixed(3)}) 100%)`;
 
+    // זליגת אור: מוצגת רק כשיש עוצמה; המיקום מתעדכן ב-seek
+    $('leak').style.display = (L.leak || 0) > 0 ? 'block' : 'none';
+
     // וינייטה רכה, בגוון אינדיגו כהה ולא שחור
     const vg = L.vignette || 0;
     $('vig').style.display = vg > 0 ? 'block' : 'none';
@@ -121,6 +126,17 @@
     for (const { img, q } of layers) {
       const m = ShotMath.matrix(s, v, P.prep, q);
       img.style.transform = `matrix(${m.map((x) => x.toFixed(7)).join(',')})`;
+    }
+    const lk = s.look.leak || 0;
+    if (lk > 0) {
+      // שני כתמי אור רכים (מג'נטה וטורקיז) שנודדים בקצב קבוע לאורך השוט, בכיוונים מנוגדים. הכיוון מתחלף משוט לשוט.
+      const t = total > 1 ? frame / (total - 1) : 0;
+      const dir = s.look.leakDir || (s.seed & 1 ? 1 : -1);
+      const ax = 50 + dir * (-58 + 34 * t), ay = 16 + 12 * t;      // מג'נטה: נכנס מהצד העליון
+      const bx = 50 - dir * (-56 + 26 * t), by = 88 - 10 * t;      // טורקיז: מהצד הנגדי, למטה
+      $('leak').style.background =
+        `radial-gradient(ellipse 62% 78% at ${ax.toFixed(3)}% ${ay.toFixed(3)}%, rgba(255,52,170,${lk.toFixed(3)}) 0%, rgba(255,52,170,${(lk * 0.45).toFixed(3)}) 38%, rgba(255,52,170,0) 100%), ` +
+        `radial-gradient(ellipse 56% 70% at ${bx.toFixed(3)}% ${by.toFixed(3)}%, rgba(0,196,255,${(lk * 0.7).toFixed(3)}) 0%, rgba(0,196,255,${(lk * 0.3).toFixed(3)}) 38%, rgba(0,196,255,0) 100%)`;
     }
     if (grain) {
       // xorshift32 עם זרע = (שוט, פריים). ממוצע של 4 בתים = התפלגות דמוית פעמון סביב אפור אמצעי

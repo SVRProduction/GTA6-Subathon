@@ -3,7 +3,7 @@
 //
 //   node capture-overlay.cjs 16x9|9x16|both                 רינדור מלא: work/overlay/<aspect>/00000.png..01349.png
 //   node capture-overlay.cjs both --range 900-1125           רינדור מחדש של טווח פריימים בלבד [from,to) (למשל אחרי ש-taps.json נוצר)
-//   node capture-overlay.cjs 16x9 --frames 10,70,150 [--out dir]   פריימים בודדים לבדיקה בעין (ברירת מחדל: work/tmp/overlay/frames/<aspect>/)
+//   node capture-overlay.cjs 16x9 --frames 10,70,150 [--out dir]   פריימים בודדים לבדיקה בעין, אל <dir>/<aspect>/ (ברירת מחדל: work/tmp/overlay/frames)
 //   node capture-overlay.cjs both --check                    בלי צילום: עובר על כל הפריימים ובודק ש-captionBoxes בתוך האזור הבטוח
 //
 // הדף (overlay/index.html) חושף window.seek(frame): פונקציה טהורה של מספר הפריים, אז אפשר לרנדר כל טווח בנפרד ולקבל אותו פלט.
@@ -72,7 +72,7 @@ async function run(aspect, args) {
       for (const b of bad.slice(0, 20)) console.log('   BAD', JSON.stringify(b));
       if (bad.length) process.exitCode = 2;
     } else if (args.frames) {
-      const dir = args.out || path.join(WORK, 'tmp', 'overlay', 'frames', aspect);
+      const dir = path.join(args.out || path.join(WORK, 'tmp', 'overlay', 'frames'), aspect);
       for (const f of args.frames) {
         await cap.eval((n) => window.seek(n), f);
         await cap.shot(path.join(dir, `${pad(f)}.png`));

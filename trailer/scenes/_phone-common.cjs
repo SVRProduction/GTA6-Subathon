@@ -17,10 +17,13 @@ const SCENES = ['phone-home', 'phone-story', 'phone-reel', 'phone-stats'];
  * CSS לצילום בלבד (בנוסף ל-PHONE_CSS של המנגנון):
  * - שורת הסטוריז: בלי scroll-snap. ברוחב 360 ה-snap מצמיד את הטבעת הראשונה לקצה המסך (נראית חתוכה),
  *   וגם לא נותן לגלול את השורה למיקום מדויק. הרווחים והגדלים נשארים כמו באתר.
+ * - שורת המשנה בכרטיס הלייב ("סאבתון GTA 6 – יום 3 | 2,140 צופים"): ברוחב 360 חסרים לה 5 פיקסלים והיא נחתכת ל-"2,140 צו…".
+ *   חצי פיקסל פחות בגודל הגופן (13 -> 12.5) והיא נכנסת כולה.
  * - הערת "תצוגה מקדימה" בפיד הקליפים: לא מופיעה בטעינה רגילה של הקישור, מוסתרת ליתר ביטחון.
  */
 const CSS = `${PHONE_CSS}
 .rings{scroll-snap-type:none!important}
+.card--live__txt small{font-size:12.5px!important}
 .feed__note{display:none!important}`;
 
 // ── מצב הבית: phone-home מסתיימת בו, phone-story מתחילה בדיוק ממנו (חיתוך בלי קפיצה) ──
@@ -70,6 +73,7 @@ const HOME_STATE = () => {
     name: q('.bar__name').textContent, nameBox: b(q('.bar__name')), logoBox: b(q('.bar__logo')), liveBox: b(q('[data-live]')), liveTxt: q('[data-live]').textContent,
     installShown: getComputedStyle(q('.bar__install')).display !== 'none',
     hello: q('.hello').textContent, liveCard: q('.card--live').innerText.replace(/\n/g, ' / '), liveCardBox: b(q('.card--live')),
+    liveSubFits: q('.card--live__txt small').scrollWidth <= q('.card--live__txt small').clientWidth,
     eyebrow: q('.card--now .eyebrow').textContent, now: q('.card--now h2').textContent, nowBox: b(q('.card--now h2')), mapBox: b(q('.card--now__map')),
     scrollTop: q('#view-home').scrollTop, ringsLeft: q('.rings').scrollLeft, viewBox: [view.left, view.top, view.right, view.bottom].map((v) => Math.round(v * devicePixelRatio)),
     rings: [...document.querySelectorAll('.ring')].map((r) => ({ label: r.getAttribute('aria-label'), box: b(r.querySelector('.ring__pic')), nameBox: b(r.querySelector('.ring__name')) })),

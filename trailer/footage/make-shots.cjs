@@ -110,7 +110,7 @@ function report(d) {
   const win = (v) => `x ${fx(v.cx - v.w / 2)}..${fx(v.cx + v.w / 2)}  y ${fx(v.cy - v.h / 2)}..${fx(v.cy + v.h / 2)}  (x${fx(v.mag, 3)})`;
   console.log(`${d.name} ${d.aspect}: ${d.n} frames, ${path.relative(ROOT, d.src)}`);
   console.log(`  first ${win(pl.first)}\n  last  ${win(pl.last)}`);
-  console.log(`  edge margin ${fx(pl.margin, 2)}px${s.keep.length ? `, keep margin ${fx(pl.keepMargin, 2)}px` : ''}${s.avoid.length ? `, avoid gap ${fx(pl.avoidGap, 2)}px` : ''}, prep [${prep.x0},${prep.y0},${prep.x1},${prep.y1}] -> ${prep.w}x${prep.h}`);
+  console.log(`  edge margin ${fx(pl.margin, 2)}px${s.keep.length ? `, keep margin ${fx(pl.keepMargin, 2)}px` : ''}${s.avoid.length ? `, avoid gap ${fx(pl.avoidGap, 2)}px` : ''}, prep [${prep.x0},${prep.y0},${prep.x1},${prep.y1}] -> ${prep.w}x${prep.h} (${path.basename(prep.file)})`);
 }
 
 function prepare(d) {

@@ -89,10 +89,10 @@ function assemble(aspect) {
   const g = [];
   inputs.forEach(({ s, phone }, i) => {
     const head = `[${i}:v]trim=end_frame=${s.frames},setpts=PTS-STARTPTS,format=gbrp`;
-    if (phone && aspect === '16x9') {
-      const r = L.phone;
+    const r = L.phone;
+    if (phone && !(r.x === 0 && r.y === 0 && r.w === L.w && r.h === L.h)) {   // טלפון בתוך מסגרת, על רקע מטושטש של אותו מסך
       g.push(`${head},split[p${i}a][p${i}b]`);
-      g.push(`[p${i}a]scale=${L.w}:-2:flags=bicubic,crop=${L.w}:${L.h},gblur=sigma=36,eq=brightness=-0.16:saturation=1.15,format=gbrp,setsar=1[p${i}bg]`);
+      g.push(`[p${i}a]scale=${L.w}:${L.h}:force_original_aspect_ratio=increase:flags=bicubic,crop=${L.w}:${L.h},gblur=sigma=36,colorchannelmixer=rr=0.38:gg=0.36:bb=0.44,format=gbrp,setsar=1[p${i}bg]`);
       g.push(`[p${i}b]scale=${r.w}:${r.h}:flags=lanczos,format=gbrp,setsar=1[p${i}fg]`);
       g.push(`[p${i}bg][p${i}fg]overlay=${r.x}:${r.y}:format=gbrp,setsar=1[v${i}]`);
     } else {

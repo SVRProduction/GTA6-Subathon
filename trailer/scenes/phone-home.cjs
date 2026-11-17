@@ -26,7 +26,7 @@ main(NAME, { url: '/phone.html?demo' }, async (cap, s, out) => {
   assert(pre.scrollTop === 0 && Math.abs(pre.ringsLeft + g.x0) < 0.5, 'home is not at its start position');
   const first = pre.rings.slice(0, 4);
   assert(first[0].label === 'סטורי: היום' && first.every((r) => r.box[0] >= 12 && r.box[2] <= W - 12 && r.box[1] >= pre.viewBox[1]), `first four rings are not fully visible: ${JSON.stringify(first.map((r) => r.box))}`);
-  assert(/משחק GTA 6 עכשיו/.test(pre.liveCard) && /לצפייה/.test(pre.liveCard), `live card: ${pre.liveCard}`);
+  assert(/משחק GTA 6 עכשיו/.test(pre.liveCard) && /2,140 צופים/.test(pre.liveCard) && /לצפייה/.test(pre.liveCard) && pre.liveSubFits, `live card (subtitle must not be cut): ${pre.liveCard} fits=${pre.liveSubFits}`);
   assert(pre.eyebrow === 'אנחנו עכשיו ב' && pre.now === 'הכביש הצפוני', `now card: ${pre.eyebrow} / ${pre.now}`);
 
   await cap.record(out, s.frames, async (i) => {
