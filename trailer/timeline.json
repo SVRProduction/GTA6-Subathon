@@ -1,0 +1,433 @@
+{
+  "bpm": 128,
+  "fps": 30,
+  "bars": 24,
+  "note": "הכול בפעימות. frame(beat) = round(beat * 14.0625). 24 תיבות = 96 פעימות = 1350 פריימים = 45.0 שניות.",
+  "scenes": [
+    {
+      "name": "gta1",
+      "kind": "gta",
+      "beat": 0,
+      "beats": 2
+    },
+    {
+      "name": "gta2",
+      "kind": "gta",
+      "beat": 2,
+      "beats": 2
+    },
+    {
+      "name": "gta3",
+      "kind": "gta",
+      "beat": 4,
+      "beats": 4
+    },
+    {
+      "name": "map-title",
+      "kind": "map",
+      "beat": 8,
+      "beats": 8,
+      "what": "המפה בשקיעה, מבט כללי, התקרבות איטית (כרטיס הפתיחה של האתר מוסתר)"
+    },
+    {
+      "name": "map-journey",
+      "kind": "map",
+      "beat": 16,
+      "beats": 12,
+      "what": "תיבה 5: צלילה מהמבט הכללי למפה בתלת-ממד. תיבות 6-7: נסיעה של כ-7 עצירות"
+    },
+    {
+      "name": "milestone",
+      "kind": "map",
+      "beat": 28,
+      "beats": 4,
+      "what": "לחיצה על סיכת מיילסטון זהובה, העמוד הזהוב נפתח"
+    },
+    {
+      "name": "fx-death",
+      "kind": "map",
+      "beat": 32,
+      "beats": 4,
+      "what": "הבזק 'מתת', רעידה, גולגולת מעל הדמות"
+    },
+    {
+      "name": "fx-arrest",
+      "kind": "map",
+      "beat": 36,
+      "beats": 4,
+      "what": "אורות משטרה ו-WANTED, תקריב על הדמות"
+    },
+    {
+      "name": "fx-fail",
+      "kind": "map",
+      "beat": 40,
+      "beats": 4,
+      "what": "באנר MISSION FAILED"
+    },
+    {
+      "name": "poll",
+      "kind": "map",
+      "beat": 44,
+      "beats": 4,
+      "what": "הסקר על המפה: קו מקווקו לסיכת הסקר, פסי ההצבעה גדלים"
+    },
+    {
+      "name": "gta4",
+      "kind": "gta",
+      "beat": 48,
+      "beats": 2
+    },
+    {
+      "name": "gta5",
+      "kind": "gta",
+      "beat": 50,
+      "beats": 2
+    },
+    {
+      "name": "tod",
+      "kind": "map",
+      "beat": 52,
+      "beats": 12,
+      "what": "אותו פריים: יום (תיבה 14) -> שקיעה (15) -> לילה והפנסים נדלקים (16)"
+    },
+    {
+      "name": "phone-home",
+      "kind": "phone",
+      "beat": 64,
+      "beats": 4,
+      "what": "בית הטלפון: טבעות סטוריז, כרטיס לייב"
+    },
+    {
+      "name": "phone-story",
+      "kind": "phone",
+      "beat": 68,
+      "beats": 4,
+      "what": "לחיצה על טבעת, סטורי של מיילסטון נפתח"
+    },
+    {
+      "name": "phone-reel",
+      "kind": "phone",
+      "beat": 72,
+      "beats": 4,
+      "what": "פיד הקליפים (הטריילר של GTA VI), לחיצה על לייק"
+    },
+    {
+      "name": "phone-stats",
+      "kind": "phone",
+      "beat": 76,
+      "beats": 4,
+      "what": "המספרים: כמה פעמים עודד מת"
+    },
+    {
+      "name": "gta6",
+      "kind": "gta",
+      "beat": 80,
+      "beats": 2
+    },
+    {
+      "name": "gta7",
+      "kind": "gta",
+      "beat": 82,
+      "beats": 2
+    },
+    {
+      "name": "endcard",
+      "kind": "map",
+      "beat": 84,
+      "beats": 12,
+      "what": "המפה בלילה עם כל הפנסים, תנועה איטית, רקע למסך הסיום"
+    }
+  ],
+  "captions": [
+    {
+      "beat": 0,
+      "beats": 4,
+      "style": "slam",
+      "text": "19.11"
+    },
+    {
+      "beat": 4,
+      "beats": 4,
+      "style": "slam",
+      "text": "GTA 6 יוצא"
+    },
+    {
+      "beat": 8,
+      "beats": 8,
+      "style": "title",
+      "text": "הסאבתון של עודד",
+      "sub": "לייב נון-סטופ, מהדקה הראשונה",
+      "logo": true
+    },
+    {
+      "beat": 16,
+      "beats": 4,
+      "style": "lower",
+      "text": "ולסאבתון יש אתר"
+    },
+    {
+      "beat": 20,
+      "beats": 8,
+      "style": "lower",
+      "text": "כל משימה, על המפה",
+      "sub": "בזמן אמת",
+      "subBeat": 24
+    },
+    {
+      "beat": 28,
+      "beats": 4,
+      "style": "lower",
+      "text": "לכל רגע גדול, עמוד משלו"
+    },
+    {
+      "beat": 32,
+      "beats": 12,
+      "style": "kicker",
+      "text": "מה שקורה בלייב קופץ על המפה"
+    },
+    {
+      "beat": 32,
+      "beats": 4,
+      "style": "label",
+      "text": "עודד מת"
+    },
+    {
+      "beat": 36,
+      "beats": 4,
+      "style": "label",
+      "text": "עודד נעצר"
+    },
+    {
+      "beat": 40,
+      "beats": 4,
+      "style": "label",
+      "text": "עודד פישל"
+    },
+    {
+      "beat": 44,
+      "beats": 4,
+      "style": "lower",
+      "text": "והצ'אט מחליט לאן נוסעים"
+    },
+    {
+      "beat": 52,
+      "beats": 12,
+      "style": "kicker",
+      "text": "המפה מתחלפת לפי השעה"
+    },
+    {
+      "beat": 52,
+      "beats": 4,
+      "style": "label",
+      "text": "יום."
+    },
+    {
+      "beat": 56,
+      "beats": 4,
+      "style": "label",
+      "text": "שקיעה."
+    },
+    {
+      "beat": 60,
+      "beats": 4,
+      "style": "label",
+      "text": "לילה."
+    },
+    {
+      "beat": 64,
+      "beats": 4,
+      "style": "lower",
+      "text": "והכול גם בטלפון"
+    },
+    {
+      "beat": 68,
+      "beats": 4,
+      "style": "lower",
+      "text": "סטוריז מהרגעים הגדולים"
+    },
+    {
+      "beat": 72,
+      "beats": 4,
+      "style": "lower",
+      "text": "קליפים ולייקים"
+    },
+    {
+      "beat": 76,
+      "beats": 4,
+      "style": "lower",
+      "text": "וסופרים כל מוות"
+    }
+  ],
+  "endcard": {
+    "beat": 84,
+    "lines": [
+      {
+        "beat": 84,
+        "text": "הסאבתון של עודד",
+        "style": "title",
+        "logo": true
+      },
+      {
+        "beat": 86,
+        "text": "GTA 6",
+        "style": "game"
+      },
+      {
+        "beat": 88,
+        "text": "19.11 · יום חמישי",
+        "style": "date"
+      },
+      {
+        "beat": 90,
+        "text": "kick.com/odedsvr",
+        "style": "link"
+      },
+      {
+        "beat": 91,
+        "text": "svrproduction.github.io/GTA6-Subathon",
+        "style": "url"
+      }
+    ],
+    "ticker": "מבזק · עודד לא הולך לישון · 19.11 · רק ב-Kick"
+  },
+  "demoTag": {
+    "text": "הדמיה",
+    "kinds": [
+      "map",
+      "phone"
+    ]
+  },
+  "sfx": [
+    {
+      "beat": 0,
+      "type": "impact"
+    },
+    {
+      "beat": 2,
+      "type": "hit"
+    },
+    {
+      "beat": 4,
+      "type": "impact"
+    },
+    {
+      "beat": 7,
+      "type": "riser",
+      "beats": 1
+    },
+    {
+      "beat": 8,
+      "type": "impact"
+    },
+    {
+      "beat": 15,
+      "type": "whoosh"
+    },
+    {
+      "beat": 16,
+      "type": "dive"
+    },
+    {
+      "beat": 28,
+      "type": "whoosh"
+    },
+    {
+      "beat": 32,
+      "type": "death"
+    },
+    {
+      "beat": 36,
+      "type": "siren",
+      "beats": 4
+    },
+    {
+      "beat": 40,
+      "type": "tapestop"
+    },
+    {
+      "beat": 44,
+      "type": "blips",
+      "beats": 4
+    },
+    {
+      "beat": 48,
+      "type": "hit"
+    },
+    {
+      "beat": 50,
+      "type": "hit"
+    },
+    {
+      "beat": 60,
+      "type": "riser",
+      "beats": 4
+    },
+    {
+      "beat": 64,
+      "type": "impact"
+    },
+    {
+      "beat": 68,
+      "type": "whoosh"
+    },
+    {
+      "beat": 74,
+      "type": "pop"
+    },
+    {
+      "beat": 76,
+      "type": "whoosh"
+    },
+    {
+      "beat": 80,
+      "type": "hit"
+    },
+    {
+      "beat": 82,
+      "type": "hit"
+    },
+    {
+      "beat": 83,
+      "type": "roll",
+      "beats": 1
+    },
+    {
+      "beat": 84,
+      "type": "impact"
+    }
+  ],
+  "layout": {
+    "16x9": {
+      "w": 1920,
+      "h": 1080,
+      "safe": {
+        "x0": 96,
+        "y0": 54,
+        "x1": 1824,
+        "y1": 1026
+      },
+      "phone": {
+        "x": 250,
+        "y": 60,
+        "w": 540,
+        "h": 960
+      }
+    },
+    "9x16": {
+      "w": 1080,
+      "h": 1920,
+      "safe": {
+        "x0": 90,
+        "y0": 250,
+        "x1": 900,
+        "y1": 1420
+      },
+      "phone": {
+        "x": 0,
+        "y": 0,
+        "w": 1080,
+        "h": 1920
+      }
+    }
+  }
+}
