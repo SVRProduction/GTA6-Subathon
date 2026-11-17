@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>GTA shot</title>
+<!--
+  שוט אחד של GTA מתמונת סטילס, מצויר כפונקציה טהורה של מספר הפריים (בלי שעון, בלי אנימציות CSS):
+  make-shots.cjs קורא ל-window.setup(plan) פעם אחת, ואז ל-window.seek(frame, total) לפני כל פריים.
+  שכבות, מלמטה למעלה: התמונה (שלושה עותקים, ערוץ צבע בכל אחד, בקנה מידה מעט שונה = שוליים כרומטיים של עדשה),
+  גוון ניאון עדין, וינייטה, גרעין פילם (רעש קבוע לפי זרע השוט ומספר הפריים).
+  ה-transform יושב רק על ה-<img> עצמו, והפילטרים על עטיפות שלא זזות: כך כרום מצייר את התמונה מחדש בכל פריים
+  (ולא מותח שכבה שכבר צוירה), והתנועה חלקה ברמת תת-פיקסל.
+-->
+<style>
+  html, body { margin: 0; background: #000; overflow: hidden; }
+  #stage { position: absolute; left: 0; top: 0; overflow: hidden; background: #000; isolation: isolate; }
+  #pic { position: absolute; inset: 0; overflow: hidden; background: #000; isolation: isolate; }
+  .chan { position: absolute; inset: 0; overflow: hidden; }
+  .chan img { position: absolute; left: 0; top: 0; max-width: none; transform-origin: 0 0; image-rendering: auto; image-rendering: high-quality; }
+  #tone, #vig { position: absolute; inset: 0; pointer-events: none; }
+  #tone { mix-blend-mode: soft-light; }
+  #grain { position: absolute; left: 0; top: 0; width: 100%; height: 100%; mix-blend-mode: overlay; pointer-events: none; }
+  #dbg, #dbgc { position: absolute; top: 0; width: 48px; height: 48px; display: none; }
+  #dbg { left: 0; }
+  #dbgc { right: 0; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <!-- ערוץ צבע אחד מכל עותק; screen של שלושתם מחזיר בדיוק את התמונה (הערוצים זרים זה לזה) -->
+  <filter id="ch0" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0"/></filter>
+  <filter id="ch1" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0"/></filter>
+  <filter id="ch2" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0"/></filter>
+</svg>
+<div id="stage">
+  <div id="pic"></div>
+  <div id="tone"></div>
+  <div id="vig"></div>
+  <canvas id="grain"></canvas>
+  <div id="dbg"></div>
+  <canvas id="dbgc" width="48" height="48"></canvas>
+</div>
+<script src="shot-math.cjs"></script>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  let P = null;        // התוכנית: { spec, prep: { url, x0, y0, kx, ky }, debug }
+  let layers = [];     // [{ img, q }]
+  let grain = null;    // { ctx, data, px, w, h }
+  window.__ready = false;
+  window.__frame = -1;
+
+  /** נקרא פעם אחת עם התוכנית מ-make-shots.cjs. window.__ready נדלק כשהתמונות נטענו ופוענחו. */
+  window.setup = (plan) => {
+    P = plan;
+    const s = plan.spec, L = s.look;
+    const stage = $('stage'), pic = $('pic');
+    stage.style.width = `${s.W}px`;
+    stage.style.height = `${s.H}px`;
+
+    // התמונה: עותק אחד, או שלושה (R,G,B) כשיש שוליים כרומטיים. הקנה מידה הנוסף תמיד >= 1, כדי שאף ערוץ לא יחשוף שוליים.
+    const ca = L.chroma || 0;
+    const qs = ca > 0 ? [1 + 2 * ca, 1 + ca, 1] : [1];
+    pic.textContent = '';
+    layers = qs.map((q, k) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'chan';
+      if (ca > 0) { wrap.style.filter = `url(#ch${k})`; wrap.style.mixBlendMode = 'screen'; }
+      const img = new Image();
+      img.decoding = 'sync';
+      img.src = plan.prep.url;
+      wrap.append(img);
+      pic.append(wrap);
+      return { img, q };
+    });
+    // גרייד: ניגודיות ורוויה מעט מעל המקור
+    const f = [];
+    if (L.contrast && L.contrast !== 1) f.push(`contrast(${L.contrast})`);
+    if (L.saturate && L.saturate !== 1) f.push(`saturate(${L.saturate})`);
+    if (L.brightness && L.brightness !== 1) f.push(`brightness(${L.brightness})`);
+    pic.style.filter = f.join(' ') || 'none';
+
+    // גוון ניאון (Vice City): טורקיז מלמעלה, מג'נטה מלמטה, ב-soft-light עדין
+    const tone = L.tone || 0;
+    $('tone').style.display = tone > 0 ? 'block' : 'none';
+    $('tone').style.background = `linear-gradient(168deg, rgba(0,214,255,${(0.34 * tone).toFixed(3)}) 0%, rgba(120,60,255,${(0.1 * tone).toFixed(3)}) 48%, rgba(255,0,150,${(0.4 * tone).toFixed(3)}) 100%)`;
+
+    // וינייטה רכה, בגוון אינדיגו כהה ולא שחור
+    const vg = L.vignette || 0;
+    $('vig').style.display = vg > 0 ? 'block' : 'none';
+    $('vig').style.background = `radial-gradient(ellipse 78% 78% at 50% 50%, rgba(8,0,22,0) 42%, rgba(8,0,22,${(0.45 * vg).toFixed(3)}) 78%, rgba(8,0,22,${vg.toFixed(3)}) 100%)`;
+
+    // גרעין: קנבס קטן מעט מהפלט (גרגר של ~1.5 פיקסל שורד קידוד טוב יותר מרעש של פיקסל בודד)
+    const g = L.grain || 0;
+    const cv = $('grain');
+    cv.style.display = g > 0 ? 'block' : 'none';
+    if (g > 0) {
+      const size = L.grainSize || 1.5;
+      cv.width = Math.ceil(s.W / size);
+      cv.height = Math.ceil(s.H / size);
+      cv.style.opacity = String(g);
+      const ctx = cv.getContext('2d');
+      const data = ctx.createImageData(cv.width, cv.height);
+      grain = { ctx, data, px: new Uint32Array(data.data.buffer), w: cv.width, h: cv.height };
+    } else grain = null;
+
+    $('dbg').style.display = $('dbgc').style.display = plan.debug ? 'block' : 'none';
+
+    Promise.all(layers.map(({ img }) => (img.complete && img.naturalWidth ? Promise.resolve() : new Promise((ok, bad) => { img.onload = ok; img.onerror = () => bad(new Error(`image failed: ${img.src}`)); }))
+      .then(() => img.decode().catch(() => {}))))
+      .then(() => { window.seek(0, plan.n || 1); window.__ready = true; })
+      .catch((e) => { window.__error = String(e); });
+    return true;
+  };
+
+  /** מצייר את פריים `frame` מתוך `total`. פונקציה טהורה של הפרמטרים: אותו פריים = אותם פיקסלים, בכל סדר קריאה. */
+  window.seek = (frame, total) => {
+    if (!P) return false;
+    const s = P.spec;
+    const v = ShotMath.view(s, frame, total);
+    for (const { img, q } of layers) {
+      const m = ShotMath.matrix(s, v, P.prep, q);
+      img.style.transform = `matrix(${m.map((x) => x.toFixed(7)).join(',')})`;
+    }
+    if (grain) {
+      // xorshift32 עם זרע = (שוט, פריים). ממוצע של 4 בתים = התפלגות דמוית פעמון סביב אפור אמצעי
+      let r = (s.seed ^ Math.imul(frame + 1, 0x9e3779b1)) >>> 0 || 0x1234567;
+      const px = grain.px;
+      for (let j = 0, N = px.length; j < N; j++) {
+        r ^= r << 13; r ^= r >>> 17; r ^= r << 5;
+        const gv = ((r & 255) + ((r >>> 8) & 255) + ((r >>> 16) & 255) + (r >>> 24)) >> 2;
+        px[j] = 0xff000000 | (gv << 16) | (gv << 8) | gv;
+      }
+      grain.ctx.putImageData(grain.data, 0, 0);
+    }
+    if (P.debug) {
+      // מספר הפריים בבסיס 4 על שלושת ערוצי הצבע: פעם ב-DOM ופעם בקנבס, לבדיקת סנכרון מול הקובץ המוקלט
+      const lv = (k) => 32 + 64 * ((frame >> (2 * k)) & 3);
+      const col = `rgb(${lv(0)},${lv(1)},${lv(2)})`;
+      $('dbg').style.background = col;
+      const c = $('dbgc').getContext('2d');
+      const d = c.createImageData(48, 48);
+      const p = new Uint32Array(d.data.buffer);
+      p.fill((0xff000000 | (lv(2) << 16) | (lv(1) << 8) | lv(0)) >>> 0);
+      c.putImageData(d, 0, 0);
+    }
+    window.__frame = frame;
+    return true;
+  };
+})();
+</script>
+</body>
+</html>

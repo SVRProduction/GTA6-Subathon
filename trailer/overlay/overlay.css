@@ -1,0 +1,93 @@
+/* שכבת הכתוביות של הטריילר: כאן רק המראה הקבוע. כל התנועה (שקיפות, transform) נקבעת ב-overlay.js לפי מספר הפריים.
+   אין transition / animation בכוונה: הדף חייב להיות פונקציה טהורה של הפריים. */
+:root {
+  --gold: #f6c81e;
+  --ink: #14110a;
+  --pink: #ff5c8a;
+  --navy: #070b14;
+  --white: #f3efe6;
+  --red: #e0222b;
+  --display: 'Karantina', 'Rubik', sans-serif;
+  --body: 'Rubik', sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { background: transparent; overflow: hidden; }
+#stage { position: absolute; left: 0; top: 0; overflow: hidden; direction: rtl; font-family: var(--body); color: var(--white); -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; font-kerning: normal; }
+#stage > *, .layer > * { position: absolute; }
+.ltr { unicode-bidi: isolate; direction: ltr; display: inline-block; }
+.txt { white-space: nowrap; text-align: center; }
+.ln { display: block; }
+.fill { left: 0; top: 0; width: 100%; height: 100%; }
+.box { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.row { display: flex; flex-direction: column; align-items: center; }
+.measure { position: absolute; left: 0; top: 0; visibility: hidden; white-space: nowrap; font-size: 100px; line-height: 1; }
+
+/* ── הבזק בחיתוך ── */
+.flash { background: #fff; }
+
+/* ── slam: מספר/משפט ענק מעל תמונות GTA ── */
+.slam { font-family: var(--display); font-weight: 700; line-height: 0.84; color: var(--white); letter-spacing: 0.01em; }
+.slam .ltr { color: var(--gold); }
+
+/* ── כותרת: לוגו + שם + שורת משנה ── */
+.scrim-title { background: radial-gradient(ellipse 58% 62% at var(--cx) var(--cy), rgba(7, 11, 20, 0.8) 0%, rgba(7, 11, 20, 0.62) 42%, rgba(7, 11, 20, 0.22) 78%, rgba(7, 11, 20, 0) 100%); }
+.logo { border-radius: 50%; border: 8px solid var(--gold); background: var(--navy); box-shadow: 0 0 0 5px var(--ink), 0 18px 50px rgba(0, 0, 0, 0.6), 0 0 70px rgba(246, 200, 30, 0.35); overflow: hidden; flex: none; }
+.logo img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.title { font-family: var(--display); font-weight: 700; line-height: 0.86; color: var(--white); }
+.subpill { font-family: var(--body); font-weight: 800; line-height: 1.15; color: var(--ink); background: var(--gold); border-radius: 999px; box-shadow: 0 10px 34px rgba(0, 0, 0, 0.5), 0 0 0 4px var(--ink); }
+
+/* ── לוחית (plate) כהה: כתובית תחתונה ── */
+.plate { background: rgba(7, 11, 20, 0.95); border-radius: 22px; box-shadow: 0 14px 44px rgba(0, 0, 0, 0.5), 0 0 0 3px rgba(243, 239, 230, 0.1); }
+.lower { position: relative; overflow: hidden; flex: none; }
+.lower::before { content: ''; position: absolute; top: 0; bottom: 0; right: 0; width: var(--bar); background: var(--gold); }
+.lower .txt { font-family: var(--body); font-weight: 900; line-height: 1.14; color: var(--white); }
+.lower .ltr { color: var(--gold); }
+.lsub { background: var(--gold); border-radius: 16px; box-shadow: 0 12px 34px rgba(0, 0, 0, 0.5), 0 0 0 4px var(--ink); flex: none; }
+.lsub .txt { font-family: var(--body); font-weight: 900; line-height: 1.14; color: var(--ink); }
+
+/* ── kicker: שורה קטנה קבועה למעלה ── */
+.kicker { display: flex; align-items: center; flex: none; border-radius: 999px; background: rgba(7, 11, 20, 0.93); border: 3px solid rgba(246, 200, 30, 0.75); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45); }
+.kicker .dot { flex: none; border-radius: 50%; background: var(--pink); box-shadow: 0 0 0 4px rgba(255, 92, 138, 0.28); }
+.kicker .txt { font-family: var(--body); font-weight: 800; line-height: 1.15; color: var(--white); }
+
+/* ── label: מילה גדולה על הפעימה ── */
+.label { flex: none; background: rgba(7, 11, 20, 0.96); border: 7px solid var(--gold); box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55), 0 0 0 5px var(--ink); }
+.label .txt { font-family: var(--display); font-weight: 700; line-height: 0.86; color: var(--gold); }
+
+/* ── תג "הדמיה" ── */
+.demo { border-radius: 999px; background: rgba(7, 11, 20, 0.74); border: 2px solid rgba(243, 239, 230, 0.4); font-family: var(--body); font-weight: 600; line-height: 1.2; color: rgba(243, 239, 230, 0.95); white-space: nowrap; }
+
+/* ── טלפון (16x9): מסגרת + כיתוב גדול בצד; לחיצות ── */
+.pcap { flex: none; }
+.pcap .txt { font-family: var(--display); font-weight: 700; line-height: 0.86; }
+.pcap.dark { background: rgba(7, 11, 20, 0.96); box-shadow: 0 18px 50px rgba(0, 0, 0, 0.5), 0 0 0 3px rgba(243, 239, 230, 0.12); }
+.pcap.dark .txt { color: var(--white); }
+.pcap.gold { background: var(--gold); box-shadow: 0 18px 50px rgba(0, 0, 0, 0.5), 0 0 0 5px var(--ink); }
+.pcap.gold .txt { color: var(--ink); }
+.tap { width: 0; height: 0; }
+.tap i { position: absolute; display: block; border-radius: 50%; }
+.tap .ring { border-style: solid; border-color: #fff; box-shadow: 0 0 0 2px rgba(20, 17, 10, 0.55), inset 0 0 0 2px rgba(20, 17, 10, 0.55); }
+.tap .dotc { background: rgba(255, 255, 255, 0.92); box-shadow: 0 0 0 3px rgba(20, 17, 10, 0.6), 0 4px 14px rgba(0, 0, 0, 0.4); }
+
+/* ── מסך הסיום ── */
+.scrim-end { background: radial-gradient(ellipse 75% 60% at var(--cx) var(--cy), rgba(7, 11, 20, 0.5) 0%, rgba(7, 11, 20, 0) 100%), linear-gradient(180deg, rgba(7, 11, 20, 0.78) 0%, rgba(7, 11, 20, 0.6) 40%, rgba(7, 11, 20, 0.72) 72%, rgba(7, 11, 20, 0.92) 100%); }
+.endcol { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.endhead { display: flex; align-items: center; justify-content: center; flex: none; }
+.endtitle { font-family: var(--display); font-weight: 700; line-height: 0.86; color: var(--white); }
+.endgame { flex: none; background: var(--pink); box-shadow: 0 12px 34px rgba(0, 0, 0, 0.5), 0 0 0 5px var(--ink); }
+.endgame .txt { font-family: var(--display); font-weight: 700; line-height: 0.86; color: var(--ink); letter-spacing: 0.03em; }
+.enddate { font-family: var(--display); font-weight: 700; line-height: 0.84; color: var(--gold); flex: none; }
+.enddate .sep { color: var(--white); }
+.endlink { flex: none; border-radius: 999px; background: rgba(7, 11, 20, 0.96); border: 5px solid var(--pink); box-shadow: 0 14px 40px rgba(0, 0, 0, 0.55), 0 0 44px rgba(255, 92, 138, 0.35); }
+.endlink .txt { font-family: var(--body); font-weight: 900; line-height: 1.15; color: var(--white); }
+.endlink .hl { color: var(--pink); }
+.endurl { flex: none; border-radius: 999px; background: rgba(7, 11, 20, 0.86); border: 2px solid rgba(243, 239, 230, 0.3); }
+.endurl .txt { font-family: var(--body); font-weight: 600; line-height: 1.2; color: var(--white); letter-spacing: 0.01em; }
+
+/* ── שורת המבזק ── */
+.ticker { overflow: hidden; border-radius: 16px; background: rgba(7, 11, 20, 0.96); box-shadow: 0 12px 36px rgba(0, 0, 0, 0.55), 0 0 0 3px rgba(243, 239, 230, 0.12); }
+.tk-tag { position: absolute; top: 0; bottom: 0; right: 0; display: flex; align-items: center; background: var(--red); color: #fff; font-family: var(--body); font-weight: 900; line-height: 1; white-space: nowrap; }
+.tk-clip { position: absolute; top: 0; bottom: 0; left: 0; overflow: hidden; }
+.tk-track { position: absolute; top: 0; left: 0; height: 100%; display: flex; flex-direction: row; direction: ltr; align-items: center; white-space: nowrap; }
+.tk-seg { flex: none; direction: rtl; unicode-bidi: isolate; font-family: var(--body); font-weight: 800; line-height: 1; color: var(--white); white-space: nowrap; }
+.tk-seg .sep { color: var(--gold); font-weight: 900; }
