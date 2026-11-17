@@ -10,8 +10,8 @@
 // הדף (overlay/index.html) חושף window.seek(frame): פונקציה טהורה של מספר הפריים, אז אפשר לרנדר כל טווח בנפרד ולקבל אותו פלט.
 const fs = require('fs');
 const path = require('path');
-const { open, WORK } = require(require('path').resolve(__dirname, '../../../../lib/harness.cjs'));
-const { T, totalFrames } = require(require('path').resolve(__dirname, '../../../../lib/timeline.cjs'));
+const { open, WORK } = require('./lib/harness.cjs');
+const { T, totalFrames } = require('./lib/timeline.cjs');
 
 const SIZE = { '16x9': { cssW: 1920, cssH: 1080 }, '9x16': { cssW: 1080, cssH: 1920 } };
 const pad = (n) => String(n).padStart(5, '0');
