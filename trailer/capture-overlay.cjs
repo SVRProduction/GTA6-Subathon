@@ -3,20 +3,21 @@
 //
 //   node capture-overlay.cjs 16x9|9x16|both                 רינדור מלא: work/overlay/<aspect>/00000.png..01349.png
 //   node capture-overlay.cjs both --range 900-1125           רינדור מחדש של טווח פריימים בלבד [from,to) (למשל אחרי ש-taps.json נוצר)
-//   node capture-overlay.cjs 16x9 --frames 10,70,150 [--out dir]   פריימים בודדים לבדיקה בעין, אל <dir>/<aspect>/ (ברירת מחדל: work/tmp/overlay/frames)
+//   node capture-overlay.cjs 16x9 --frames 10,70,150 [--out dir]   פריימים בודדים לבדיקה בעין (ברירת מחדל: work/tmp/overlay/frames/<aspect>/)
 //   node capture-overlay.cjs both --check                    בלי צילום: עובר על כל הפריימים ובודק ש-captionBoxes בתוך האזור הבטוח
+//   אפשרויות לבדיקת גרסה אחרת של הדף בלי לגעת בפלט הרגיל:  --page /__work/tmp/x/index.html   --dest <dir> (במקום work/overlay)
 //
 // הדף (overlay/index.html) חושף window.seek(frame): פונקציה טהורה של מספר הפריים, אז אפשר לרנדר כל טווח בנפרד ולקבל אותו פלט.
 const fs = require('fs');
 const path = require('path');
-const { open, WORK } = require('./lib/harness.cjs');
-const { T, totalFrames } = require('./lib/timeline.cjs');
+const { open, WORK } = require(require('path').resolve(__dirname, '../../../../lib/harness.cjs'));
+const { T, totalFrames } = require(require('path').resolve(__dirname, '../../../../lib/timeline.cjs'));
 
 const SIZE = { '16x9': { cssW: 1920, cssH: 1080 }, '9x16': { cssW: 1080, cssH: 1920 } };
 const pad = (n) => String(n).padStart(5, '0');
 
 function parseArgs(argv) {
-  const a = { aspects: null, frames: null, range: null, out: null, check: false };
+  const a = { aspects: null, frames: null, range: null, out: null, check: false, page: '/__trailer/overlay/index.html', dest: path.join(WORK, 'overlay') };
   for (let i = 0; i < argv.length; i++) {
     const v = argv[i];
     if (v === '16x9' || v === '9x16') a.aspects = [v];
@@ -25,6 +26,8 @@ function parseArgs(argv) {
     else if (v === '--range') { const [x, y] = argv[++i].split('-').map(Number); a.range = [x, y]; }
     else if (v === '--out') a.out = path.resolve(argv[++i]);
     else if (v === '--check') a.check = true;
+    else if (v === '--page') a.page = argv[++i];
+    else if (v === '--dest') a.dest = path.resolve(argv[++i]);
     else throw new Error(`unknown argument: ${v}`);
   }
   if (!a.aspects) throw new Error('usage: node capture-overlay.cjs 16x9|9x16|both [--range from-to | --frames a,b,c [--out dir] | --check]');
@@ -34,7 +37,7 @@ function parseArgs(argv) {
 }
 
 async function run(aspect, args) {
-  const cap = await open({ url: `/__trailer/overlay/index.html?aspect=${aspect}`, ...SIZE[aspect], dsf: 1, transparent: true, seed: false });
+  const cap = await open({ url: `${args.page}?aspect=${aspect}`, ...SIZE[aspect], dsf: 1, transparent: true, seed: false });
   try {
     await cap.ready(() => window.__overlayReady === true || !!window.__overlayError, { settle: 5 });
     const err = await cap.eval(() => window.__overlayError || null);
@@ -72,14 +75,14 @@ async function run(aspect, args) {
       for (const b of bad.slice(0, 20)) console.log('   BAD', JSON.stringify(b));
       if (bad.length) process.exitCode = 2;
     } else if (args.frames) {
-      const dir = path.join(args.out || path.join(WORK, 'tmp', 'overlay', 'frames'), aspect);
+      const dir = args.out || path.join(WORK, 'tmp', 'overlay', 'frames', aspect);
       for (const f of args.frames) {
         await cap.eval((n) => window.seek(n), f);
         await cap.shot(path.join(dir, `${pad(f)}.png`));
       }
       console.log(`[${aspect}] ${args.frames.length} sample frames -> ${dir}`);
     } else {
-      const dir = path.join(WORK, 'overlay', aspect);
+      const dir = path.join(args.dest, aspect);
       const [from, to] = args.range || [0, totalFrames];
       fs.mkdirSync(dir, { recursive: true });
       // מצלמים לתיקייה זמנית ומעבירים בסוף, כדי שרינדור שנקטע לא ישאיר רצף חצי-חדש
