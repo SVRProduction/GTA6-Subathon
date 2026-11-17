@@ -112,7 +112,12 @@ export function createWorld(stage: HTMLElement, onSize: (w: number, h: number) =
     });
   }
 
-  const view = () => ({ w: stage.clientWidth, h: stage.clientHeight });
+  // גודל הבמה נשמר ומתעדכן רק בשינוי גודל: קריאה ל-clientWidth בכל הקרנה של נקודה גרמה לחישוב פריסה מחדש עשרות פעמים בפריים
+  let vsize = { w: stage.clientWidth, h: stage.clientHeight };
+  const measure = () => (vsize = { w: stage.clientWidth, h: stage.clientHeight });
+  new ResizeObserver(measure).observe(stage);
+  addEventListener('resize', measure);
+  const view = () => (vsize.w ? vsize : measure());
 
   /** זום שבו כל המפה נכנסת במסך */
   function fitZ() {
@@ -176,7 +181,8 @@ export function createWorld(stage: HTMLElement, onSize: (w: number, h: number) =
   // לא מתרחקים יותר מכל המפה על המסך (התרחקות מעבר לזה שברה את התצוגה)
   const minZ = () => fitZ();
   // לא מתקרבים מעבר למה שיש לו פיקסלים אמיתיים (אחרת מטושטש)
-  const maxZ = () => Math.max(fitZ() * 2.5, Math.min(fitZ() * 10, ((hdSets[hdSets.length - 1]?.set.w ?? W) / W) / devicePixelRatio));
+  const coarse = matchMedia('(max-width: 760px), (pointer: coarse)').matches;
+  const maxZ = () => (coarse ? fitZ() * 6 : Math.max(fitZ() * 2.5, Math.min(fitZ() * 10, ((hdSets[hdSets.length - 1]?.set.w ?? W) / W) / devicePixelRatio)));
 
   /** גבולות: מרכז המצלמה נשאר בתוך המפה */
   // בטיול חופשי מותר לצאת גם אל הים שמסביב למפה (עד שליש מפה לכל צד)
@@ -356,6 +362,22 @@ export function createWorld(stage: HTMLElement, onSize: (w: number, h: number) =
       tilt = deg;
     },
     tilt: () => tilt,
+    /** טיסה רכה של המצלמה החופשית לנקודה (בטלפון: לחיצה על "אנחנו כאן", עצירה מהרשימה וכו') */
+    flyTo(t: { x: number; y: number; z: number }, ms = 900) {
+      if (!free) return;
+      cancelAnimationFrame(glide);
+      const from = { ...free };
+      const z1 = Math.min(maxZ(), Math.max(minZ(), t.z));
+      const to = { x: bound(t.x, W), y: bound(t.y, H) };
+      const start = performance.now();
+      const step = () => {
+        const k = Math.min(1, (performance.now() - start) / ms);
+        const e = 1 - Math.pow(1 - k, 3);
+        free = raw = { x: from.x + (to.x - from.x) * e, y: from.y + (to.y - from.y) * e, z: from.z * Math.pow(z1 / from.z, e) };
+        if (k < 1) glide = requestAnimationFrame(step);
+      };
+      glide = requestAnimationFrame(step);
+    },
     explore(on: boolean) {
       cancelAnimationFrame(glide);
       free = on ? { ...cam } : null;

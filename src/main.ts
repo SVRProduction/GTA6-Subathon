@@ -85,6 +85,9 @@ function makeClouds(urls: string[]) {
 
 // ── העולם ──
 let onMapReady: (() => void) | null = null;
+// בטלפון: המפה עובדת כמו Google Maps – גוררים כדי לזוז, צובטים לזום, לוחצים על עצירה. בלי "גלילה" בין עצירות
+const freeMap = !flat && matchMedia('(max-width: 760px), (pointer: coarse)').matches;
+if (freeMap) stage.classList.add('is-freemap');
 const world = createWorld(stage, () => {
   rebuild();
   stage.classList.add('is-ready');
@@ -133,6 +136,15 @@ function rebuild() {
   liveTrail = trail;
   life?.setTrail(trail);
   buildLamps(trail);
+  // בטלפון: נכנסים למצב חופשי רק אחרי שיש מסלול, מהמצלמה של מבט הפתיחה (כל המפה)
+  if (freeMap && !world.exploring()) {
+    requestAnimationFrame(() => {
+      if (world.exploring() || !curve) return;
+      frame(true);
+      world.explore(true);
+      if (focus >= 0) goTo(Math.round(focus)); // קישור ישיר / טאב המפה: טסים לעצירה
+    });
+  }
 
   const sNow = cur >= 0 ? curve.stopS[cur] : 0;
   const done = curve.path(0, sNow || 0.01);
@@ -806,12 +818,28 @@ addEventListener('keydown', (e) => {
 
 // ── גרירה חופשית ──
 function explore(on: boolean) {
+  if (freeMap && !on) return; // בטלפון תמיד במצב חופשי
   world.explore(on);
   document.documentElement.classList.toggle('no-scroll', on);
   if (!on) frame(true);
 }
 q('[data-explore]').onclick = () => explore(true);
 q('[data-explore-close]').onclick = () => explore(false);
+// "אנחנו כאן": בטלפון טס לעצירה הנוכחית (בתוך הטלפון – בשורת הכפתורים; באתר – כפתור עגול)
+{
+  const here = q<HTMLButtonElement>('[data-here]');
+  here.hidden = !freeMap;
+  here.onclick = () => goTo(cur);
+  if (freeMap && !embed) {
+    const fab = h('button', { type: 'button', class: 'here-fab', ariaLabel: 'אנחנו כאן: לעצירה הנוכחית' }, '📍');
+    fab.onclick = () => goTo(cur);
+    stage.append(fab);
+  }
+  // גרירה ראשונה בטלפון מסתירה את כרטיס הפתיחה (נכנסים למפה)
+  stage.addEventListener('pointermove', () => {
+    if (freeMap && focus < -0.5 && stage.classList.contains('is-dragging') && data?.missions.length) focus = shown = 0;
+  });
+}
 
 // ── גלילה ← מצלמה: האתר לא נגלל; גלילה למעלה מקדמת במסע, גלילה למטה חוזרת ──
 const PX_WHEEL = 300; // כמה פיקסלים של גלגלת לכל עצירה
@@ -829,6 +857,14 @@ function layout() {}
 
 function goTo(i: number) {
   if (flat || !data) return;
+  // בטלפון: טסים לעצירה (או לכל המפה) במצלמה החופשית
+  if (freeMap && world.exploring() && curve) {
+    focus = shown = clampF(i);
+    const p = i >= 0 ? curve.stops[Math.min(i, curve.stops.length - 1)] : null;
+    const { w: W, h: H } = world.size();
+    world.flyTo(p ? { x: p.x, y: p.y, z: world.fitZ() * 3.2 } : { x: W / 2, y: H / 2, z: world.fitZ() });
+    return;
+  }
   focus = clampF(i);
   travelTo = Math.abs(focus - shown) > 1.5 && i >= 0 ? focus : null;
   if (reduce) shown = focus;
@@ -1017,6 +1053,7 @@ window.addEventListener('oded:fx', (e) => {
 });
 
 let last = performance.now();
+let lastFreeKey = '';
 function frame(force = false) {
   if (!curve || !data) return;
   const now = performance.now();
@@ -1032,6 +1069,14 @@ function frame(force = false) {
   const wantTilt = reduce || world.exploring() ? 0 : tripTilt * easeT;
   const settling = Math.abs(wantShift - panelShift) > 0.5 || Math.abs(wantTilt - tiltShown) > 0.05;
   if (!force && Math.abs(focus - shown) < 0.0004 && !world.exploring() && !settling) return;
+  // מצב חופשי (טלפון): כשהמצלמה עומדת, הדמות במקום ואין סקר – אין מה לצייר מחדש
+  if (world.exploring() && !force && !settling) {
+    const c = world.camera();
+    const key = `${c.x.toFixed(2)}|${c.y.toFixed(2)}|${c.z.toFixed(5)}|${shown}|${cur}`;
+    const still = key === lastFreeKey && (playerS === null || !curve.stops[cur] || Math.abs(curve.sOf(cur) - playerS) < 0.5) && !control.pollAt();
+    lastFreeKey = key;
+    if (still) return;
+  }
   const k1 = force || reduce ? 1 : 1 - Math.exp(-dt * 6);
   shown += (focus - shown) * k1;
   panelShift += (wantShift - panelShift) * (force || reduce ? 1 : 1 - Math.exp(-dt * 8));

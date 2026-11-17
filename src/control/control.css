@@ -627,7 +627,7 @@ button.pc__opt:active { transform: scale(0.985); }
 .hud__actions [data-list][hidden] { display: none !important; }
 .is-embed .hud__actions .btn { min-height: 44px; padding: 0 16px; font-size: 15px; }
 .is-embed .locator { display: block !important; position: absolute; left: 14px; right: auto; bottom: calc(14px + var(--safe-b, 0px)); z-index: 6; }
-.is-embed .is-free .hud__actions { display: none !important; }
+.is-embed .is-free:not(.is-freemap) .hud__actions { display: none !important; }
 /* עמוד עצירה פתוח (מסך מלא): הכפתורים הצפים לא מסתירים את התוכן */
 .journey__stage:has(.panel.is-menu[data-open]) :is(.phone-btn, .poll-chip) { display: none !important; }
 
@@ -664,3 +664,9 @@ button.pc__opt:active { transform: scale(0.985); }
   .poll-line path { filter: none; animation: none; }
   .ticker__win { mask-image: none; -webkit-mask-image: none; }
 }
+
+/* ── טלפון: מפה חופשית (גרירה/צביטה) ── */
+.is-freemap .explore-close, .is-freemap [data-explore] { display: none !important; }
+.is-freemap.is-free { cursor: default; }
+.here-fab { position: absolute; z-index: 7; right: 12px; bottom: calc(150px + var(--safe-b, 0px)); display: grid; place-items: center; width: 48px; height: 48px; padding: 0; border-radius: 50%; border: 1px solid var(--m-edge); background: rgba(8, 12, 22, 0.9); font-size: 22px; box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45); cursor: pointer; }
+.journey__stage:has(.panel.is-menu[data-open]) .here-fab { display: none; }
