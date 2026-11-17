@@ -1191,7 +1191,8 @@ function frame(force = false) {
   const m = data.missions[idx];
   q('[data-odo-day]').textContent = `יום ${m?.stream_day ?? 1}`;
   q('[data-odo-stop]').textContent = `משימה ${n ? idx + 1 : 0}`;
-  q('[data-odo-ms]').textContent = `${data.missions.slice(0, idx + 1).filter((x) => x.is_milestone).length} מיילסטונים`;
+  const ms = data.missions.slice(0, idx + 1).filter((x) => x.is_milestone).length;
+  q('[data-odo-ms]').textContent = ms === 1 ? 'מיילסטון 1' : `${ms} מיילסטונים`;
   const pct = n ? Math.max(0, Math.min(1, (shown + 1) / (n + 1))) : 0;
   q('[data-progress-now]').style.insetInlineStart = `${pct * 100}%`;
   const firsts = (rail.dataset.firsts || '').split(',').map(Number);
@@ -1256,6 +1257,28 @@ function ambient(now: number) {
 
 q('[data-jump-now]').onclick = () => goTo(cur);
 q('[data-start]').onclick = () => goTo(0);
+
+// ── ספירה לאחור ל-19.11 (נעלמת לבד כשמגיע היום) ──
+const RELEASE = Date.parse('2026-11-19T00:00:00+02:00');
+const countEl = q('[data-count]');
+function tickCount() {
+  const left = RELEASE - Date.now();
+  // לפי התאריך בלבד: started_at כבר מוגדר מנתוני הפתיחה, לפני שהמשחק יצא
+  if (left <= 0) {
+    countEl.hidden = true;
+    return;
+  }
+  const s = Math.floor(left / 1000);
+  const d = Math.floor(s / 86400);
+  const hh = String(Math.floor((s % 86400) / 3600)).padStart(2, '0');
+  const mm = String(Math.floor((s % 3600) / 60)).padStart(2, '0');
+  const ss = String(s % 60).padStart(2, '0');
+  const days = d === 0 ? '' : d === 1 ? 'יום ו-' : d === 2 ? 'יומיים ו-' : `${d} ימים ו-`;
+  countEl.innerHTML = `GTA 6 יוצא בעוד ${days}<b dir="ltr">${hh}:${mm}:${ss}</b>`;
+  countEl.hidden = false;
+}
+tickCount();
+setInterval(tickCount, 1000);
 
 // ── התחלה ──
 type HdSet = { tiles: string[]; grid: number; w: number };

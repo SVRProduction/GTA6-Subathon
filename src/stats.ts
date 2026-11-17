@@ -28,7 +28,8 @@ const ago = (ms: number) => {
   const m = Math.round(ms / 60_000);
   if (m < 60) return `לפני ${m} דק'`;
   if (m < 1440) return `לפני ${Math.round(m / 60)} שעות`;
-  return `לפני ${Math.round(m / 1440)} ימים`;
+  const d = Math.round(m / 1440);
+  return d === 1 ? 'אתמול' : `לפני ${d} ימים`;
 };
 
 /** שעות משחק לכל יום (לפי שעון מקומי), מפוצל בחצות */
@@ -129,7 +130,7 @@ function render() {
         h('div', {}, h('dt', {}, 'המשימה שהכי שברה אותו'), h('dd', {}, hardest[0] ? h('a', { href: `./#m-${hardest[0].i + 1}` }, `${hardest[0].m.title || `עצירה ${hardest[0].i + 1}`} · ${num(hardest[0].n)} מיתות`) : '–')),
         h('div', {}, h('dt', {}, 'יום השיא'), h('dd', {}, peak ? `${peak[0]}: ${num(peak[1] / 3600_000, 1)} שעות משחק` : '–')),
         h('div', {}, h('dt', {}, 'ימים בסאבתון'), h('dd', {}, days ? num(days) : '–')),
-        h('div', {}, h('dt', {}, 'אנחנו עכשיו ב'), h('dd', {}, missions[cur] ? h('a', { href: `./#m-${cur + 1}` }, `עצירה ${cur + 1}: ${missions[cur].title}`) : '–')),
+        h('div', {}, h('dt', {}, 'איפה אנחנו עכשיו'), h('dd', {}, missions[cur] ? h('a', { href: `./#m-${cur + 1}` }, `עצירה ${cur + 1}: ${missions[cur].title}`) : '–')),
       ),
     ),
     h('section', { class: 'sx-card' }, h('h2', {}, 'שעות משחק לפי יום'), bars(dayRows)),
