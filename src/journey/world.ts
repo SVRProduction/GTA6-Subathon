@@ -67,9 +67,11 @@ export function createWorld(stage: HTMLElement, onSize: (w: number, h: number) =
   let cam: Camera = { x: 0.5, y: 0.5, z: 1 };
   let free: Camera | null = null;
 
+  // גודל "לוגי" של המפה: כשבטלפון טוענים תמונה קטנה יותר, הקואורדינטות נשארות של המפה המלאה
+  let logical: { w: number; h: number } | null = null;
   img.addEventListener('load', () => {
-    W = img.naturalWidth;
-    H = img.naturalHeight;
+    W = logical?.w ?? img.naturalWidth;
+    H = logical?.h ?? img.naturalHeight;
     world.style.width = `${W}px`;
     world.style.height = `${H}px`;
     svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
@@ -92,7 +94,8 @@ export function createWorld(stage: HTMLElement, onSize: (w: number, h: number) =
     onSize(W, H);
   });
 
-  function setImage(url: string) {
+  function setImage(url: string, size?: { w: number; h: number }) {
+    logical = size ?? null;
     if (img.getAttribute('src') !== url) img.src = url;
   }
 
