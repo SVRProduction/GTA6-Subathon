@@ -74,7 +74,7 @@ html, body { background: transparent; overflow: hidden; }
 .tap .dotc { background: rgba(255, 255, 255, 0.92); box-shadow: 0 0 0 3px rgba(20, 17, 10, 0.6), 0 4px 14px rgba(0, 0, 0, 0.4); }
 
 /* ── מסך הסיום ── */
-.scrim-end { background: radial-gradient(ellipse 75% 60% at var(--cx) var(--cy), rgba(7, 11, 20, 0.42) 0%, rgba(7, 11, 20, 0) 100%), linear-gradient(180deg, rgba(7, 11, 20, 0.66) 0%, rgba(7, 11, 20, 0.44) 40%, rgba(7, 11, 20, 0.55) 72%, rgba(7, 11, 20, 0.86) 100%); }
+.scrim-end { background: radial-gradient(ellipse 75% 60% at var(--cx) var(--cy), rgba(7, 11, 20, 0.3) 0%, rgba(7, 11, 20, 0) 100%), linear-gradient(180deg, rgba(7, 11, 20, 0.42) 0%, rgba(7, 11, 20, 0.28) 40%, rgba(7, 11, 20, 0.4) 72%, rgba(7, 11, 20, 0.8) 100%); }
 .endcol { display: flex; flex-direction: column; align-items: center; justify-content: center; }
 .endhead { display: flex; align-items: center; justify-content: center; flex: none; }
 .endtitle { font-family: var(--display); font-weight: 700; line-height: 0.86; color: var(--white); }

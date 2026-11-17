@@ -16,7 +16,7 @@ const STEP = (-300 * STOPS) / GLIDE;
 // כרטיס הסקר, הקו אליו והתווית שבסוף המסלול מוסתרים: במבט הכללי הם יושבים מתחת לתג הלייב, ובהמשך הם ממילא מחוץ לפריים.
 // ה-HUD (מד העצירות ושעון המשחק) ותג הלייב הוורוד נשארים.
 const CSS = `${MAP_CSS}
-.mk--poll,.poll-line,.ahead-tag{display:none!important}
+.mk--poll,.poll-line,.ahead-tag,[data-odo-ms]{display:none!important}
 ${OPENING_OFF}`;
 
 // 9x16 בלבד: האתר לא מרשה למצלמה לרדת מתחת לקצה הדרומי של המפה, ולכן בחלון גבוה העצירות הדרומיות (1-9)

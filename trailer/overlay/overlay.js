@@ -265,7 +265,7 @@
           put(d, { op, anim: op < 1 });
         });
       };
-      const corner = V ? { left: S.x0, top: S.y0, fontSize: 27, padding: '7px 22px 8px' } : { right: W - S.x1, top: S.y0, fontSize: 25, padding: '6px 20px 7px' };
+      const corner = V ? { left: S.x0, top: S.y0, fontSize: 40, padding: '9px 28px 11px' } : { right: W - S.x1, top: S.y0, fontSize: 25, padding: '6px 20px 7px' };
       const isPhone = (n) => phoneScenes.some((s) => s.name === n);
       mk(DEMO_SCENES.filter((n) => !(beside && isPhone(n))), corner);
       if (beside) mk(DEMO_SCENES.filter(isPhone), { left: S.x0, top: P.y + 26, fontSize: 25, padding: '6px 14px 7px', fit: P.x - BEZEL - S.x0 - 6 });
@@ -291,7 +291,7 @@
         const k = f - s;
         const o = tout(f, e, 3);
         put(scrim, { op: clamp(tin(f, s, 3)) * (1 - o) });
-        let sc = lerp(1.5, 1, outBack(tp(f, s, 4), 1.4));
+        let sc = lerp(V ? 1.25 : 1.5, 1, outBack(tp(f, s, 4), 1.4));
         sc *= 1 + 0.035 * clamp((k - 4) / (e - s - 4)); // זחילה איטית בזמן ההחזקה
         for (const b of bumps) if (f >= b) sc *= 1 + 0.07 * Math.pow(1 - clamp((f - b) / 5), 2);
         sc *= 1 - 0.08 * o;
@@ -323,7 +323,7 @@
       reg(c.text, c.style, t, t);
       let sub = null;
       if (c.sub) {
-        const sf = fitText(c.sub, { family: 'Rubik', weight: 800, maxW: V ? SW - 2 * 34 - 10 : 1400, maxSize: V ? 46 : 50, maxLines: 1 });
+        const sf = fitText(c.sub, { family: 'Rubik', weight: 800, maxW: V ? SW - 2 * 34 - 10 : 1400, maxSize: V ? 52 : 50, maxLines: 1 });
         sub = el('div', 'subpill', box);
         css(sub, { padding: V ? '14px 34px 15px' : '13px 44px 14px', marginTop: V ? 40 : 26 });
         reg(c.sub, 'title-sub', textEl(sub, '', sf), sub);
@@ -439,7 +439,7 @@
 
     // ═══ kicker ═══
     function buildKicker(c, s, e) {
-      const size = V ? 42 : 40;
+      const size = V ? 52 : 40;
       const fit = fitText(c.text, { family: 'Rubik', weight: 800, maxW: SW - 2 * 34 - 40, maxSize: size, maxLines: 1 });
       const row = el('div', 'row', layers.caps);
       css(row, { left: S.x0, width: SW, top: V ? S.y0 + 64 : S.y0 });
@@ -598,7 +598,7 @@
           });
         } else {
           const padX = V ? 26 : 30;
-          const fit = fitText(ln.text, { family: 'Rubik', weight: 600, maxW: SW - 2 * padX - 16, maxSize: V ? 37 : 34, maxLines: 1 });
+          const fit = fitText(ln.text, { family: 'Rubik', weight: 600, maxW: SW - 2 * padX - 16, maxSize: V ? 37 : 50, maxLines: 1 });
           const p = el('div', 'endurl', col);
           css(p, { padding: V ? '9px 26px 10px' : '8px 30px 9px' });
           reg(ln.text, 'end-url', textEl(p, '', fit), p);
@@ -615,7 +615,7 @@
       const body = segs.length > 1 ? segs.slice(1).join(' · ') : E.ticker;
       const bar = el('div', 'ticker', layers.caps);
       css(bar, { left: S.x0, top: ty, width: SW, height: th });
-      const fs = V ? 40 : 36;
+      const fs = V ? 33 : 36;
       const tag = el('div', 'tk-tag', bar, `<span>${esc(tagText)}</span>`);
       css(tag, { zIndex: 2, fontSize: fs + 2, padding: V ? '0 26px 0 34px' : '0 30px 0 38px', clipPath: 'polygon(18px 0, 100% 0, 100% 100%, 0 100%)' });
       const tagW = tag.offsetWidth;
