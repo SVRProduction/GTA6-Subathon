@@ -170,13 +170,14 @@ export function createWorld(stage: HTMLElement, onSize: (w: number, h: number) =
   let pinchDist = 0;
   let history: Array<{ x: number; y: number; t: number }> = [];
   let glide = 0;
-  const minZ = () => fitZ() * 0.8;
+  // לא מתרחקים יותר מכל המפה על המסך (התרחקות מעבר לזה שברה את התצוגה)
+  const minZ = () => fitZ();
   // לא מתקרבים מעבר למה שיש לו פיקסלים אמיתיים (אחרת מטושטש)
   const maxZ = () => Math.max(fitZ() * 2.5, Math.min(fitZ() * 10, ((hdSets[hdSets.length - 1]?.set.w ?? W) / W) / devicePixelRatio));
 
   /** גבולות: מרכז המצלמה נשאר בתוך המפה */
   // בטיול חופשי מותר לצאת גם אל הים שמסביב למפה (עד שליש מפה לכל צד)
-  const ROAM = 0.35;
+  const ROAM = matchMedia('(pointer: coarse)').matches ? 0.12 : 0.35;
   const bound = (v: number, max: number) => Math.min(max * (1 + ROAM), Math.max(-max * ROAM, v));
   function soft(c: Camera): Camera {
     const { w, h } = view();

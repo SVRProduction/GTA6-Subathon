@@ -47,6 +47,12 @@ export function createPhone(opts: {
   // בפופאפ במפה: בתוך המכשיר רץ אותו הטלפון בדיוק (phone.html), כדי שיהיה טלפון אחד
   const frameBox = h('div', { class: 'phone__framebox' });
   let frame: HTMLIFrameElement | null = null;
+  // הטלפון (בתוך ה-iframe) מבקש לעבור למפה: סוגרים ומזיזים את המפה של האתר
+  addEventListener('message', (e) => {
+    if (e.origin !== location.origin || e.data?.type !== 'oded:map') return;
+    setOpen(false);
+    if (e.data.hash) location.hash = e.data.hash;
+  });
   const loadFrame = () => {
     if (frame) return;
     const demo = new URLSearchParams(location.search).has('demo') ? '&demo' : '';
@@ -96,7 +102,15 @@ export function createPhone(opts: {
       setTimeout(() => closeBtn.focus({ preventScroll: true }), 40);
     } else {
       phone.classList.remove('is-open');
-      setTimeout(() => !openState && (phone.hidden = true), 300);
+      setTimeout(() => {
+        if (openState) return;
+        phone.hidden = true;
+        // בטלפון: משחררים את הזיכרון של הטלפון הפנימי (ייטען מחדש בפתיחה הבאה)
+        if (frame && matchMedia('(pointer: coarse)').matches) {
+          frame.remove();
+          frame = null;
+        }
+      }, 300);
       if (location.hash === '#phone') history.replaceState(null, '', location.pathname + location.search);
       btn.focus({ preventScroll: true });
     }

@@ -565,7 +565,7 @@ function buildLamps(trail: ReturnType<typeof makeTrail> | null) {
   const out: SVGCircleElement[] = [];
   let seed = 7;
   const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-  const step = 46;
+  const step = lite ? 110 : 46; // בטלפון פחות פנסים
   for (let s = step; s < trail.total; s += step) {
     const a = trail.at(s - 2);
     const b = trail.at(s + 2);
@@ -797,7 +797,7 @@ q('[data-explore-close]').onclick = () => explore(false);
 
 // ── גלילה ← מצלמה: האתר לא נגלל; גלילה למעלה מקדמת במסע, גלילה למטה חוזרת ──
 const PX_WHEEL = 300; // כמה פיקסלים של גלגלת לכל עצירה
-const PX_TOUCH = 140; // כמה פיקסלים של גרירה לכל עצירה
+const PX_TOUCH = 120; // כמה פיקסלים של החלקה לכל עצירה
 const project = (v: number, d = 0.998) => ((v / 1000) * d) / (1 - d);
 const maxF = () => (data ? data.missions.length - 1 + 0.6 : 0);
 const clampF = (f: number) => Math.min(maxF(), Math.max(-1, f));
@@ -831,23 +831,39 @@ addEventListener(
   { passive: false },
 );
 
-// מגע: גוררים את המפה למטה כדי להתקדם (רואים את מה שמעל), למעלה כדי לחזור
-let touch: { id: number; y0: number; f0: number; moved: boolean; hist: Array<{ y: number; t: number }> } | null = null;
+// מגע: מחליקים ימינה כדי להתקדם (כמו לדפדף בעברית), שמאלה כדי לחזור. גרירה למעלה/למטה לא עושה כלום
+let touch: { id: number; y0: number; x0: number; f0: number; moved: boolean; hist: Array<{ y: number; t: number }> } | null = null;
+const fingers = new Set<number>();
 stage.addEventListener('pointerdown', (e) => {
-  if (e.pointerType === 'mouse' || flat || world.exploring() || inPanel(e.target)) return;
-  touch = { id: e.pointerId, y0: e.clientY, f0: focus, moved: false, hist: [{ y: e.clientY, t: performance.now() }] };
+  if (e.pointerType === 'mouse') return;
+  fingers.add(e.pointerId);
+  // שתי אצבעות (צביטה) – לא מזיזים את המסע
+  if (fingers.size > 1) {
+    touch = null;
+    return;
+  }
+  if (flat || world.exploring() || inPanel(e.target)) return;
+  touch = { id: e.pointerId, y0: e.clientY, x0: e.clientX, f0: focus, moved: false, hist: [{ y: e.clientX, t: performance.now() }] };
 });
 stage.addEventListener('pointermove', (e) => {
   if (!touch || e.pointerId !== touch.id) return;
+  const dx = e.clientX - touch.x0;
   const dy = e.clientY - touch.y0;
-  if (!touch.moved && Math.abs(dy) < 8) return; // סף קטן כדי שלחיצה על סיכה תישאר לחיצה
+  if (!touch.moved && Math.abs(dx) < 10) {
+    // גרירה אנכית ברורה – לא שלנו
+    if (Math.abs(dy) > 14) touch = null;
+    return;
+  }
   if (!touch.moved) stage.setPointerCapture(e.pointerId);
   touch.moved = true;
-  focus = clampF(touch.f0 + dy / PX_TOUCH);
+  focus = clampF(touch.f0 + dx / PX_TOUCH);
   shown = focus; // מעקב 1:1 אחרי האצבע
-  touch.hist.push({ y: e.clientY, t: performance.now() });
+  touch.hist.push({ y: e.clientX, t: performance.now() });
   if (touch.hist.length > 6) touch.hist.shift();
 });
+const lift = (e: PointerEvent) => fingers.delete(e.pointerId);
+stage.addEventListener('pointerup', lift);
+stage.addEventListener('pointercancel', lift);
 const endTouch = (e: PointerEvent) => {
   if (!touch || e.pointerId !== touch.id) return;
   if (touch.moved) {
@@ -855,7 +871,8 @@ const endTouch = (e: PointerEvent) => {
     const r = touch.hist.filter((p) => now - p.t < 100);
     const v = r.length > 1 ? ((r[r.length - 1].y - r[0].y) / Math.max(1, r[r.length - 1].t - r[0].t)) * 1000 : 0;
     // נוחתים על העצירה הקרובה לנקודה שהמומנטום מנבא
-    focus = snapF(clampF(focus + project(v) / PX_TOUCH));
+    // מומנטום מוגבל: החלקה מהירה מדלגת לכל היותר עצירה אחת נוספת
+    focus = snapF(clampF(focus + Math.max(-1.2, Math.min(1.2, project(v) / PX_TOUCH))));
   }
   touch = null;
 };
@@ -992,7 +1009,8 @@ function frame(force = false) {
   // הטיה (מבט רחפן): גדלה עם הכניסה למסע; שטוח במבט הפתיחה, בגרירה חופשית ובהפחתת תנועה
   const kNow = Math.min(1, Math.max(0, shown + 1));
   const easeT = kNow * kNow * (3 - 2 * kNow);
-  const tripTilt = vw <= 760 ? 30 : 40;
+  // בטלפון בלי הטיה בתלת-ממד: הטיה של שכבת מפה ענקית היא הדבר הכי כבד לכרטיס הגרפי
+  const tripTilt = lite ? 0 : vw <= 760 ? 30 : 40;
   const wantTilt = reduce || world.exploring() ? 0 : tripTilt * easeT;
   const settling = Math.abs(wantShift - panelShift) > 0.5 || Math.abs(wantTilt - tiltShown) > 0.05;
   if (!force && Math.abs(focus - shown) < 0.0004 && !world.exploring() && !settling) return;
@@ -1055,7 +1073,7 @@ function frame(force = false) {
     const depth = Math.pow(Math.min(1.25, Math.max(0.55, s.s)), 0.8);
     pin.style.transform = `translate3d(${s.x.toFixed(1)}px, ${s.y.toFixed(1)}px, 0) scale(${depth.toFixed(3)})`;
     pin.style.zIndex = String(Math.round(s.y));
-    pin.classList.toggle('pin--near', !world.exploring() && i === near && Math.abs(shown - i) < 0.45 && k >= 1);
+    pin.classList.toggle('pin--near', !world.exploring() && i === near && Math.abs(shown - i) < 0.45 && k >= 0.97);
     pin.classList.toggle('pin--flip', s.x < vw * 0.42);
     pin.hidden = s.x < -80 || s.y < -80 || s.x > vw + 80 || s.y > vh + 80;
   });
@@ -1206,11 +1224,14 @@ function setMap() {
   // ים מסביב: למפה המקורית יש קובץ מוכן; למפה שהועלתה – צבע הים מסביב
   world.setPad(!custom && padMeta ? `${import.meta.env.BASE_URL}${padMeta.pad}` : null, padMeta?.mx, padMeta?.my);
   const B = import.meta.env.BASE_URL;
-  const levels = !custom && padMeta?.hd ? [padMeta.hd.lite, wantHd ? padMeta.hd.full : null].filter((x): x is HdSet => !!x) : [];
+  // בטלפון: בלי אריחי HD בכלל – כל אריח הוא ~25MB בזיכרון אחרי פענוח, ובאייפון זה מקריס את הדף
+  const levels = !custom && padMeta?.hd && !lite ? [padMeta.hd.lite, wantHd ? padMeta.hd.full : null].filter((x): x is HdSet => !!x) : [];
   world.setHd(levels.map((x) => ({ ...x, tiles: x.tiles.map((u) => `${B}${u}`) })));
   // מים ועננים: רק למפה המקורית (יש לה מסכת ים)
-  if (!custom && padMeta?.sea && !water && !flat) water = createWater(world.tiltLayer, `${B}${padMeta.sea}`, lite);
-  world.setEdge(!custom && padMeta?.edge ? `${B}${padMeta.edge}` : null);
+  // מים מונפשים (WebGL): רק במחשב – בטלפון זה עוד שכבה ענקית שמצוירת כל פריים
+  if (!custom && padMeta?.sea && !water && !flat && !lite) water = createWater(world.tiltLayer, `${B}${padMeta.sea}`, lite);
+  // מסכת הקצוות על תמונה ענקית יקרה מאוד לציור מחדש – בטלפון בלעדיה
+  world.setEdge(!custom && padMeta?.edge && !lite ? `${B}${padMeta.edge}` : null);
   water?.show(!custom);
   if (!custom && padMeta?.sea && !life && !flat) {
     life = createLife(sky, world, `${B}${padMeta.sea}`, lite);
