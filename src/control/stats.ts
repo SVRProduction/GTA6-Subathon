@@ -1,4 +1,4 @@
-// חלון הסטטיסטיקות: כל המספרים של המסע – זמן משחק, מיתות, חתולים, מרקרים, סקרים וסטוריז,
+// חלון הסטטיסטיקות: כל המספרים של המסע – זמן משחק, מיתות, מעצרים, פישולים, מרקרים, סקרים וסטוריז,
 // קצב, שעות לפי יום, המשימות הקשות, ואיפה הכי הרבה מיתות על המפה.
 import { countOf, currentIndex, liveStories, MARKER_TYPES, playMs, statusFresh, type Data, type Extras, type LiveData, type MarkerType } from '../data/types';
 import { h } from '../dom';
@@ -47,7 +47,8 @@ export function statsView(d: Data, l: LiveData | null, ex: Extras | null, opts: 
   const ms = playMs(l);
   const hrs = ms / 3600_000;
   const deaths = countOf(l, 'deaths');
-  const cats = countOf(l, 'cats');
+  const arrests = countOf(l, 'arrests');
+  const fails = countOf(l, 'fails');
   const missions = d.missions;
   const milestones = missions.filter((m) => m.is_milestone).length;
   const markers = ex?.markers ?? [];
@@ -57,7 +58,7 @@ export function statsView(d: Data, l: LiveData | null, ex: Extras | null, opts: 
   const polls = (ex?.polls ?? []).filter((p) => p.status === 'closed');
   const votes = (ex?.polls ?? []).reduce((a, p) => a + p.votes.reduce((x, y) => x + y, 0), 0);
   const hardest = missions
-    .map((m, i) => ({ m, i, n: countOf(l, 'deaths', m.id), c: countOf(l, 'cats', m.id) }))
+    .map((m, i) => ({ m, i, n: countOf(l, 'deaths', m.id), c: countOf(l, 'arrests', m.id) }))
     .filter((x) => x.n > 0)
     .sort((a, b) => b.n - a.n || b.i - a.i)
     .slice(0, 5);
@@ -74,8 +75,9 @@ export function statsView(d: Data, l: LiveData | null, ex: Extras | null, opts: 
       'section',
       { class: 'sx-tiles', ariaLabel: 'המספרים הגדולים' },
       tile(fmtPlay(ms), playing ? 'שעות משחק · רץ עכשיו' : 'שעות משחק ב-GTA 6', `sx-tile--play ${playing ? 'is-live' : ''}`),
-      tile(num(deaths), 'מיתות', 'sx-tile--deaths'),
-      tile(num(cats), 'חתולים שנדרסו', 'sx-tile--cats'),
+      tile(num(deaths), 'כמה פעמים עודד מת', 'sx-tile--deaths'),
+      tile(num(arrests), 'כמה פעמים עודד נעצר', 'sx-tile--cats'),
+      tile(num(fails), 'משימות שעודד פישל'),
       tile(num(missions.length), 'עצירות'),
       tile(num(milestones), 'מיילסטונים'),
       tile(num(markers.length), 'מרקרים על המפה'),
@@ -91,7 +93,7 @@ export function statsView(d: Data, l: LiveData | null, ex: Extras | null, opts: 
         'dl',
         {},
         h('div', {}, h('dt', {}, 'מיתות לשעת משחק'), h('dd', {}, hrs > 0.05 ? num(deaths / hrs, 1) : '–')),
-        h('div', {}, h('dt', {}, 'חתולים לשעת משחק'), h('dd', {}, hrs > 0.05 ? num(cats / hrs, 2) : '–')),
+        h('div', {}, h('dt', {}, 'עודד מת בממוצע כל'), h('dd', {}, deaths && hrs > 0.05 ? `${Math.max(1, Math.round((hrs * 60) / deaths))} דק׳ משחק` : '–')),
         h('div', {}, h('dt', {}, 'משימות לשעה'), h('dd', {}, hrs > 0.05 ? num(missions.length / hrs, 1) : '–')),
         h('div', {}, h('dt', {}, 'החלטות של הצ׳אט'), h('dd', {}, num(polls.length))),
         h('div', { class: 'is-wide' }, h('dt', {}, 'אנחנו עכשיו ב'), h('dd', {}, missions[cur] ? link(`עצירה ${cur + 1}: ${missions[cur].title}`, () => opts.openStop(cur)) : '–')),

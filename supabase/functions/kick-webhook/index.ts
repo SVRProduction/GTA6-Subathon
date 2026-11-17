@@ -1,10 +1,14 @@
 // kick-webhook: Kick שולח לכאן כל הודעת צ'אט (chat.message.sent).
 // סקרים: כשיש סקר פתוח, כל צופה יכול לכתוב !1 / !2 / !3 / !4 – קול אחד לכל משתמש, הצבעה חוזרת מחליפה.
-// פקודות שסופרות (רק אתה או מודרטור):  !death / !מוות  ·  !cat / !חתול  ·  עם "-" בסוף = ביטול (‎!death-)
+// פקודות שסופרות (רק אתה או מודרטור):  !מת / !מוות  ·  !נעצר / !משטרה  ·  !נכשל / !פישל  ·  עם "-" בסוף = ביטול (‎!מת-)
 // הפונקציה צריכה לרוץ בלי בדיקת JWT של Supabase: supabase functions deploy kick-webhook --no-verify-jwt
 import { createClient } from 'npm:@supabase/supabase-js@2.45.4';
 
-const COMMANDS: Record<string, 'deaths' | 'cats'> = { death: 'deaths', 'מוות': 'deaths', 'מת': 'deaths', cat: 'cats', 'חתול': 'cats' };
+const COMMANDS: Record<string, 'deaths' | 'arrests' | 'fails'> = {
+  death: 'deaths', dead: 'deaths', 'מוות': 'deaths', 'מת': 'deaths',
+  busted: 'arrests', arrest: 'arrests', 'נעצר': 'arrests', 'משטרה': 'arrests', 'מעצר': 'arrests',
+  fail: 'fails', failed: 'fails', 'נכשל': 'fails', 'פישל': 'fails', 'כישלון': 'fails',
+};
 
 let keyCache: { key: CryptoKey; at: number } | null = null;
 /** המפתח הציבורי של Kick (לא שומרים קבוע בקוד: Kick יכולים להחליף אותו) */

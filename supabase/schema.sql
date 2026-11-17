@@ -154,7 +154,7 @@ create table if not exists public.play_segments (
 -- ספירות (מוות / חתולים): כל לחיצה היא שורה, כך שיש ביטול, היסטוריה וספירה לפי משימה
 create table if not exists public.counter_events (
   id bigint generated always as identity primary key,
-  counter text not null check (counter in ('deaths', 'cats')),
+  counter text not null check (counter in ('deaths', 'cats', 'arrests', 'fails')),
   delta integer not null check (delta in (-1, 1)),
   mission_id uuid,
   source text not null default 'button',
@@ -397,3 +397,5 @@ do $$ begin alter publication supabase_realtime add table public.markers; except
 do $$ begin alter publication supabase_realtime add table public.stories; exception when duplicate_object then null; end $$;
 do $$ begin alter publication supabase_realtime add table public.polls; exception when duplicate_object then null; end $$;
 do $$ begin alter publication supabase_realtime add table public.poll_votes; exception when duplicate_object then null; end $$;
+
+-- לייקים ועדכוני ספירות: ראה supabase/update-likes-counters.sql (חלק מההתקנה)

@@ -79,9 +79,11 @@ function readCounters(d: Data): CounterEvent[] {
   const out: CounterEvent[] = [];
   d.missions.forEach((m, i) => {
     const deaths = (i * 7 + 3) % 5 === 0 ? 3 : (i * 13) % 4 === 0 ? 1 : (i * 5) % 7 === 0 ? 2 : 0;
-    const cats = (i * 11) % 9 === 0 ? 1 : 0;
+    const arrests = (i * 11) % 9 === 0 ? 1 : 0;
+    const fails = (i * 5) % 11 === 0 ? 1 : 0;
     for (let k = 0; k < deaths; k++) out.push({ counter: 'deaths', delta: 1, mission_id: m.id, created_at: m.happened_at ?? new Date().toISOString() });
-    for (let k = 0; k < cats; k++) out.push({ counter: 'cats', delta: 1, mission_id: m.id, created_at: m.happened_at ?? new Date().toISOString() });
+    for (let k = 0; k < arrests; k++) out.push({ counter: 'arrests', delta: 1, mission_id: m.id, created_at: m.happened_at ?? new Date().toISOString() });
+    for (let k = 0; k < fails; k++) out.push({ counter: 'fails', delta: 1, mission_id: m.id, created_at: m.happened_at ?? new Date().toISOString() });
   });
   return out;
 }
@@ -172,6 +174,29 @@ function demoOwners() {
 
 // v2: איפוס המרקרים לכל מי שכבר ביקר (תחילת הסאבתון)
 const EXTRAS_KEY = `${KEY}-extras-v2`;
+// לייקים בדמו: כמה לייקים "של אחרים" כדי שהמיון לפי לייקים ייראה
+const LIKES_KEY = `${KEY}-likes-v1`;
+function readLikes(): Record<string, string[]> {
+  try {
+    const saved = localStorage.getItem(LIKES_KEY);
+    if (saved) return JSON.parse(saved) as Record<string, string[]>;
+  } catch {
+    /* חסום */
+  }
+  const out: Record<string, string[]> = {};
+  const fake = (n: number) => Array.from({ length: n }, (_, k) => `demo-fan-${k}`);
+  const d = (() => {
+    try {
+      return JSON.parse(localStorage.getItem(KEY) ?? 'null') as Data | null;
+    } catch {
+      return null;
+    }
+  })();
+  (d?.missions ?? []).forEach((m, i) => {
+    if (m.is_milestone) out[`stop:${m.id}`] = fake((i * 7) % 23);
+  });
+  return out;
+}
 const B = import.meta.env.BASE_URL;
 interface DemoExtras extends Extras {
   /** pollId → kick_user_id → אפשרות */
@@ -354,6 +379,28 @@ export function createDemoStore(): Store {
       who.push(viewer.kick_user_id);
       s.likes++;
       writeExtras(e);
+    },
+    async loadLikes() {
+      const out: Record<string, number> = {};
+      Object.entries(readLikes()).forEach(([k, who]) => (out[k] = who.length));
+      return out;
+    },
+    async myLikes(viewer) {
+      return Object.entries(readLikes()).filter(([, who]) => who.includes(viewer.kick_user_id)).map(([k]) => k);
+    },
+    async toggleLike(viewer, type, id) {
+      const all = readLikes();
+      const k = `${type}:${id}`;
+      const who = (all[k] ??= []);
+      const i = who.indexOf(viewer.kick_user_id);
+      if (i >= 0) who.splice(i, 1);
+      else who.push(viewer.kick_user_id);
+      try {
+        localStorage.setItem(LIKES_KEY, JSON.stringify(all));
+      } catch {
+        /* חסום */
+      }
+      return { liked: i < 0, n: who.length };
     },
     async moderateStory(id, action) {
       const e = readExtras(read());

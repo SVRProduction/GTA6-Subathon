@@ -13,6 +13,7 @@ export default defineConfig({
         overlay: resolve(__dirname, 'overlay.html'),
         phone: resolve(__dirname, 'phone.html'),
         phoneStats: resolve(__dirname, 'phone-stats.html'),
+        install: resolve(__dirname, 'install.html'),
       },
     },
   },

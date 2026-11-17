@@ -124,6 +124,7 @@ export function createSupabaseStore(url: string, key: string): Store {
       body: JSON.stringify({ token: viewer.token, action, ...payload }),
     });
     if (!r.ok) throw new Error((await r.json().catch(() => null))?.error ?? 'הפעולה לא הצליחה. נסו שוב.');
+    return r.json().catch(() => ({}));
   }
   /** תמונה לסטורי: מוקטנת ל-JPEG של עד 1080px לפני השליחה */
   async function toJpeg(file: File, max = 1080) {
@@ -181,6 +182,22 @@ export function createSupabaseStore(url: string, key: string): Store {
     },
     async likeStory(viewer, id) {
       await viewerCall(viewer, 'like', { story_id: id });
+    },
+    async loadLikes() {
+      const { data, error } = await sb.from('like_totals').select('target_type, target_id, n');
+      if (error) return {}; // לפני שהורץ עדכון הלייקים
+      const out: Record<string, number> = {};
+      (data ?? []).forEach((r: { target_type: string; target_id: string; n: number }) => (out[`${r.target_type}:${r.target_id}`] = r.n));
+      return out;
+    },
+    async myLikes(viewer) {
+      if (viewer.token === 'demo') return [];
+      const j = await viewerCall(viewer, 'my_likes', {}).catch(() => ({ likes: [] }));
+      return (j as { likes?: string[] }).likes ?? [];
+    },
+    async toggleLike(viewer, type, id) {
+      const j = (await viewerCall(viewer, 'toggle_like', { target_type: type, target_id: id })) as { liked?: boolean; n?: number };
+      return { liked: !!j.liked, n: Number(j.n ?? 0) };
     },
     async moderateStory(id, action) {
       if (action === 'delete') check(await sb.from('stories').delete().eq('id', id));

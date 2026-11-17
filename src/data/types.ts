@@ -55,7 +55,14 @@ export interface Segment {
   ended_at: string;
 }
 
-export type CounterName = 'deaths' | 'cats';
+/** cats נשאר רק בשביל היסטוריה – כבר לא מוצג */
+export type CounterName = 'deaths' | 'arrests' | 'fails' | 'cats';
+/** הספירות שמוצגות באתר: קל לספור, וקצת קומי */
+export const COUNTERS: Array<{ key: Exclude<CounterName, 'cats'>; emoji: string; short: string; long: string; cmd: string; feed: string }> = [
+  { key: 'deaths', emoji: '💀', short: 'מוות', long: 'כמה פעמים עודד מת', cmd: '!מת', feed: 'עודד מת' },
+  { key: 'arrests', emoji: '🚔', short: 'נעצר', long: 'כמה פעמים עודד נעצר', cmd: '!נעצר', feed: 'עודד נעצר' },
+  { key: 'fails', emoji: '❌', short: 'נכשל', long: 'משימות שעודד פישל', cmd: '!נכשל', feed: 'משימה נכשלה' },
+];
 export interface CounterEvent {
   counter: CounterName;
   delta: number;
@@ -76,6 +83,7 @@ export interface Clip {
 
 /** תגובה של צופה (מחובר עם Kick) על עצירה או על קליפ */
 export type CommentTarget = 'stop' | 'clip' | 'marker' | 'story';
+export type LikeTarget = 'stop' | 'clip' | 'story';
 export interface Comment {
   id: string;
   target_type: CommentTarget;
@@ -226,6 +234,12 @@ export interface Store {
   /** צופה: סטורי חדש (נכנס לתור האישור) ולייק */
   submitStory(viewer: Viewer, draft: StoryDraft): Promise<void>;
   likeStory(viewer: Viewer, id: string): Promise<void>;
+  /** לייקים לעצירות / קליפים / סטוריז: ספירה לכל "type:id" */
+  loadLikes(): Promise<Record<string, number>>;
+  /** מה הצופה עשה לו לייק ("type:id") */
+  myLikes(viewer: Viewer): Promise<string[]>;
+  /** לייק / ביטול; מחזיר את המצב והספירה החדשים */
+  toggleLike(viewer: Viewer, type: LikeTarget, id: string): Promise<{ liked: boolean; n: number }>;
   /** מוד: אישור / דחייה / מחיקה של סטורי */
   moderateStory(id: string, action: 'approve' | 'reject' | 'delete'): Promise<void>;
   /** מוד: סקרים */

@@ -1,5 +1,5 @@
 // kick-viewer: פעולות של צופה מחובר עם Kick (כרטיס חתום מ-kick-auth).
-// ‎POST { token, action: 'story' | 'like' | 'vote', ... }
+// ‎POST { token, action: 'story' | 'like' | 'vote' | 'toggle_like' | 'my_likes', ... }
 //   story: { image (JPEG base64, עד ~1.5MB), caption, mission_id?, x?, y? } → נשמר כ-pending עד אישור מוד
 //   like:  { story_id } → לייק אחד לכל משתמש
 //   vote:  { poll_id, option } → קול אחד לכל משתמש; הצבעה חוזרת מחליפה את הקודמת
@@ -91,6 +91,28 @@ Deno.serve(async (req) => {
     const { error } = await sb.rpc('like_story', { p_story: id, p_user: who.uid });
     if (error) return fail(error.message, 500);
     return ok();
+  }
+
+  // ── לייק / ביטול לייק לעצירה, מיילסטון, קליפ או סטורי ──
+  if (action === 'toggle_like') {
+    const type = String(input.target_type ?? '');
+    const id = String(input.target_id ?? '').slice(0, 80);
+    if (!['stop', 'clip', 'story'].includes(type) || !id) return fail('יעד לא תקין');
+    // הקליפים של Rockstar ביוטיוב (yt-…) לא נמצאים בטבלה
+    if (!(type === 'clip' && /^yt-[\w-]{6,20}$/.test(id))) {
+      const table = { stop: 'missions', clip: 'clips', story: 'stories' }[type]!;
+      const { data: t } = await sb.from(table).select('id').eq('id', id).maybeSingle();
+      if (!t) return fail('לא נמצא');
+    }
+    const { data, error } = await sb.rpc('toggle_like', { p_type: type, p_id: id, p_user: who.uid });
+    if (error) return fail(error.message, 500);
+    const row = Array.isArray(data) ? data[0] : data;
+    return ok({ liked: !!row?.liked, n: Number(row?.n ?? 0) });
+  }
+  if (action === 'my_likes') {
+    const { data, error } = await sb.rpc('my_likes', { p_user: who.uid });
+    if (error) return fail(error.message, 500);
+    return ok({ likes: (data ?? []).map((r: { target_type: string; target_id: string }) => `${r.target_type}:${r.target_id}`) });
   }
 
   // ── הצבעה בסקר ──

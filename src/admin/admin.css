@@ -222,7 +222,7 @@ dialog form { display: grid; gap: 18px; padding: 22px 22px 0; }
 
 /* ── ספירות (מוות / חתולים) ── */
 .live-line { margin: 0; font-size: 15px; padding: 8px 12px; border-radius: 10px; background: var(--paper-3); border: var(--hair); }
-.counters__row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.counters__row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
 .counter { display: grid; gap: 8px; }
 .big {
   display: grid; justify-items: center; gap: 4px; padding: 16px 10px; min-height: 150px; border-radius: 18px;

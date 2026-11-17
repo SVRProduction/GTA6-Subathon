@@ -1,11 +1,11 @@
 // Service Worker מינימלי: מעטפת האפליקציה עובדת גם בקליטה חלשה.
-// דפים: רשת קודם (תמיד הגרסה העדכנית), מטמון רק כשאין רשת.
+// דפים: רשת קודם, תמיד בבדיקה מול השרת (הגרסה העדכנית מיד), מטמון רק כשאין רשת.
 // קבצי קוד/פונטים/אייקונים: מהמטמון, ומתעדכנים ברקע. אריחי המפה הכבדים (map-hd-*) – רק מהרשת.
 // בקשות לשרתים אחרים (Supabase, Kick) לא נוגעים בהן.
-const CACHE = 'subathon-v7';
+const CACHE = 'subathon-v8';
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(['./', './phone.html', './manifest.webmanifest', './phone.webmanifest', './icons/icon-192.png'])).catch(() => {}));
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(['./', './phone.html', './install.html', './manifest.webmanifest', './phone.webmanifest', './icons/icon-192.png'])).catch(() => {}));
   self.skipWaiting();
 });
 self.addEventListener('activate', (e) => {
@@ -19,7 +19,8 @@ self.addEventListener('fetch', (e) => {
   if (/map-hd-|\.m3u8|\.ts$/.test(url.pathname)) return;
   if (req.mode === 'navigate') {
     e.respondWith(
-      fetch(req)
+      // no-cache: תמיד שואלים את השרת אם יש גרסה חדשה (בלי לחכות 10 דקות של מטמון הדפדפן)
+      fetch(req, { cache: 'no-cache' })
         .then((r) => {
           const copy = r.clone();
           caches.open(CACHE).then((c) => c.put(req, copy));

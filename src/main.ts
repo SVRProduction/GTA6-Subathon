@@ -197,8 +197,9 @@ function renderHud() {
   rail.hidden = chapters.length < 2;
 
   timeline.querySelectorAll('.timeline__tick').forEach((t) => t.remove());
-  // אין נקודת סיום: העצירה האחרונה לא בקצה הפס, ותמיד נשאר מקום להמשך
+  // הפס יחסי לכמות העצירות: כל עצירה במקום (i+1)/(n+1), כך שתמיד נשאר מקום אחד להמשך
   const n = Math.max(ms.length, 1);
+  const slot = (i: number) => (i + 1) / (ms.length + 1);
   // "פרופיל" לאורך התחתית: גובה לכל עצירה לפי החשיבות שלה (מיילסטון הכי גבוה)
   // גובה לכל עצירה לפי חשיבות, מוחלק (ממוצע נע) – גבעות רכות ולא שיניים, גם עם 70 עצירות
   const raw = ms.map((m) => (m.is_milestone ? 40 : m.kind === 'moment' ? 22 : 14));
@@ -215,21 +216,26 @@ function renderHud() {
     }
     return t / c;
   });
-  const xs = ms.map((_, i) => (i / n) * 1000);
-  let d = `M0 ${60 - (hs[0] ?? 10)}`;
-  for (let i = 1; i < ms.length; i++) {
-    const mx = (xs[i - 1] + xs[i]) / 2;
-    d += ` C${mx} ${60 - hs[i - 1]} ${mx} ${60 - hs[i]} ${xs[i]} ${60 - hs[i]}`;
+  const xs = ms.map((_, i) => slot(i) * 1000);
+  // מתחילים מהקרקע בקצה, ועולים בעדינות לעצירה הראשונה
+  let d = 'M0 54';
+  let px = 0;
+  let py = 54;
+  for (let i = 0; i < ms.length; i++) {
+    const mx = (px + xs[i]) / 2;
+    d += ` C${mx} ${py} ${mx} ${60 - hs[i]} ${xs[i]} ${60 - hs[i]}`;
+    px = xs[i];
+    py = 60 - hs[i];
   }
   q('[data-profile-line]').setAttribute('d', d);
   const lastX = xs[xs.length - 1] ?? 0;
-  const lastY = 60 - (hs[hs.length - 1] ?? 10);
+  const lastY = ms.length ? 60 - hs[hs.length - 1] : 54;
   q('[data-profile-fill]').setAttribute('d', `${d} L${lastX} 60 L0 60 Z`);
   q('[data-profile-ahead]').setAttribute('d', `M${lastX} ${lastY} L1000 ${lastY}`);
   ms.forEach((m, i) => {
     if (!m.is_milestone && i !== cur) return;
     const t = h('button', { type: 'button', class: `timeline__tick ${i === cur ? 'is-now' : ''}`, title: m.title, ariaLabel: m.title, onclick: () => goTo(i) });
-    t.style.insetInlineStart = `${(i / n) * 100}%`;
+    t.style.insetInlineStart = `${slot(i) * 100}%`;
     timeline.append(t);
   });
 
@@ -322,20 +328,20 @@ function clipComments(c: Clip) {
   return wrap;
 }
 
-/** שורת הנתונים של עצירה: מוות, חתולים, וכמה שעות שיחק עד אליה */
+/** שורת הנתונים של עצירה: מוות, מעצרים, וכמה שעות שיחק עד אליה */
 function stopStats(i: number) {
   const m = data.missions[i];
   if (!liveData || !m) return null;
   const d = countOf(liveData, 'deaths', m.id);
-  const c = countOf(liveData, 'cats', m.id);
+  const c = countOf(liveData, 'arrests', m.id);
   const until = m.happened_at ? Date.parse(m.happened_at) : Date.now();
   const hrs = playMs(liveData, i === cur ? Date.now() : until);
   const parts = [
     hrs > 60_000 ? h('span', {}, `⏱ ${fmtHours(hrs)} משחק עד כאן`) : null,
     h('span', {}, `💀 ${d}`),
-    h('span', {}, `🐈 ${c}`),
+    h('span', {}, `🚔 ${c}`),
   ];
-  return h('p', { class: 'stop__stats', ariaLabel: `${d} מיתות ו-${c} חתולים במשימה הזאת` }, ...parts);
+  return h('p', { class: 'stop__stats', ariaLabel: `${d} מיתות ו-${c} מעצרים במשימה הזאת` }, ...parts);
 }
 function stopClips(i: number) {
   const list = clipsByStop.get(i);
@@ -923,7 +929,7 @@ function frame(force = false) {
   q('[data-odo-day]').textContent = `יום ${m?.stream_day ?? 1}`;
   q('[data-odo-stop]').textContent = `משימה ${n ? idx + 1 : 0}`;
   q('[data-odo-ms]').textContent = `${data.missions.slice(0, idx + 1).filter((x) => x.is_milestone).length} מיילסטונים`;
-  const pct = Math.max(0, Math.min(1, shown / Math.max(n, 1)));
+  const pct = n ? Math.max(0, Math.min(1, (shown + 1) / (n + 1))) : 0;
   q('[data-progress-now]').style.insetInlineStart = `${pct * 100}%`;
   const firsts = (rail.dataset.firsts || '').split(',').map(Number);
   let ch = 0;

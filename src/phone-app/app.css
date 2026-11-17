@@ -51,6 +51,23 @@ img { display: block; max-width: 100%; }
 }
 .bar__live::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: #fff; animation: pulse 1.6s ease-out infinite; }
 .bar__live[hidden] { display: none; }
+.bar__name { font-size: 18px; font-weight: 800; white-space: nowrap; }
+.bar__brand, .bar__live, .bar__install { white-space: nowrap; }
+.bar__live, .bar__install { padding: 0 13px; font-size: 13px; }
+.bar__end { gap: 6px; }
+.bar__logo { font-size: 15px; letter-spacing: -0.02em; }
+/* כרטיס פתיחה כשעוד אין עצירות */
+.card--start { display: grid; gap: 6px; padding: 18px 16px; background: linear-gradient(var(--surface), var(--surface)) padding-box, var(--sun) border-box; border: 2px solid transparent; }
+.card--start h2 { font-size: 22px; font-weight: 900; line-height: 1.15; letter-spacing: -0.01em; }
+/* לייק */
+.like.is-liked { color: var(--pink); }
+.like.is-liked svg { fill: currentColor; }
+.pill.like.is-liked { background: #ffe3ec; }
+.st-actions .pill.like.is-liked { background: rgba(255, 255, 255, 0.92); color: var(--pink); }
+.reel__btn.like.is-liked { color: #ff4d86; }
+.reel__btn.like.is-liked svg { animation: pop 0.4s var(--spring); }
+/* טריילר ביוטיוב בפיד */
+.reel__yt { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
 /* כפתור התקנה (רק כשאפשר להתקין, ולא בתוך הטלפון שבאתר) */
 .bar__end { display: flex; align-items: center; gap: 8px; }
 .bar__install { display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border: 0; border-radius: 999px; background: var(--surface); color: var(--ink); font-weight: 700; font-size: 14px; box-shadow: var(--shadow-sm); }
