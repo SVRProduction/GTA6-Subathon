@@ -2,7 +2,8 @@
 // דפים: רשת קודם, תמיד בבדיקה מול השרת (הגרסה העדכנית מיד), מטמון רק כשאין רשת.
 // קבצי קוד/פונטים/אייקונים: מהמטמון, ומתעדכנים ברקע. אריחי המפה הכבדים (map-hd-*) – רק מהרשת.
 // בקשות לשרתים אחרים (Supabase, Kick) לא נוגעים בהן.
-const CACHE = 'subathon-v9';
+// התראות: סטורי חדש / משימה נגמרה (נשלחות מהפונקציה push-send).
+const CACHE = 'subathon-v10';
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(['./', './phone.html', './install.html', './manifest.webmanifest', './phone.webmanifest', './icons/icon-192.png', './icons/oded-96.png'])).catch(() => {}));
@@ -45,4 +46,42 @@ self.addEventListener('fetch', (e) => {
       ),
     );
   }
+});
+
+// ── התראות לטלפון ──
+self.addEventListener('push', (e) => {
+  let d = {};
+  try {
+    d = e.data ? e.data.json() : {};
+  } catch {
+    d = { body: e.data ? e.data.text() : '' };
+  }
+  e.waitUntil(
+    self.registration.showNotification(d.title || 'הסאבתון של עודד', {
+      body: d.body || '',
+      icon: './icons/oded-192.png',
+      badge: './icons/icon-192.png',
+      tag: d.tag || 'subathon',
+      renotify: true,
+      lang: 'he',
+      dir: 'rtl',
+      data: { url: d.url || './phone.html' },
+    }),
+  );
+});
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const url = new URL((e.notification.data && e.notification.data.url) || './phone.html', self.registration.scope).href;
+  e.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+      // אם האפליקציה כבר פתוחה – עוברים אליה ולקישור; אחרת פותחים חלון חדש
+      for (const c of list) {
+        if (c.url.startsWith(self.registration.scope) && 'focus' in c) {
+          c.navigate(url).catch(() => {});
+          return c.focus();
+        }
+      }
+      return self.clients.openWindow(url);
+    }),
+  );
 });
