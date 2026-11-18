@@ -454,6 +454,8 @@ kbd { display: inline-grid; place-items: center; min-width: 26px; height: 24px; 
   [data-tod='sunset'] .world > .tod__tint { background: linear-gradient(180deg, rgba(120, 50, 170, 0.32), rgba(240, 90, 140, 0.26) 45%, rgba(255, 140, 70, 0.24)); }
   [data-tod='night'] .world > .tod__tint { background: rgba(6, 10, 40, 0.58); }
   .lamps circle { mix-blend-mode: normal; filter: none; transition: none; }
+  /* בטלפון המפה לא יוצאת מהמסך (גבולות הגרירה), אז הגוון לא צריך לכסות ים רחוק: שכבה ענקית כבדה על הכרטיס הגרפי */
+  .world > .tod__tint { inset: 0; }
   .player.is-live i, .player__zz { animation: none; }
   .bubble { animation-duration: 4.5s; }
 }

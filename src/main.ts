@@ -1054,6 +1054,13 @@ window.addEventListener('oded:fx', (e) => {
 
 let last = performance.now();
 let lastFreeKey = '';
+let openRect: DOMRect | null = null;
+let lastHudKey = '';
+/** כותבים סגנון רק כשהערך באמת השתנה (כתיבה של אותו ערך עדיין מסמנת את האלמנט לחישוב מחדש) */
+function setStyle(el: HTMLElement | SVGElement, prop: string, v: string) {
+  const st = el.style as unknown as Record<string, string>;
+  if (st[prop] !== v) st[prop] = v;
+}
 function frame(force = false) {
   if (!curve || !data) return;
   const now = performance.now();
@@ -1091,7 +1098,9 @@ function frame(force = false) {
   // מבט הפתיחה: כל המפה, בשטח שהכרטיס של הפתיחה לא מכסה (לידו בדסקטופ, מעליו בטלפון)
   const mobile = vw <= 760;
   // מבט הפתיחה: כל המפה בשטח שכרטיס הפתיחה לא מכסה (לידו בדסקטופ, מעליו בטלפון); הים ממלא את השאר
-  const op = opening.getBoundingClientRect();
+  // הכרטיס של הפתיחה: נמדד רק כשהוא על המסך (מדידה בכל פריים אילצה חישוב פריסה מחדש)
+  if (opening.style.visibility !== 'hidden' || !openRect) openRect = opening.getBoundingClientRect();
+  const op = openRect;
   const free = mobile ? { x0: 0, x1: vw, y0: 0, y1: Math.max(vh * 0.45, op.top - 8) } : { x0: op.right + 16, x1: vw, y0: 0, y1: vh };
   const overZ = Math.min((free.x1 - free.x0) / w, (free.y1 - free.y0) / hh) * 0.94;
   const overX = w / 2 - ((free.x0 + free.x1) / 2 - vw / 2) / overZ;
@@ -1117,28 +1126,35 @@ function frame(force = false) {
   world.apply();
 
   // הפתיחה נעלמת כשנכנסים למסלול, וה-HUD מופיע
-  hud.classList.toggle('is-on', k > 0.55);
-  stage.classList.toggle('is-overview', k < 0.5);
-  opening.style.opacity = String(Math.max(0, 1 - k * 2.2));
-  opening.style.visibility = k > 0.45 ? 'hidden' : '';
+  if (hud.classList.contains('is-on') !== k > 0.55) hud.classList.toggle('is-on', k > 0.55);
+  if (stage.classList.contains('is-overview') !== k < 0.5) stage.classList.toggle('is-overview', k < 0.5);
+  setStyle(opening, 'opacity', String(Math.max(0, 1 - k * 2.2)));
+  setStyle(opening, 'visibility', k > 0.45 ? 'hidden' : '');
 
   // המסלול נמתח עם הגלילה עד העצירה הנוכחית
   const sNow = cur >= 0 ? curve.stopS[cur] : 0;
   const reveal = sNow > 0 ? Math.min(1, Math.max(0, curve.sOf(Math.max(0, shown)) / sNow)) : 1;
   const off = String(1 - Math.max(reveal * k, 0.0001));
-  routeDone.style.strokeDashoffset = off;
-  routeCasing.style.strokeDashoffset = off;
+  setStyle(routeDone, 'strokeDashoffset', off);
+  setStyle(routeCasing, 'strokeDashoffset', off);
 
   const near = Math.round(shown);
   pins.forEach((pin, i) => {
     const s = world.project(curve!.stops[i]);
+    // סיכה מחוץ למסך: רק מסתירים, בלי לחשב לה מיקום (חוסך עבודה בכל פריים של גרירה)
+    const out = s.x < -80 || s.y < -80 || s.x > vw + 80 || s.y > vh + 80;
+    if (pin.hidden !== out) pin.hidden = out;
+    if (out) return;
     // רחוק = קטן יותר (עומק), קרוב = קצת גדול
     const depth = Math.pow(Math.min(1.25, Math.max(0.55, s.s)), 0.8);
     pin.style.transform = `translate3d(${s.x.toFixed(1)}px, ${s.y.toFixed(1)}px, 0) scale(${depth.toFixed(3)})`;
-    pin.style.zIndex = String(Math.round(s.y));
-    pin.classList.toggle('pin--near', !world.exploring() && i === near && Math.abs(shown - i) < 0.45 && k >= 0.97);
-    pin.classList.toggle('pin--flip', s.x < vw * 0.42);
-    pin.hidden = s.x < -80 || s.y < -80 || s.x > vw + 80 || s.y > vh + 80;
+    // סדר הערימה משתנה רק כשהסדר בין הסיכות משתנה – כתיבה בכל פריים גרמה לחישוב סגנונות מחדש
+    const zi = String(Math.round(s.y / 8));
+    if (pin.style.zIndex !== zi) pin.style.zIndex = zi;
+    const nearOn = !world.exploring() && i === near && Math.abs(shown - i) < 0.45 && k >= 0.97;
+    if (pin.classList.contains('pin--near') !== nearOn) pin.classList.toggle('pin--near', nearOn);
+    const flip = s.x < vw * 0.42;
+    if (pin.classList.contains('pin--flip') !== flip) pin.classList.toggle('pin--flip', flip);
   });
   // כמו ביומן מסע: בדסקטופ הפאנל צמוד לצד ומתעדכן לבד לעצירה הקרובה
   if (!mobile && !world.exploring()) {
@@ -1189,18 +1205,23 @@ function frame(force = false) {
   // HUD
   const idx = Math.max(0, Math.min(n - 1, near));
   const m = data.missions[idx];
-  q('[data-odo-day]').textContent = `יום ${m?.stream_day ?? 1}`;
-  q('[data-odo-stop]').textContent = `משימה ${n ? idx + 1 : 0}`;
-  const ms = data.missions.slice(0, idx + 1).filter((x) => x.is_milestone).length;
-  q('[data-odo-ms]').textContent = ms === 1 ? 'מיילסטון 1' : `${ms} מיילסטונים`;
+  // ה-HUD מתעדכן רק כשהעצירה הקרובה משתנה
+  const hudKey = `${idx}|${n}|${m?.stream_day}`;
+  if (hudKey !== lastHudKey) {
+    lastHudKey = hudKey;
+    q('[data-odo-day]').textContent = `יום ${m?.stream_day ?? 1}`;
+    q('[data-odo-stop]').textContent = `משימה ${n ? idx + 1 : 0}`;
+    const ms = data.missions.slice(0, idx + 1).filter((x) => x.is_milestone).length;
+    q('[data-odo-ms]').textContent = ms === 1 ? 'מיילסטון 1' : `${ms} מיילסטונים`;
+    const firsts = (rail.dataset.firsts || '').split(',').map(Number);
+    let ch = 0;
+    firsts.forEach((f, j) => {
+      if (idx >= f) ch = j;
+    });
+    rail.querySelectorAll('button').forEach((b, j) => b.toggleAttribute('aria-current', j === ch));
+  }
   const pct = n ? Math.max(0, Math.min(1, (shown + 1) / (n + 1))) : 0;
-  q('[data-progress-now]').style.insetInlineStart = `${pct * 100}%`;
-  const firsts = (rail.dataset.firsts || '').split(',').map(Number);
-  let ch = 0;
-  firsts.forEach((f, j) => {
-    if (idx >= f) ch = j;
-  });
-  rail.querySelectorAll('button').forEach((b, j) => b.toggleAttribute('aria-current', j === ch));
+  setStyle(q('[data-progress-now]'), 'insetInlineStart', `${(pct * 100).toFixed(2)}%`);
 
   const c = world.camera();
   locView.setAttribute('x', String(c.x - vw / 2 / c.z));
