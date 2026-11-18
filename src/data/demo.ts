@@ -450,13 +450,13 @@ export function createDemoStore(): Store {
       commentListeners.add(f as any);
       return () => commentListeners.delete(f as any);
     },
-    async postComment(viewer, target, targetId, body) {
+    async postComment(viewer, target, targetId, body, parentId) {
       const text = body.trim().slice(0, 500);
       if (!text) throw new Error('אי אפשר לשלוח תגובה ריקה');
       if (Date.now() - lastPost < 15_000) throw new Error('רגע, אפשר להגיב פעם ב-15 שניות');
       lastPost = Date.now();
       const all = readComments(read());
-      all.push({ id: crypto.randomUUID(), target_type: target, target_id: targetId, kick_user_id: viewer.kick_user_id, username: viewer.username, avatar: viewer.avatar, body: text, created_at: new Date().toISOString(), hidden: false });
+      all.push({ id: crypto.randomUUID(), target_type: target, target_id: targetId, kick_user_id: viewer.kick_user_id, username: viewer.username, avatar: viewer.avatar, body: text, created_at: new Date().toISOString(), hidden: false, parent_id: parentId ?? null });
       writeComments(all);
     },
     async moderateComment(id, action) {

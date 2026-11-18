@@ -94,6 +94,8 @@ export interface Comment {
   body: string;
   created_at: string;
   hidden?: boolean;
+  /** תגובה לתגובה: ה-id של התגובה הראשית (רמה אחת) */
+  parent_id?: string | null;
 }
 /** מי שמחובר עם Kick (נשמר בדפדפן; הכרטיס חתום בשרת) */
 export interface Viewer {
@@ -219,7 +221,7 @@ export interface Store {
   /** תגובות: כולם קוראים; כותבים רק מחוברים עם Kick (דרך הפונקציה kick-comment) */
   loadComments(includeHidden?: boolean): Promise<Comment[]>;
   subscribeComments(cb: (c: Comment[]) => void, includeHidden?: boolean): () => void;
-  postComment(viewer: Viewer, target: CommentTarget, targetId: string, body: string): Promise<void>;
+  postComment(viewer: Viewer, target: CommentTarget, targetId: string, body: string, parentId?: string | null): Promise<void>;
   /** אדמין: הסתרה/החזרה, מחיקה, חסימת משתמש */
   moderateComment(id: string, action: 'hide' | 'show' | 'delete'): Promise<void>;
   banUser(kickUserId: string, username: string): Promise<void>;

@@ -523,6 +523,15 @@ details[open] .log__chev { transform: rotate(-90deg); }
 .cmts__input:focus { outline: none; box-shadow: 3px 3px 0 var(--red); }
 .cmts__bar { grid-column: 2; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .cmts__who { margin-inline-end: auto; font-size: 13px; color: var(--ink-mute); }
+/* תגובה לתגובה: מוזחת מתחת לתגובה הראשית, קצת קטנה יותר */
+.cmt--reply { margin-inline-start: 34px; }
+.cmt--reply .cmt__pic { width: 28px; height: 28px; }
+.cmt .cmt__reply { justify-self: start; margin-top: 2px; font-size: 12px; text-decoration: none; opacity: 0.75; cursor: pointer; }
+.cmt .cmt__reply:hover { opacity: 1; text-decoration: underline; }
+.cmts__replying { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0; padding: 6px 12px; border-radius: 10px; font-size: 13px; }
+.cmts__replying-x { width: 28px; height: 28px; border: 0; border-radius: 50%; background: none; color: inherit; font-size: 14px; cursor: pointer; }
+.cmts__replying { background: rgba(0,0,0,0.06); }
+
 .cmts__count { font: 400 12px/1 var(--stamp); color: var(--red); }
 .linkish { padding: 0; border: 0; background: none; color: inherit; text-decoration: underline; text-underline-offset: 3px; font: inherit; cursor: pointer; }
 .btn--kick { background: #53fc18; color: #0b0e0f; justify-self: start; }
