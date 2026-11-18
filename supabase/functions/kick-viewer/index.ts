@@ -98,8 +98,8 @@ Deno.serve(async (req) => {
     const type = String(input.target_type ?? '');
     const id = String(input.target_id ?? '').slice(0, 80);
     if (!['stop', 'clip', 'story'].includes(type) || !id) return fail('יעד לא תקין');
-    // הקליפים של Rockstar ביוטיוב (yt-…) לא נמצאים בטבלה
-    if (!(type === 'clip' && /^yt-[\w-]{6,20}$/.test(id))) {
+    // הקליפים של Rockstar ביוטיוב (yt-…) והקליפים הנבחרים מהערוץ ב-Kick (clip_…) לא נמצאים בטבלה
+    if (!(type === 'clip' && /^(yt-[\w-]{6,20}|clip_[A-Z0-9]{20,32})$/.test(id))) {
       const table = { stop: 'missions', clip: 'clips', story: 'stories' }[type]!;
       const { data: t } = await sb.from(table).select('id').eq('id', id).maybeSingle();
       if (!t) return fail('לא נמצא');

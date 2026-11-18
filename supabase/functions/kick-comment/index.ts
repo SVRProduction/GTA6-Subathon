@@ -56,8 +56,8 @@ Deno.serve(async (req) => {
 
   // היעד קיים?
   const table = { stop: 'missions', clip: 'clips', marker: 'markers', story: 'stories' }[type];
-  // הטריילרים של Rockstar בפיד הקליפים (yt-…) לא נמצאים בטבלה
-  const exists = type === 'clip' && /^yt-[\w-]{6,20}$/.test(target) ? true : (await sb.from(table).select('id').eq('id', target).maybeSingle()).data;
+  // הטריילרים של Rockstar (yt-…) והקליפים הנבחרים מהערוץ ב-Kick (clip_…) לא נמצאים בטבלה
+  const exists = type === 'clip' && /^(yt-[\w-]{6,20}|clip_[A-Z0-9]{20,32})$/.test(target) ? true : (await sb.from(table).select('id').eq('id', target).maybeSingle()).data;
   if (!exists) return fail('העצירה או הקליפ לא נמצאו');
 
   const { error } = await sb.from('comments').insert({

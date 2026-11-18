@@ -151,7 +151,15 @@ function allClips(): Clip[] {
   const seen = new Set(lv.map((x) => x.c.id));
   const ch = channelClips.filter((c) => !seen.has(c.id)).map((c, k) => ({ c, s: likesOf('clip', c.id) - 0.2 - k * 0.01 }));
   const yt = GTA_CLIPS.map((c, k) => ({ c, s: likesOf('clip', c.id) - 0.5 - k * 0.01 }));
-  return [...lv, ...ch, ...yt].sort((a, b) => b.s - a.s).map((x) => x.c);
+  // הטריילרים של GTA משולבים בתוך הפיד: אחרי הקליפ הראשון ואז אחד כל 3 קליפים (בסוף הרשימה הם נקברו מתחת לקליפים מהלייב)
+  const base = [...lv.sort((a, b) => b.s - a.s), ...ch.sort((a, b) => b.s - a.s)];
+  const ytQ = yt.sort((a, b) => b.s - a.s);
+  const out: typeof base = [];
+  base.forEach((x, i) => {
+    out.push(x);
+    if ((i === 0 || i % 3 === 0) && ytQ.length) out.push(ytQ.shift()!);
+  });
+  return [...out, ...ytQ].map((x) => x.c);
 }
 const isLive = () => !!data && !!live && (statusFresh(live.status) ? !!live.status?.is_live : data.settings.is_live);
 const onGame = () => !!live && statusFresh(live.status) && !!live.status?.on_category;
