@@ -1,5 +1,6 @@
 // גרסה 4 · Stories – האתר כאפליקציה לטלפון: בית עם סטוריז, מפה, פיד קליפים ומספרים.
 // המפה והמספרים הם הדפים הקיימים (index.html?embed / phone-stats.html) בתוך הטאבים, כך שהמנוע לא משוכפל.
+import { initPush } from './push';
 import { ChartColumnBig, Clapperboard, ExternalLink, Heart, House, Map as MapIco, MapPin, MessageCircle, Play, Share2, Volume2, VolumeX, X, createElement, type IconNode } from 'lucide';
 import { getViewer, login, loginError, onViewer } from '../auth';
 import { playClip } from '../clips';
@@ -595,6 +596,8 @@ const installBtn = $<HTMLButtonElement>('[data-install]');
 installBtn.hidden = inapp || standalone;
 // עמוד הסבר פשוט (עם כפתור "להתקין עכשיו" כשהדפדפן מאפשר)
 installBtn.onclick = () => (location.href = `${B}install.html`);
+// 🔔 התראות על סטורי חדש ומשימה שנגמרה (בתוך הטלפון שבאתר – לא; שם זו לא אפליקציה)
+if (!inapp) initPush($<HTMLButtonElement>('[data-push]'), { toast, installUrl: `${B}install.html` });
 
 // ══════════════ בית ══════════════
 const home = $('#view-home');

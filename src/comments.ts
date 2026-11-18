@@ -43,20 +43,36 @@ export function commentsBox(store: Store, type: CommentTarget, id: string, opts:
   const head = h('h3', { class: 'cmts__title stamp' });
   const foot = h('div', { class: 'cmts__foot' });
   let draft = '';
+  /** תגובה שעונים לה עכשיו (null = תגובה רגילה) */
+  let replyTo: Comment | null = null;
+
+  function row(c: Comment, isReply: boolean) {
+    const reply = h('button', { class: 'cmt__reply linkish', type: 'button' }, 'להגיב');
+    reply.onclick = () => {
+      replyTo = c;
+      renderFoot();
+      foot.querySelector<HTMLTextAreaElement>('textarea')?.focus();
+    };
+    return h(
+      'li',
+      { class: `cmt${isReply ? ' cmt--reply' : ''}` },
+      avatar(c),
+      h('div', { class: 'cmt__main' }, h('p', { class: 'cmt__meta' }, h('strong', {}, c.username), h('span', {}, ago(c.created_at))), h('p', { class: 'cmt__body' }, c.body), reply),
+    );
+  }
 
   function renderList() {
     const items = commentsFor(type, id);
     head.textContent = items.length ? `תגובות (${items.length})` : 'תגובות';
-    list.replaceChildren(
-      ...items.map((c) =>
-        h(
-          'li',
-          { class: 'cmt' },
-          avatar(c),
-          h('div', { class: 'cmt__main' }, h('p', { class: 'cmt__meta' }, h('strong', {}, c.username), h('span', {}, ago(c.created_at))), h('p', { class: 'cmt__body' }, c.body)),
-        ),
-      ),
-    );
+    // תגובות ראשיות לפי הסדר, וכל התשובות שלהן מוזחות מתחתן (תשובה שהתגובה שלה הוסתרה מוצגת כרגילה)
+    const ids = new Set(items.map((c) => c.id));
+    const isTop = (c: Comment) => !c.parent_id || !ids.has(c.parent_id);
+    const rows: HTMLElement[] = [];
+    for (const c of items.filter(isTop)) {
+      rows.push(row(c, false));
+      for (const r of items.filter((x) => x.parent_id === c.id)) rows.push(row(r, true));
+    }
+    list.replaceChildren(...rows);
     if (!items.length) list.append(h('li', { class: 'cmts__empty' }, 'עוד אין תגובות. מה חשבתם על הקטע?'));
   }
 
@@ -68,7 +84,13 @@ export function commentsBox(store: Store, type: CommentTarget, id: string, opts:
       foot.replaceChildren(btn);
       return;
     }
-    const ta = h('textarea', { class: 'cmts__input', rows: 2, maxLength: 500, placeholder: 'כתבו תגובה…', value: draft, ariaLabel: 'תגובה' });
+    const ta = h('textarea', { class: 'cmts__input', rows: 2, maxLength: 500, placeholder: replyTo ? `תשובה ל-${replyTo.username}…` : 'כתבו תגובה…', value: draft, ariaLabel: 'תגובה' });
+    const cancel = h('button', { class: 'cmts__replying-x', type: 'button', ariaLabel: 'ביטול התשובה' }, '✕');
+    cancel.onclick = () => {
+      replyTo = null;
+      renderFoot();
+    };
+    const replying = replyTo ? h('p', { class: 'cmts__replying' }, h('span', {}, 'מגיבים ל-', h('strong', {}, `@${replyTo.username}`)), cancel) : null;
     const count = h('span', { class: 'cmts__count' }, '');
     const send = h('button', { class: 'btn btn--primary btn--small', type: 'submit' }, 'שליחה');
     const sync = () => {
@@ -87,6 +109,7 @@ export function commentsBox(store: Store, type: CommentTarget, id: string, opts:
     const form = h(
       'form',
       { class: 'cmts__form' },
+      replying,
       avatar(v),
       ta,
       h('div', { class: 'cmts__bar' }, h('span', { class: 'cmts__who' }, `מחובר כ-${v.username} · `, h('button', { class: 'linkish', type: 'button', onclick: () => logout() }, 'התנתקות')), count, send),
@@ -96,9 +119,14 @@ export function commentsBox(store: Store, type: CommentTarget, id: string, opts:
       if (!ta.value.trim()) return;
       send.disabled = true;
       try {
-        await store.postComment(v, type, id, ta.value);
+        await store.postComment(v, type, id, ta.value, replyTo?.id ?? null);
         draft = '';
         ta.value = '';
+        if (replyTo) {
+          replyTo = null;
+          renderFoot();
+          return;
+        }
         sync();
       } catch (err) {
         opts.toast((err as Error).message);

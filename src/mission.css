@@ -360,6 +360,8 @@ kbd { display: inline-grid; place-items: center; min-width: 26px; height: 24px; 
 .msec .cmts { border-top: 0; padding-top: 0; }
 /* תיבת התגובה באתר: שום דבר לא נדחף החוצה */
 .cmts__form > *, .cmts__bar > *, .cmt__main { min-width: 0; }
+.cmts__replying { background: rgba(255, 255, 255, 0.06); color: var(--m-txt); }
+.cmts__replying strong, .cmt__reply { color: var(--m-gold); }
 .cmt__body { overflow-wrap: anywhere; }
 
 /* ── הדמות של עודד (הסמן "אנחנו כאן") ── */

@@ -230,11 +230,11 @@ export function createSupabaseStore(url: string, key: string): Store {
         sb.removeChannel(ch);
       };
     },
-    async postComment(viewer, target, targetId, body) {
+    async postComment(viewer, target, targetId, body, parentId) {
       const r = await fetch(fn('kick-comment'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', apikey: key },
-        body: JSON.stringify({ token: viewer.token, target_type: target, target_id: targetId, body }),
+        body: JSON.stringify({ token: viewer.token, target_type: target, target_id: targetId, body, ...(parentId ? { parent_id: parentId } : {}) }),
       });
       if (!r.ok) throw new Error((await r.json().catch(() => null))?.error ?? 'התגובה לא נשלחה. נסו שוב.');
     },

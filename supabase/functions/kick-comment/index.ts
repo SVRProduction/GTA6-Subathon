@@ -1,5 +1,5 @@
 // kick-comment: שליחת תגובה של צופה מחובר עם Kick.
-// ‎POST { token, target_type: 'stop'|'clip', target_id, body }
+// ‎POST { token, target_type: 'stop'|'clip'|'marker'|'story', target_id, body, parent_id? }  (parent_id = תגובה לתגובה)
 // בודק: כרטיס חתום (kick-auth), חסימה, קצב (אחת ל-15 שניות, עד 30 בשעה), אורך (עד 500), ושהיעד קיים.
 // סודות: SESSION_SECRET. פריסה: supabase functions deploy kick-comment --no-verify-jwt
 import { createClient } from 'npm:@supabase/supabase-js@2.45.4';
@@ -29,7 +29,7 @@ Deno.serve(async (req) => {
   const secret = Deno.env.get('SESSION_SECRET');
   if (!secret) return fail('השרת לא מוגדר (SESSION_SECRET)', 500);
 
-  let input: { token?: string; target_type?: string; target_id?: string; body?: string };
+  let input: { token?: string; target_type?: string; target_id?: string; body?: string; parent_id?: string };
   try {
     input = await req.json();
   } catch {
@@ -60,6 +60,14 @@ Deno.serve(async (req) => {
   const exists = type === 'clip' && /^(yt-[\w-]{6,20}|clip_[A-Z0-9]{20,32})$/.test(target) ? true : (await sb.from(table).select('id').eq('id', target).maybeSingle()).data;
   if (!exists) return fail('העצירה או הקליפ לא נמצאו');
 
+  // תגובה לתגובה: רמה אחת בלבד. מגיבים לתגובה שהיא עצמה תשובה – נשמר תחת התגובה הראשית שלה
+  let parent: string | null = null;
+  if (input.parent_id) {
+    const { data: p } = await sb.from('comments').select('id, parent_id, target_type, target_id, hidden').eq('id', String(input.parent_id).slice(0, 40)).maybeSingle();
+    if (!p || p.hidden || p.target_type !== type || p.target_id !== target) return fail('התגובה שעניתם לה לא נמצאה');
+    parent = p.parent_id ?? p.id;
+  }
+
   const { error } = await sb.from('comments').insert({
     target_type: type,
     target_id: target,
@@ -67,6 +75,7 @@ Deno.serve(async (req) => {
     username: String(who.name).slice(0, 40),
     avatar: who.pic && /^https:\/\//.test(who.pic) ? who.pic : null,
     body,
+    ...(parent ? { parent_id: parent } : {}),
   });
   if (error) return fail(error.message, 500);
   return Response.json({ ok: true }, { headers: CORS });
