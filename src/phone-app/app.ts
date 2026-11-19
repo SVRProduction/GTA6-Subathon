@@ -3,7 +3,7 @@
 import { initPush } from './push';
 import { ChartColumnBig, Clapperboard, ExternalLink, Heart, House, Map as MapIco, MapPin, MessageCircle, Play, Share2, Volume2, VolumeX, X, createElement, type IconNode } from 'lucide';
 import { getViewer, login, loginError, onViewer } from '../auth';
-import { playClip } from '../clips';
+import { playClip, stopClipThumb } from '../clips';
 import { commentCount, commentsBox, initComments } from '../comments';
 import { createStore } from '../data/store';
 import { COUNTERS, countOf, currentIndex, kickSlug, playMs, statusFresh, type Clip, type Data, type LikeTarget, type LiveData, type Mission } from '../data/types';
@@ -228,10 +228,10 @@ function withPin(bg: HTMLElement) {
   } else pin.hidden = true;
   return [bg, pin];
 }
-/** רקע של עצירה: התמונה מהקטע אם יש, אחרת המפה במקום שלה */
+/** רקע של עצירה: התמונה מהקטע אם יש, אחרת התמונה של קליפ מאותה עצירה, אחרת המפה במקום שלה */
 function stopBg(i: number, w: number, hgt: number, span?: number): HTMLElement {
   const m = data!.missions[i];
-  const img = safeUrl(m?.image_url);
+  const img = safeUrl(m?.image_url) ?? stopClipThumb(i, data!.missions, live);
   return img ? h('img', { className: 'snap', src: img, alt: '' }) : snapshot(i, w, hgt, span);
 }
 
