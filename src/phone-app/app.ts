@@ -9,6 +9,7 @@ import { createStore } from '../data/store';
 import { COUNTERS, countOf, currentIndex, kickSlug, playMs, statusFresh, type Clip, type Data, type LikeTarget, type LiveData, type Mission } from '../data/types';
 import { fill, h, safeUrl } from '../dom';
 import { videoEmbed } from '../journey/content';
+import { hasVodRange, playVodRange } from '../kickVod';
 import { makeTrail, placeAll, type Pt } from '../journey/route';
 import { fmtPlay } from '../live';
 
@@ -425,7 +426,7 @@ function renderSlide() {
   const actions = h(
     'div',
     { className: 'st-actions' },
-    url ? h('button', { className: 'pill pill--solid', type: 'button', onclick: () => watch(m) }, ico(Play, 18), 'לצפייה בקטע') : null,
+    url || hasVodRange(m) ? h('button', { className: 'pill pill--solid', type: 'button', onclick: () => watch(m) }, ico(Play, 18), 'לצפייה בקטע') : null,
     likeBtn('stop', m.id, 'pill', 18),
     h('button', { className: 'pill', type: 'button', onclick: () => openComments('stop', m.id, m.title) }, ico(MessageCircle, 18), nC ? `${nC}` : 'תגובות'),
     h('button', { className: 'pill pill--icon', type: 'button', ariaLabel: 'במפה', onclick: () => { closeStory(); location.hash = `#m-${i + 1}`; } }, ico(MapPin, 18)),
@@ -562,7 +563,14 @@ function openComments(type: 'stop' | 'clip', id: string, title: string) {
 }
 function watch(m: Mission) {
   const url = safeUrl(m.recap_url);
-  if (!url) return;
+  if (!url) {
+    // דקות מהלייב: ההקלטה ב-Kick מהנקודה הזאת
+    if (!hasVodRange(m) || !data) return;
+    const box = h('div', { className: 'player' });
+    openSheet(m.title, box);
+    playVodRange(box, m, kickSlug(data.settings.kick_channel), toast);
+    return;
+  }
   const embed = videoEmbed(url);
   if (!embed) {
     window.open(url, '_blank', 'noopener');
