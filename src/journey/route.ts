@@ -137,7 +137,8 @@ export function placeAll(missions: Mission[], trail?: Trail | null): Placed[] {
 function placeOnTrail(known: Array<Pt | null>, trail: Trail): Placed[] {
   const { w, h, total } = trail;
   const STEP = total / TRAIL_STOPS;
-  const SNAP = Math.min(w, h) * 0.045;
+  // נצמדת לשביל רק עצירה שסומנה ממש על הכביש; אחרת נשארת בדיוק איפה שלחצו (קודם 4.5% – כמעט כל לחיצה בעיר "נשאבה" לכביש)
+  const SNAP = Math.min(w, h) * 0.008;
   const n = known.length;
   // s לכל עצירה; near = ה-s הקרוב על השביל גם לעצירה שלא נצמדה (כדי להמשיך ממנה)
   const s: Array<number | null> = new Array(n).fill(null);
