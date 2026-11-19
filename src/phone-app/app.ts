@@ -919,7 +919,7 @@ if (loginError) setTimeout(() => toast('ההתחברות עם Kick לא הצלי
 
 // לייקים: בהתחלה ואז כל דקה (הסידור מתעדכן בבנייה הבאה של הבית)
 refreshLikes().then(() => story.hidden && renderHome());
-setInterval(() => void refreshLikes(), 60_000);
+setInterval(() => document.visibilityState !== 'hidden' && void refreshLikes(), 150_000 + Math.random() * 60_000);
 
 // זמן המשחק מתקתק
 setInterval(() => {
