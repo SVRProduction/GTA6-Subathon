@@ -728,6 +728,10 @@ function renderHome() {
     h('h1', { className: 'hello' }, d.settings.title || 'סאבתון GTA 6'),
     rings,
     liveCard,
+    // מונים של כל הסאבתון
+    live
+      ? h('div', { className: 'home-count' }, ...([['deaths', '💀', 'מוות'], ['arrests', '🚓', 'מעצרים'], ['fails', '❌', 'כישלונות']] as const).map(([k, e, l]) => h('span', { className: 'home-count__i' }, h('i', {}, e), h('b', {}, num(countOf(live!, k))), h('small', {}, l))))
+      : null,
     nowCard ??
       h(
         'article',

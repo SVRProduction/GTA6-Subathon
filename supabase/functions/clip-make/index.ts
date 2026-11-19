@@ -3,6 +3,8 @@
 //   { mode: 'range',   mission_id }                          – לפי clip_start / clip_end שבכרטיס העצירה ("1:23:10"), מתחילת השידור
 //   { mode: 'moment',  at, mission_id?, label?, before? }    – before שניות (ברירת מחדל 45) עד הרגע at (למשל !מת)
 //   { mode: 'archive', clip_id }                             – עותק של קליפ שנוצר ב-Kick (אותו טווח זמן, מההקלטה, ב-720p)
+//   { mode: 'undo',    category }                            – ביטול פקודה (!מת- וכו'): מוחק את הקליפ האחרון מהקטגוריה (3 דקות אחרונות)
+// range ארוך: נשמרות 3 הדקות הראשונות, והטווח המלא נרשם (vod_url/vod_from/vod_to) כדי לנגן את כולו מההקלטה בקיק.
 // הרשאה: x-cron-secret (טריגרים במסד) או טוקן של עורך מחובר (נבדק מול public.is_mod()).
 // הקליפ: קטעי ה-HLS המקוריים (10 שניות, 720p) מועתקים כמו שהם + index.m3u8 – בלי המרה. עד 3 דקות.
 // סודות: CRON_SECRET. פריסה: supabase functions deploy clip-make --no-verify-jwt
@@ -80,8 +82,8 @@ async function vodSegments(uuid: string): Promise<{ base: string; segs: Seg[]; t
 
 /** מעתיק את הקטעים שבטווח [a,b] (שניות מתחילת השידור) ל-Storage. מחזיר כתובת ציבורית של index.m3u8 ואורך */
 async function copyRange(sb: SupabaseClient, folder: string, uuid: string, a: number, b: number, waitLive: boolean) {
-  if (b - a > MAX_SEC) a = b - MAX_SEC;
   if (b <= a) throw new Error('טווח זמן לא תקין');
+  if (b - a > MAX_SEC) b = a + MAX_SEC; // קטע ארוך: שומרים את ההתחלה (המלא מתנגן מההקלטה בקיק)
   let vod = await vodSegments(uuid);
   // שידור חי: הקטעים האחרונים מגיעים באיחור קצר – מחכים עד ~40 שניות
   for (let i = 0; waitLive && vod.total < b && i < 8; i++) {
@@ -103,7 +105,7 @@ async function copyRange(sb: SupabaseClient, folder: string, uuid: string, a: nu
   const { error } = await sb.storage.from(BUCKET).upload(`${folder}/index.m3u8`, new TextEncoder().encode(lines.join('\n')), { contentType: 'application/vnd.apple.mpegurl', upsert: true });
   if (error) throw new Error(`שמירה נכשלה: ${error.message}`);
   const url = sb.storage.from(BUCKET).getPublicUrl(`${folder}/index.m3u8`).data.publicUrl;
-  return { url, duration: Math.round(pick.reduce((n, s) => n + s.dur, 0)), from: pick[0].t0 };
+  return { url, duration: Math.round(pick.reduce((n, s) => n + s.dur, 0)), from: pick[0].t0, vod: vod.base };
 }
 
 async function liveThumb(slug: string) {
@@ -114,6 +116,15 @@ async function liveThumb(slug: string) {
   } catch {
     return null;
   }
+}
+
+const LABELS: Record<string, string> = { death: 'עודד מת 💀', arrest: 'עודד נעצר 🚓', fail: 'עודד פישל ❌' };
+
+/** מחיקת קליפ שלנו: השורה והקבצים */
+async function removeClip(sb: SupabaseClient, id: string) {
+  const { data: files } = await sb.storage.from(BUCKET).list(id, { limit: 200 });
+  if (files?.length) await sb.storage.from(BUCKET).remove(files.map((f) => `${id}/${f.name}`));
+  await sb.from('clips').delete().eq('id', id);
 }
 
 async function run(sb: SupabaseClient, input: Json) {
@@ -128,8 +139,11 @@ async function run(sb: SupabaseClient, input: Json) {
     const b = parseTime(m.clip_end);
     if (a == null || b == null || b <= a) throw new Error('דקת התחלה/סיום לא תקינות (למשל 1:23:10 עד 1:24:30)');
     const st = await findStream(slug, m.happened_at ? Date.parse(m.happened_at) : null);
-    const out = await copyRange(sb, id, st.uuid, a, b, st.live);
-    const row = { id, title: m.title || 'קליפ', thumbnail_url: m.image_url ?? (st.live ? await liveThumb(slug) : null), video_url: out.url, duration: out.duration, views: 0, creator: 'עודד', created_at: new Date(st.start + out.from * 1000).toISOString(), mission_id: m.id, source: 'own' };
+    const out = await copyRange(sb, id, st.uuid, a, Math.min(b, a + MAX_SEC), st.live);
+    // שמירה מחדש של אותה עצירה: הקליפ הקודם שלה מתחלף
+    const { data: old } = await sb.from('clips').select('id').eq('mission_id', m.id).eq('kind', 'range');
+    for (const o of old ?? []) await removeClip(sb, o.id);
+    const row = { id, title: m.title || 'קליפ', thumbnail_url: m.image_url ?? (st.live ? await liveThumb(slug) : null), video_url: out.url, duration: out.duration, views: 0, creator: 'עודד', created_at: new Date(st.start + a * 1000).toISOString(), mission_id: m.id, source: 'own', kind: 'range', vod_url: out.vod, vod_from: Math.round(a), vod_to: Math.round(b) };
     const { error } = await sb.from('clips').insert(row);
     if (error) throw new Error(error.message);
     return row;
@@ -141,8 +155,15 @@ async function run(sb: SupabaseClient, input: Json) {
     const st = await findStream(slug, at);
     const off = (at - st.start) / 1000;
     const out = await copyRange(sb, id, st.uuid, Math.max(0, off - before), off + 3, st.live);
-    const missionId = input.mission_id ?? s?.current_mission_id ?? null;
-    const row = { id, title: String(input.label || 'רגע מהלייב').slice(0, 80), thumbnail_url: st.live ? await liveThumb(slug) : null, video_url: out.url, duration: out.duration, views: 0, creator: 'עודד', created_at: new Date(at).toISOString(), mission_id: missionId, source: 'own' };
+    // משויך לעצירה רק אם היא עוד לא הסתיימה ברגע האירוע; אחרת – קליפ עצמאי (עודד מסתובב)
+    let missionId: string | null = input.mission_id ?? s?.current_mission_id ?? null;
+    if (missionId) {
+      const { data: m } = await sb.from('missions').select('finished_at, published').eq('id', missionId).maybeSingle();
+      if (!m || m.published === false || (m.finished_at && Date.parse(m.finished_at) <= at)) missionId = null;
+    }
+    const category = ['death', 'arrest', 'fail'].includes(String(input.category)) ? String(input.category) : null;
+    const label = input.label || (category ? LABELS[category] : 'רגע מהלייב');
+    const row = { id, title: String(label).slice(0, 80), thumbnail_url: st.live ? await liveThumb(slug) : null, video_url: out.url, duration: out.duration, views: 0, creator: 'עודד', created_at: new Date(at).toISOString(), mission_id: missionId, source: 'own', kind: 'moment', category };
     const { error } = await sb.from('clips').insert(row);
     if (error) throw new Error(error.message);
     return row;
@@ -168,6 +189,13 @@ async function run(sb: SupabaseClient, input: Json) {
     const { error } = await sb.from('clips').update({ archived_url: out.url }).eq('id', c.id);
     if (error) throw new Error(error.message);
     return { id: c.id, archived_url: out.url };
+  }
+
+  if (input.mode === 'undo') {
+    const since = new Date(Date.now() - 3 * 60_000).toISOString();
+    const { data: last } = await sb.from('clips').select('id').eq('kind', 'moment').eq('category', String(input.category ?? '')).gte('created_at', since).order('created_at', { ascending: false }).limit(1).maybeSingle();
+    if (last) await removeClip(sb, last.id);
+    return { removed: last?.id ?? null };
   }
   throw new Error('מצב לא מוכר');
 }

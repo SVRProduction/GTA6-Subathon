@@ -274,7 +274,20 @@ let liveData: LiveData | null = null;
 const mission = createMissionHud(stage, { reduce });
 /** קליפים לפי עצירה (העצירה שהייתה פעילה כשצולמו) */
 let clipsByStop = new Map<number, Clip[]>();
+// מונים קבועים על המפה (כל הסאבתון): מוות, מעצרים, כישלונות
+const mapCount = h('div', { class: 'mapcount', ariaLabel: 'מונים', hidden: true });
+stage.append(mapCount);
+function paintMapCount(l: LiveData) {
+  const items: Array<[CounterName, string, string]> = [
+    ['deaths', '💀', 'מוות'],
+    ['arrests', '🚓', 'מעצרים'],
+    ['fails', '❌', 'כישלונות'],
+  ];
+  mapCount.replaceChildren(...items.map(([k, e, label]) => h('span', { class: 'mapcount__i', title: label }, h('i', { ariaHidden: 'true' }, e), h('b', {}, countOf(l, k).toLocaleString('he-IL')), h('small', {}, label))));
+  mapCount.hidden = embed;
+}
 function onLive(l: LiveData) {
+  paintMapCount(l);
   liveData = l;
   liveUi.setLive(l);
   mission.setLive(l);

@@ -13,16 +13,63 @@ const ago = (iso: string) => {
 
 /** העצירה שהייתה פעילה כשהקליפ צולם: האחרונה שקרתה לפניו */
 export function clipStop(c: Clip, missions: Mission[]) {
+  const t = Date.parse(c.created_at);
+  // משימה שהסתיימה לפני הקליפ לא מקבלת אותו (חוץ מהקטע שנבחר בכרטיס שלה)
+  const ended = (m: Mission) => !!m.finished_at && Date.parse(m.finished_at) < t && c.kind !== 'range';
   if (c.mission_id) {
     const k = missions.findIndex((m) => m.id === c.mission_id);
-    if (k >= 0) return k;
+    if (k >= 0) return ended(missions[k]) ? -1 : k;
   }
-  const t = Date.parse(c.created_at);
+  // קליפ של מוות/מעצר/כישלון בלי משימה = עצמאי (עודד הסתובב)
+  if (c.kind === 'moment') return -1;
   let best = -1;
   missions.forEach((m, i) => {
     if (m.happened_at && Date.parse(m.happened_at) <= t) best = i;
   });
-  return best;
+  return best >= 0 && ended(missions[best]) ? -1 : best;
+}
+
+/** הקטע שנבחר בכרטיס העצירה (מדקה–עד דקה), אם נחתך */
+export function rangeClip(missionId: string, live: LiveData | null): Clip | null {
+  return live?.clips.find((c) => c.kind === 'range' && c.mission_id === missionId) ?? null;
+}
+
+/** "צפה בקטע": מנגן את כל הטווח מההקלטה בקיק; אם היא כבר לא קיימת – את 3 הדקות שנשמרו אצלנו */
+export function playRange(box: HTMLElement, c: Clip) {
+  if (!c.vod_url || c.vod_from == null || c.vod_to == null) return playClip(box, c);
+  const v = h('video', { controls: true, playsInline: true, autoplay: true, poster: c.thumbnail_url ?? undefined }) as HTMLVideoElement;
+  box.replaceChildren(v);
+  const from = c.vod_from;
+  const to = c.vod_to;
+  let stopFn = () => v.pause();
+  let fellBack = false;
+  const fallback = () => {
+    if (fellBack) return;
+    fellBack = true;
+    stopFn();
+    stopFn = playClip(box, c);
+  };
+  // עוצרים בסוף הטווח
+  v.addEventListener('timeupdate', () => {
+    if (v.currentTime >= to) v.pause();
+  });
+  const src = c.vod_url;
+  if (!('MediaSource' in window || 'ManagedMediaSource' in window)) {
+    v.src = src;
+    v.addEventListener('loadedmetadata', () => (v.currentTime = from), { once: true });
+    v.addEventListener('error', fallback, { once: true });
+  } else {
+    hlsMod ??= import('hls.js');
+    hlsMod.then(({ default: Hls }) => {
+      if (!Hls.isSupported()) return fallback();
+      const hls = new Hls({ startPosition: from, maxBufferLength: 30 });
+      hls.on(Hls.Events.ERROR, (_e, d) => d.fatal && fallback());
+      hls.loadSource(src);
+      hls.attachMedia(v);
+      stopFn = () => hls.destroy();
+    }, fallback);
+  }
+  return () => stopFn();
 }
 
 /** תמונה לתצוגה מקדימה של עצירה: התמונה של הקליפ הנצפה ביותר שצולם בזמן העצירה (null = אין) */

@@ -474,6 +474,20 @@ kbd { display: inline-grid; place-items: center; min-width: 26px; height: 24px; 
 .pin--done .pin__kind::after { content: ' · ✓ הושלמה'; color: #7fe3a0; }
 .player.is-roaming::after { content: 'מסתובב חופשי'; position: absolute; left: 0; top: 30px; translate: -50% 0; white-space: nowrap; padding: 3px 9px; border-radius: 999px; background: rgba(8, 12, 22, 0.88); color: var(--m-gold); font: 600 12px/1.2 var(--m-body); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45); pointer-events: none; }
 
+/* ── מונים קבועים על המפה ── */
+.mapcount { position: absolute; z-index: 6; left: 50%; translate: -50% 0; top: calc(max(18px, env(safe-area-inset-top)) + 54px); display: flex; gap: 6px; pointer-events: none; }
+.mapcount[hidden] { display: none; }
+.mapcount__i { display: inline-flex; align-items: baseline; gap: 6px; padding: 8px 12px; border-radius: 10px; background: rgba(8, 12, 22, 0.82); border: 1px solid var(--m-edge); color: var(--m-txt); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35); }
+.mapcount__i i { font-style: normal; font-size: 15px; }
+.mapcount__i b { font: 700 22px/1 var(--m-display); color: var(--m-gold); }
+.mapcount__i small { font: 500 12px/1 var(--m-body); color: var(--m-txt-2); }
+@media (max-width: 760px), (pointer: coarse) {
+  /* בטלפון: מתחת לתג הלייב; כרטיס הפתיחה מכסה אותם עד שמתחילים */
+  .mapcount { z-index: 2; top: calc(max(16px, env(safe-area-inset-top)) + 128px); }
+  .mapcount__i { padding: 6px 10px; }
+  .mapcount__i b { font-size: 18px; }
+  .mapcount__i small { display: none; }
+}
 /* קטע מהקלטת הלייב ב-Kick */
 .vod-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 2px 0; font-size: 13px; opacity: 0.85; }
 .vod-note { margin: 0; }
