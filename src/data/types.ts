@@ -213,6 +213,12 @@ export interface Store {
   listMods(): Promise<ModEntry[]>;
   addMod(name: string): Promise<void>;
   removeMod(name: string): Promise<void>;
+  /** מי שלא ברשימה: בקשת גישה (נכנסת לתור, כל מוד יכול לאשר). מחזיר את מצב הבקשה */
+  requestModAccess(viewer: Viewer): Promise<ModRequestState>;
+  /** מוד: בקשות הגישה לרשימת המודים */
+  listModRequests(): Promise<ModRequest[]>;
+  /** מוד: אישור (נכנס לרשימה) או דחייה. נבדק בשרת */
+  decideModRequest(name: string, approve: boolean): Promise<void>;
   /** לייב, זמן משחק, ספירות וקליפים */
   loadLive(): Promise<LiveData>;
   subscribeLive(cb: (d: LiveData) => void): () => void;
@@ -250,6 +256,18 @@ export interface Store {
   deletePoll(id: string): Promise<void>;
   /** צופה: הצבעה (אפשר לשנות; הקול האחרון קובע) */
   vote(viewer: Viewer, pollId: string, option: number): Promise<void>;
+}
+
+export type ModRequestState = 'pending' | 'rejected' | null;
+/** בקשת גישה לרשימת המודים ("ויטליסט") */
+export interface ModRequest {
+  kick_username: string;
+  display_name: string | null;
+  avatar: string | null;
+  status: 'pending' | 'rejected';
+  requested_at: string;
+  decided_by: string | null;
+  decided_at: string | null;
 }
 
 export interface ModEntry {

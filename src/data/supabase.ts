@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { STORAGE_BUCKET } from '../config';
 import { DEFAULT_OWNERS, getModSession, kickName, setModSession, type ModSession } from './modSession';
-import { DEFAULT_SETTINGS, type Clip, type Comment, type CounterEvent, type Data, type Extras, type LiveData, type LiveStatus, type Marker, type Mission, type Poll, type Segment, type Settings, type Store, type Story, type Viewer, type ModEntry } from './types';
+import { DEFAULT_SETTINGS, type Clip, type Comment, type CounterEvent, type Data, type Extras, type LiveData, type LiveStatus, type Marker, type Mission, type Poll, type Segment, type Settings, type Store, type Story, type Viewer, type ModEntry, type ModRequest, type ModRequestState } from './types';
 
 export function createSupabaseStore(url: string, key: string): Store {
   // פעולות מוד נשלחות עם הטוקן מ-kick-mod; בלי טוקן – כמו צופה (anon)
@@ -19,7 +19,7 @@ export function createSupabaseStore(url: string, key: string): Store {
     const j = await r.json().catch(() => null);
     if (!r.ok) {
       if (r.status === 403 || r.status === 401) setModSession(null);
-      throw Object.assign(new Error(j?.error ?? 'הבדיקה מול רשימת המודים נכשלה. נסו שוב.'), { status: r.status });
+      throw Object.assign(new Error(j?.error ?? 'הבדיקה מול רשימת המודים נכשלה. נסו שוב.'), { status: r.status, request: (j?.request ?? null) as ModRequestState });
     }
     const s: ModSession = { token: j.token, exp: j.exp, name: j.name, owner: !!j.owner };
     setModSession(s);
@@ -341,6 +341,26 @@ export function createSupabaseStore(url: string, key: string): Store {
     },
     async removeMod(name) {
       check(await sb.from('mods').delete().eq('kick_username', kickName(name)));
+    },
+    async requestModAccess(viewer) {
+      const r = await fetch(fnUrl('kick-mod'), { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: key }, body: JSON.stringify({ token: viewer.token, request: true }) });
+      const j = await r.json().catch(() => null);
+      // כבר ברשימה: נכנסים כרגיל
+      if (r.ok) {
+        await modLogin(viewer);
+        return null;
+      }
+      if (r.status === 403 && j?.request) return j.request as ModRequestState;
+      throw new Error(j?.error ?? 'שליחת הבקשה נכשלה. נסו שוב.');
+    },
+    async listModRequests() {
+      const r = await sb.from('mod_requests').select('kick_username, display_name, avatar, status, requested_at, decided_by, decided_at').order('requested_at', { ascending: false }).limit(200);
+      // הטבלה עוד לא קיימת (update-mod-requests.sql לא הורץ) – אין בקשות
+      if (r.error) return [];
+      return (r.data ?? []) as ModRequest[];
+    },
+    async decideModRequest(name, approve) {
+      check(await sb.rpc('decide_mod_request', { p_name: kickName(name), p_approve: approve }));
     },
   };
 }

@@ -11,7 +11,7 @@ import { createLife, type Life } from './journey/life';
 import { createLive, fmtHours } from './live';
 import { clipCard, clipsView, clipStop, playClip } from './clips';
 import { commentCount, commentsBox, initComments } from './comments';
-import { loginError } from './auth';
+import { loginError, loginErrorText } from './auth';
 import { createMissionHud, legend } from './mission';
 import { createControl } from './control';
 import { COUNTERS, countOf, kickSlug, playMs, type Clip, type CounterName, type LiveData } from './data/types';
@@ -685,7 +685,7 @@ initComments(store, (list) => {
   const talked = new Set(list.filter((c) => c.target_type === 'stop').map((c) => c.target_id));
   pins.forEach((p, i) => p.classList.toggle('pin--talk', talked.has(data.missions[i]?.id)));
 });
-if (loginError) setTimeout(() => toast('ההתחברות עם Kick לא הצליחה. נסו שוב.'), 600);
+if (loginError) setTimeout(() => toast(loginErrorText()), 600);
 
 // ── פאנל הצד: פתיחה וסגירה באותו מסלול, וניתן לעצור באמצע ──
 /**

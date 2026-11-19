@@ -2,7 +2,7 @@
 // המפה והמספרים הם הדפים הקיימים (index.html?embed / phone-stats.html) בתוך הטאבים, כך שהמנוע לא משוכפל.
 import { initPush } from './push';
 import { ChartColumnBig, Clapperboard, ExternalLink, Heart, House, Map as MapIco, MapPin, MessageCircle, Play, Share2, Volume2, VolumeX, X, createElement, type IconNode } from 'lucide';
-import { getViewer, login, loginError, onViewer } from '../auth';
+import { getViewer, login, loginError, loginErrorText, onViewer } from '../auth';
 import { playClip, stopClipThumb } from '../clips';
 import { commentCount, commentsBox, initComments } from '../comments';
 import { createStore } from '../data/store';
@@ -915,7 +915,7 @@ store
     fill(home, h('p', { className: 'empty' }, 'הנתונים לא נטענו. נסו לרענן.'));
   });
 
-if (loginError) setTimeout(() => toast('ההתחברות עם Kick לא הצליחה. נסו שוב.'), 600);
+if (loginError) setTimeout(() => toast(loginErrorText()), 600);
 
 // לייקים: בהתחלה ואז כל דקה (הסידור מתעדכן בבנייה הבאה של הבית)
 refreshLikes().then(() => story.hidden && renderHome());

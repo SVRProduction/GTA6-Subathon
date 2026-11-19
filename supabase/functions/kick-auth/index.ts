@@ -11,9 +11,15 @@ import { randomString, sha256b64u, sign, verify } from '../_shared/session.ts';
 const ID = 'https://id.kick.com';
 const API = 'https://api.kick.com/public/v1';
 
+/** חזרה לדף באתר; ה-hash המקורי שלו (למשל ‎#phone) נשאר, והתוצאה נוספת אחריו */
 function back(returnTo: string, hash: string) {
-  return new Response(null, { status: 302, headers: { Location: `${returnTo.split('#')[0]}#${hash}` } });
+  const i = returnTo.indexOf('#');
+  const keep = i >= 0 ? returnTo.slice(i + 1).split('&').filter((x) => x && !/^kick_(session|error)=/.test(x)).join('&') : '';
+  return new Response(null, { status: 302, headers: { Location: `${i >= 0 ? returnTo.slice(0, i) : returnTo}#${keep ? `${keep}&` : ''}${hash}` } });
 }
+// כמה זמן יש להשלים את ההתחברות ב-Kick. הרשמה חדשה (במיוחד עם Google: בחירת שם, תאריך לידה, קוד אימות)
+// לוקחת לפעמים יותר מ-10 דקות, ואז החזרה נדחתה. החתימה מונעת זיוף; ה-PKCE עדיין חד-פעמי מול Kick.
+const STATE_TTL = 60 * 60;
 
 Deno.serve(async (req) => {
   const url = new URL(req.url);
@@ -30,18 +36,26 @@ Deno.serve(async (req) => {
   const stateRaw = url.searchParams.get('state');
   if (code || stateRaw || url.searchParams.get('error')) {
     const st = stateRaw ? await verify<{ v: string; r: string }>(stateRaw, secret) : null;
-    if (!st) return new Response('בקשת התחברות לא תקינה או שפג תוקפה. חזרו לאתר ונסו שוב.', { status: 400 });
-    if (!code) return back(st.r, 'kick_error=denied');
+    if (!st) {
+      // חתימה תקינה אבל פג תוקף: מחזירים לאתר עם הסבר, במקום דף שגיאה ריק בכתובת של Supabase
+      const old = stateRaw ? await verify<{ r: string }>(stateRaw, secret, true) : null;
+      if (old?.r) return back(old.r, 'kick_error=expired');
+      return new Response('בקשת התחברות לא תקינה או שפג תוקפה. חזרו לאתר ונסו שוב.', { status: 400 });
+    }
+    if (!code) {
+      console.error('kick-auth: kick returned', url.searchParams.get('error'), url.searchParams.get('error_description'));
+      return back(st.r, 'kick_error=denied');
+    }
     try {
       const tok = await fetch(`${ID}/oauth/token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({ grant_type: 'authorization_code', code, client_id: clientId, client_secret: clientSecret, redirect_uri: self, code_verifier: st.v }),
       });
-      if (!tok.ok) throw new Error(`token ${tok.status}`);
+      if (!tok.ok) throw new Error(`token ${tok.status} ${(await tok.text().catch(() => '')).slice(0, 300)}`);
       const access = (await tok.json()).access_token as string;
       const me = await fetch(`${API}/users`, { headers: { Authorization: `Bearer ${access}` } });
-      if (!me.ok) throw new Error(`users ${me.status}`);
+      if (!me.ok) throw new Error(`users ${me.status} ${(await me.text().catch(() => '')).slice(0, 300)}`);
       const u = (await me.json()).data?.[0];
       if (!u?.user_id) throw new Error('no user');
       const session = await sign({ uid: String(u.user_id), name: String(u.name ?? 'צופה'), pic: u.profile_picture ?? null, exp: Math.floor(Date.now() / 1000) + 30 * 86400 }, secret);
@@ -63,8 +77,8 @@ Deno.serve(async (req) => {
   }
   if (!ok) return new Response('כתובת חזרה לא מותרת', { status: 400 });
   const verifier = randomString(48);
-  // ה-state חתום ותקף ל-10 דקות: מונע זיוף ומחזיק את ה-PKCE בלי מסד נתונים
-  const state = await sign({ v: verifier, r: returnTo, n: randomString(8), exp: Math.floor(Date.now() / 1000) + 600 }, secret);
+  // ה-state חתום ותקף לשעה (STATE_TTL): מונע זיוף ומחזיק את ה-PKCE בלי מסד נתונים
+  const state = await sign({ v: verifier, r: returnTo, n: randomString(8), exp: Math.floor(Date.now() / 1000) + STATE_TTL }, secret);
   const auth = new URL(`${ID}/oauth/authorize`);
   auth.search = new URLSearchParams({
     response_type: 'code',

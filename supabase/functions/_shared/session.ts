@@ -14,15 +14,15 @@ export async function sign(payload: Record<string, unknown>, secret: string) {
   return `${body}.${b64u(sig)}`;
 }
 
-/** מחזיר את ה-payload אם החתימה תקינה ולא פג תוקף (exp בשניות), אחרת null */
-export async function verify<T = Record<string, unknown>>(token: string, secret: string): Promise<T | null> {
+/** מחזיר את ה-payload אם החתימה תקינה ולא פג תוקף (exp בשניות), אחרת null. ignoreExp: רק החתימה נבדקת */
+export async function verify<T = Record<string, unknown>>(token: string, secret: string, ignoreExp = false): Promise<T | null> {
   const [body, sig] = String(token).split('.');
   if (!body || !sig) return null;
   try {
     const ok = await crypto.subtle.verify('HMAC', await key(secret), fromB64u(sig), enc.encode(body));
     if (!ok) return null;
     const p = JSON.parse(new TextDecoder().decode(fromB64u(body)));
-    if (typeof p.exp === 'number' && p.exp * 1000 < Date.now()) return null;
+    if (!ignoreExp && typeof p.exp === 'number' && p.exp * 1000 < Date.now()) return null;
     return p as T;
   } catch {
     return null;

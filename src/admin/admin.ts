@@ -1,7 +1,7 @@
 import { $, fill, fmtDate, h } from '../dom';
 import { createStore } from '../data/store';
-import { COUNTERS, countOf, currentIndex, newMission, statusFresh, type Comment, type CounterName, type Data, type Extras, type LiveData, type Mission, type ModEntry } from '../data/types';
-import { getViewer, login, loginError, logout } from '../auth';
+import { COUNTERS, countOf, currentIndex, newMission, statusFresh, type Comment, type CounterName, type Data, type Extras, type LiveData, type Mission, type ModEntry, type ModRequest, type ModRequestState } from '../data/types';
+import { getViewer, login, loginError, loginErrorText, logout } from '../auth';
 import { getModSession, kickName, onModChange } from '../data/modSession';
 import { safeUrl } from '../dom';
 import { createPicker } from './picker';
@@ -39,6 +39,8 @@ let comments: Comment[] = [];
 let showHidden = false;
 let ex: Extras = { markers: [], stories: [], polls: [] };
 let mods: ModEntry[] = [];
+/** בקשות גישה לרשימת המודים: כל מוד רואה ומאשר */
+let requests: ModRequest[] = [];
 
 let toastTimer = 0;
 function toast(text: string, bad = false) {
@@ -56,6 +58,7 @@ async function run(action: () => Promise<void>, ok?: string) {
     if (store.mode === 'supabase') data = await store.load();
     ex = await store.loadExtras(true).catch(() => ex);
     if (getModSession()?.owner) mods = await store.listMods().catch(() => mods);
+    requests = await store.listModRequests().catch(() => requests);
     render();
     if (ok) toast(ok);
     return true;
@@ -141,7 +144,7 @@ function field(label: string, input: HTMLElement, hint?: string) {
 }
 
 // ── התחברות: רק עם Kick. ההרשאה לפי רשימת המודים (או בעלים) ──
-function renderLogin(error?: string) {
+function renderLogin(error?: string, notMod?: { request: ModRequestState }) {
   const v = getViewer();
   const btn = h('button', { class: 'btn primary', type: 'button' }, v ? 'התחברות עם משתמש Kick אחר' : 'התחברות עם Kick');
   btn.onclick = () => {
@@ -158,9 +161,68 @@ function renderLogin(error?: string) {
       h('h1', {}, 'ניהול המסע'),
       h('p', { class: 'muted' }, 'כניסה למודים שמעדכנים את המפה בזמן הלייב. מתחברים עם החשבון ב-Kick.'),
       error ? h('p', { class: 'banner bad', role: 'alert' }, v ? `מחובר כ-${v.username}. ${error}` : error) : null,
+      v && notMod ? requestBox(notMod.request) : null,
       btn,
       store.mode === 'demo' ? h('small', { class: 'muted' }, 'מצב דמו: ההתחברות מכניסה אתכם כבעלים (odedsvr).') : null,
     ),
+  );
+}
+
+/** במסך הכניסה, למי שלא ברשימה: בקשת גישה שכל מוד יכול לאשר */
+function requestBox(state: ModRequestState) {
+  const v = getViewer();
+  if (!v) return null;
+  if (state === 'rejected') return null;
+  if (state === 'pending') {
+    const again = h('button', { class: 'btn', type: 'button' }, 'בדיקה אם אושרתי');
+    again.onclick = () => start();
+    return h('div', { class: 'req-box' }, h('p', { class: 'muted' }, 'הבקשה שלך מחכה לאישור של מוד. אחרי האישור לוחצים כאן ונכנסים.'), again);
+  }
+  const ask = h('button', { class: 'btn primary', type: 'button' }, 'בקשת גישה למודים');
+  ask.onclick = async () => {
+    ask.disabled = true;
+    try {
+      const st = await store.requestModAccess(v);
+      if (st === null) return start();
+      renderLogin(st === 'pending' ? 'הבקשה נשלחה. כשמוד יאשר אותה, לוחצים על "בדיקה אם אושרתי".' : 'בקשת הגישה שלך נדחתה. אפשר לבקש שוב מחר.', { request: st });
+    } catch (e) {
+      ask.disabled = false;
+      toast((e as Error).message, true);
+    }
+  };
+  return h('div', { class: 'req-box' }, h('p', { class: 'muted' }, 'עוזרים בלייב? שלחו בקשה, וכל אחד מהמודים יכול לאשר אתכם.'), ask);
+}
+
+// ── בקשות גישה (ויטליסט): כל מוד מאשר או דוחה. ההרשאה נבדקת גם בשרת (decide_mod_request) ──
+function requestsPanel() {
+  const pending = requests.filter((r) => r.status === 'pending');
+  const rejected = requests.filter((r) => r.status === 'rejected').slice(0, 10);
+  const row = (r: ModRequest) =>
+    h(
+      'li',
+      {},
+      r.avatar && safeUrl(r.avatar) ? h('img', { class: 'req__pic', src: safeUrl(r.avatar)!, alt: '', loading: 'lazy' }) : null,
+      h(
+        'div',
+        { class: 'info' },
+        h('strong', { dir: 'ltr' }, r.kick_username),
+        h('small', {}, r.status === 'pending' ? `ביקש/ה ${fmtDate(r.requested_at)}` : `נדחה${r.decided_by ? ` ע"י ${r.decided_by}` : ''}${r.decided_at ? ` · ${fmtDate(r.decided_at)}` : ''}`),
+      ),
+      h(
+        'div',
+        { class: 'ops' },
+        h('a', { class: 'btn', href: `https://kick.com/${encodeURIComponent(r.kick_username)}`, target: '_blank', rel: 'noopener' }, 'הפרופיל ב-Kick'),
+        h('button', { type: 'button', class: 'ok', onclick: () => run(() => store.decideModRequest(r.kick_username, true), `${r.kick_username} אושר/ה ונכנס/ה לרשימת המודים`) }, 'אישור'),
+        r.status === 'pending' ? h('button', { type: 'button', class: 'danger', onclick: (e: MouseEvent) => twice(e, () => run(() => store.decideModRequest(r.kick_username, false), `הבקשה של ${r.kick_username} נדחתה`)) }, 'דחייה') : null,
+      ),
+    );
+  return h(
+    'section',
+    { class: 'panel mods' },
+    h('div', { class: 'panel-head' }, h('h2', {}, `בקשות גישה (${pending.length})`)),
+    h('p', { class: 'muted' }, 'מי שמתחבר באדמין עם Kick ולא ברשימה יכול לבקש גישה. כל מוד יכול לאשר או לדחות. מי שאושר מקבל את כלי העריכה, וההסרה מהרשימה נשארת אצל הבעלים.'),
+    pending.length ? h('ul', { class: 'mods__list' }, ...pending.map(row)) : h('p', { class: 'empty' }, 'אין בקשות שמחכות.'),
+    rejected.length ? h('details', { class: 'req__old' }, h('summary', {}, `נדחו לאחרונה (${rejected.length})`), h('ul', { class: 'mods__list' }, ...rejected.map(row))) : null,
   );
 }
 
@@ -582,6 +644,7 @@ function render() {
     pollsPanel({ store, ex, data, run, twice }),
     markersPanel({ store, ex, data, run, twice }),
     commentsPanel(),
+    requestsPanel(),
     getModSession()?.owner ? modsPanel() : null,
     (() => {
       // נשאר פתוח גם אחרי שמירה (העמוד נבנה מחדש בכל שינוי)
@@ -601,11 +664,12 @@ let started = false;
 async function start() {
   if (!(await store.isAuthed())) {
     const v = getViewer();
-    if (!v) return renderLogin(loginError ? 'ההתחברות ל-Kick לא הושלמה. נסו שוב.' : undefined);
+    if (!v) return renderLogin(loginError ? loginErrorText() : undefined);
     try {
       await store.modLogin(v);
     } catch (e) {
-      return renderLogin((e as Error).message);
+      const err = e as Error & { status?: number; request?: ModRequestState };
+      return renderLogin(err.message, err.status === 403 ? { request: err.request ?? null } : undefined);
     }
   }
   if (started) return render();
@@ -615,6 +679,15 @@ async function start() {
     if (!s) location.reload();
   });
   if (getModSession()?.owner) mods = await store.listMods().catch(() => []);
+  requests = await store.listModRequests().catch(() => []);
+  // בקשות חדשות מגיעות בלי לרענן (בדיקה כל דקה; לא בונים מחדש בזמן עריכה או הקלדה)
+  setInterval(async () => {
+    const next = await store.listModRequests().catch(() => requests);
+    const key = (l: ModRequest[]) => l.map((r) => `${r.kick_username}:${r.status}`).join();
+    if (key(next) === key(requests)) return;
+    requests = next;
+    if (!editor.open && !(document.activeElement instanceof HTMLInputElement || document.activeElement instanceof HTMLTextAreaElement)) render();
+  }, 60_000);
   try {
     data = await store.load();
   } catch (e) {

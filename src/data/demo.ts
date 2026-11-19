@@ -1,4 +1,4 @@
-import { DEFAULT_SETTINGS, kickSlug, type Clip, type Comment, type CounterEvent, type Data, type Extras, type LiveData, type Marker, type Mission, type Poll, type Store, type Story, type ModEntry } from './types';
+import { DEFAULT_SETTINGS, kickSlug, type Clip, type Comment, type CounterEvent, type Data, type Extras, type LiveData, type Marker, type Mission, type Poll, type Store, type Story, type ModEntry, type ModRequest } from './types';
 import { DEFAULT_OWNERS, getModSession, kickName, setModSession } from './modSession';
 
 const KEY = 'journey-demo-v9';
@@ -157,6 +157,21 @@ function readMods(): ModEntry[] {
 function writeMods(m: ModEntry[]) {
   try {
     localStorage.setItem(MODS_KEY, JSON.stringify(m));
+  } catch {
+    /* חסום */
+  }
+}
+const REQ_KEY = `${KEY}-mod-requests`;
+function readReqs(): ModRequest[] {
+  try {
+    return JSON.parse(localStorage.getItem(REQ_KEY) ?? '[]') as ModRequest[];
+  } catch {
+    return [];
+  }
+}
+function writeReqs(r: ModRequest[]) {
+  try {
+    localStorage.setItem(REQ_KEY, JSON.stringify(r));
   } catch {
     /* חסום */
   }
@@ -543,7 +558,8 @@ export function createDemoStore(): Store {
       const owner = demoOwners().includes(n);
       if (!owner && !readMods().some((m) => m.kick_username === n)) {
         setModSession(null);
-        throw Object.assign(new Error('אין לך הרשאת מוד. בקשו מהבעלים להוסיף אתכם ברשימת המודים.'), { status: 403 });
+        const request = readReqs().find((r) => r.kick_username === n)?.status ?? null;
+        throw Object.assign(new Error(request === 'pending' ? 'בקשת הגישה שלך מחכה לאישור של מוד.' : 'אין לך עדיין הרשאת מוד. אפשר לבקש גישה, ומוד יאשר אותה.'), { status: 403, request });
       }
       if (!owner) writeMods(readMods().map((m) => (m.kick_username === n ? { ...m, last_login: new Date().toISOString() } : m)));
       const s = { token: 'demo', exp: Math.floor(Date.now() / 1000) + 12 * 3600, name: viewer.username, owner };
@@ -567,6 +583,27 @@ export function createDemoStore(): Store {
     async removeMod(name) {
       if (!getModSession()?.owner) throw new Error('רק הבעלים מנהלים את רשימת המודים');
       writeMods(readMods().filter((m) => m.kick_username !== kickName(name)));
+    },
+    async requestModAccess(viewer) {
+      const n = kickName(viewer.username);
+      if (!n) throw new Error('שם משתמש לא תקין');
+      const all = readReqs().filter((r) => r.kick_username !== n);
+      writeReqs([{ kick_username: n, display_name: viewer.username, avatar: viewer.avatar, status: 'pending', requested_at: new Date().toISOString(), decided_by: null, decided_at: null }, ...all]);
+      return 'pending';
+    },
+    async listModRequests() {
+      return getModSession() ? readReqs() : [];
+    },
+    async decideModRequest(name, approve) {
+      const s = getModSession();
+      if (!s) throw new Error('רק מודים יכולים לאשר בקשות גישה');
+      const n = kickName(name);
+      const r = readReqs().find((x) => x.kick_username === n);
+      if (!r) throw new Error('הבקשה לא נמצאה (אולי מוד אחר כבר טיפל בה)');
+      if (approve) {
+        if (!readMods().some((m) => m.kick_username === n)) writeMods([...readMods(), { kick_username: n, owner: false, added_at: new Date().toISOString(), last_login: null }]);
+        writeReqs(readReqs().filter((x) => x.kick_username !== n));
+      } else writeReqs(readReqs().map((x) => (x.kick_username === n ? { ...x, status: 'rejected', decided_by: kickName(s.name), decided_at: new Date().toISOString() } : x)));
     },
   };
 }

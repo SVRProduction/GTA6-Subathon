@@ -399,3 +399,4 @@ do $$ begin alter publication supabase_realtime add table public.polls; exceptio
 do $$ begin alter publication supabase_realtime add table public.poll_votes; exception when duplicate_object then null; end $$;
 
 -- לייקים ועדכוני ספירות: ראה supabase/update-likes-counters.sql (חלק מההתקנה)
+-- בקשות גישה לרשימת המודים (כל מוד מאשר): ראה supabase/update-mod-requests.sql (חלק מההתקנה)
