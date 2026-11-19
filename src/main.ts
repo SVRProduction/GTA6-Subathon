@@ -1,5 +1,5 @@
 import { createStore } from './data/store';
-import { currentIndex, type Data, type Mission } from './data/types';
+import { currentIndex, DEFAULT_SETTINGS, type Data, type Mission } from './data/types';
 import { fill, h, safeUrl } from './dom';
 import { ico } from './icons';
 import { kindLabel, metaText, stopBody, stopNo } from './journey/content';
@@ -1360,9 +1360,27 @@ function setMap() {
   locImg.src = custom ? url : `${import.meta.env.BASE_URL}map-thumb.webp`;
 }
 
-store
-  .load()
+let lateApply: ((d: Data) => void) | null = null;
+let pendingReal: Data | null = null;
+// השרת לא עונה תוך 8 שניות: מציירים את המפה בלי נקודות, והנתונים נכנסים לבד כשהשרת חוזר
+const firstLoad = store.load();
+Promise.race([firstLoad, new Promise<null>((r) => setTimeout(() => r(null), 8000))])
   .then((d) => {
+    if (!d) {
+      toast('השרת איטי כרגע. המפה תתעדכן לבד כשהוא יחזור');
+      d = { missions: [], settings: { ...DEFAULT_SETTINGS } };
+      const got = (real: Data) => (lateApply ? lateApply(real) : (pendingReal = real));
+      // אם הטעינה הראשונה נכשלה או נתקעה – מנסים שוב כל 20 שניות עד שמצליח
+      let done = false;
+      const retry = () => {
+        if (done) return;
+        Promise.race([store.load(), new Promise<null>((r) => setTimeout(() => r(null), 15000))])
+          .then((real) => (real ? ((done = true), got(real)) : setTimeout(retry, 20000)))
+          .catch(() => setTimeout(retry, 20000));
+      };
+      firstLoad.then((real) => { if (!done) { done = true; got(real); } }).catch(() => {});
+      setTimeout(retry, 20000);
+    }
     data = d;
     layout();
     renderHud();
@@ -1392,6 +1410,16 @@ store
     control.setData(data);
     store.loadLive().then(onLive).catch(console.error);
     store.subscribeLive(onLive);
+    const applyLate = (next: Data) => {
+      data = next;
+      setMap();
+      rebuild();
+      renderHud();
+      renderLog();
+      control.setData(next);
+    };
+    lateApply = applyLate;
+    if (pendingReal) applyLate(pendingReal);
     store.subscribe((next) => {
       const known = new Set(data.missions.map((x) => x.id));
       const added = next.missions.filter((x: Mission) => !known.has(x.id));
