@@ -340,3 +340,9 @@ body[data-tab]:not([data-tab='home']) .app { grid-template-rows: 1fr calc(var(--
 /* אזור השעון למעלה בצבע התוכן (ולא פס בהיר) */
 body[data-tab='map'] .app { background: #0b2a45; }
 body[data-tab='clips'] .app { background: #0b0814; }
+
+/* קטע מהקלטת הלייב ב-Kick */
+.vod-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 2px 0; font-size: 13px; opacity: 0.85; }
+.vod-note { margin: 0; }
+.player .vod-bar { position: absolute; top: 8px; left: 8px; right: 8px; z-index: 1; padding: 0; color: #fff; text-shadow: 0 1px 3px #000; pointer-events: none; }
+.player .vod-bar a { pointer-events: auto; }

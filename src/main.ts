@@ -402,7 +402,7 @@ function renderLog() {
             'div',
             { class: 'log__detail' },
             m.summary ? h('p', { class: 'stop__body' }, m.summary) : null,
-            ...stopBody(m, i, toast, { embed: false }),
+            ...stopBody(m, i, toast, { embed: false, channel: kickSlug(data.settings.kick_channel) }),
             flat ? null : h('button', { class: 'btn btn--quiet', type: 'button', onclick: () => { goTo(i); openPanel(i); } }, ico.pin(), 'הצגה על המפה'),
           ),
         ),
@@ -731,7 +731,7 @@ function openPanel(i: number, auto = false, refresh = false) {
     panel.classList.toggle('is-menu', !auto);
   }
   active = i;
-  const [media, ...rest] = stopBody(m, i, toast, { embed: true, snapshot: mapSnapshot(i) });
+  const [media, ...rest] = stopBody(m, i, toast, { embed: true, snapshot: mapSnapshot(i), channel: kickSlug(data.settings.kick_channel) });
   const clips = stopClips(i);
   const nClips = clipsByStop.get(i)?.length ?? 0;
   const nTalk = commentCount('stop', m.id);

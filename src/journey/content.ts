@@ -2,6 +2,7 @@
 import { h, safeUrl } from '../dom';
 import type { Mission } from '../data/types';
 import { ico } from '../icons';
+import { hasVodRange, playVodRange } from '../kickVod';
 
 /** מספר עצירה, שתי ספרות: 01, 02… */
 export const stopNo = (i: number) => String(i + 1).padStart(2, '0');
@@ -66,8 +67,11 @@ function ytThumb(url: string | null) {
 }
 
 /** הגוף המלא של עצירה: מדיה, ריקאפ, ציטוט, פעולות */
-export function stopBody(m: Mission, i: number, toast: (t: string) => void, opts: { embed: boolean; snapshot?: HTMLElement | null }) {
+export function stopBody(m: Mission, i: number, toast: (t: string) => void, opts: { embed: boolean; snapshot?: HTMLElement | null; channel?: string }) {
   const url = safeUrl(m.recap_url);
+  // אין סרטון/קישור אבל נרשמו דקות: מנגנים את ההקלטה ב-Kick מהנקודה הזאת
+  const vod = !url && hasVodRange(m) && opts.channel ? opts.channel : null;
+  const vodBox = vod ? h('div', { class: 'stop__media stop__vod', hidden: true }) : null;
   const dl = safeUrl(m.download_url);
   const img = safeUrl(m.image_url);
   const embed = opts.embed && url ? videoEmbed(url) : null;
@@ -82,13 +86,25 @@ export function stopBody(m: Mission, i: number, toast: (t: string) => void, opts
           : opts.snapshot
             ? h('figure', { class: 'stop__media stop__media--map' }, opts.snapshot)
             : null,
+    vodBox,
     text ? h('p', { class: 'stop__body' }, text) : null,
     m.quote ? h('blockquote', { class: 'stop__quote' }, h('p', {}, m.quote), m.quote_by ? h('cite', {}, m.quote_by) : null) : null,
-    (url && !embed) || dl
+    (url && !embed) || dl || vod
       ? h(
           'div',
           { class: 'stop__actions' },
           url && !embed ? h('a', { class: 'btn btn--primary', href: url, target: '_blank', rel: 'noopener' }, ico.play(), 'צפייה בקטע') : null,
+          vod && vodBox
+            ? h('button', {
+                class: 'btn btn--primary',
+                type: 'button',
+                onclick: (e: Event) => {
+                  (e.currentTarget as HTMLElement).hidden = true;
+                  vodBox.hidden = false;
+                  playVodRange(vodBox, m, vod, toast);
+                },
+              }, ico.play(), 'צפייה בקטע מהלייב')
+            : null,
           dl ? h('a', { class: 'btn', href: dl, download: '', target: '_blank', rel: 'noopener' }, ico.download(), 'הורדה') : null,
         )
       : null,
