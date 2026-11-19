@@ -322,3 +322,11 @@ dialog form { display: grid; gap: 18px; padding: 22px 22px 0; }
   .mk-list li { grid-template-columns: 1fr auto; }
   .mk-list__type { grid-column: 1 / -1; justify-self: start; }
 }
+
+/* ── פס גלילה: דק וכהה בכל האתר, במקום הפס הלבן של Windows ── */
+* { scrollbar-width: thin; scrollbar-color: rgba(246, 200, 30, 0.45) transparent; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(246, 200, 30, 0.38); border-radius: 999px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background: rgba(246, 200, 30, 0.7); background-clip: padding-box; }
+::-webkit-scrollbar-button, ::-webkit-scrollbar-corner { display: none; width: 0; height: 0; background: transparent; }
