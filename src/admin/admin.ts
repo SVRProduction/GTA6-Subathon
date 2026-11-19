@@ -5,6 +5,8 @@ import { getViewer, login, loginError, logout } from '../auth';
 import { getModSession, kickName, onModChange } from '../data/modSession';
 import { safeUrl } from '../dom';
 import { createPicker } from './picker';
+
+const VIDEO_MAX_MB = 50;
 import { markersPanel, pollsPanel, storiesPanel } from './extras';
 
 const DEFAULT_MAP = `${import.meta.env.BASE_URL}map.webp`;
@@ -225,14 +227,21 @@ function openEditor(m: Mission, isNew: boolean) {
     value: m.map_x != null && m.map_y != null ? { x: m.map_x, y: m.map_y } : null,
   });
 
-  const uploader = (target: HTMLInputElement, accept: string) => {
+  const uploader = (target: HTMLInputElement, accept: string, video = false) => {
     const file = h('input', { type: 'file', accept, class: 'file' });
     file.onchange = async () => {
-      if (!file.files?.[0]) return;
-      toast('מעלה…');
+      const f = file.files?.[0];
+      if (!f) return;
+      // בתוכנית החינמית של Supabase קובץ יכול להיות עד 50MB
+      if (f.size > VIDEO_MAX_MB * 1024 * 1024) {
+        toast(`הקובץ גדול מ-${VIDEO_MAX_MB}MB. קצרו אותו או הקטינו את האיכות (720p) ונסו שוב.`, true);
+        file.value = '';
+        return;
+      }
+      toast(video ? 'מעלה סרטון… זה יכול לקחת דקה-שתיים, לא לסגור את הדף' : 'מעלה…');
       try {
-        target.value = await store.upload(file.files[0]);
-        toast('הקובץ הועלה');
+        target.value = await store.upload(f);
+        toast(video ? 'הסרטון הועלה. לחצו "שמירה" כדי שיופיע בעצירה' : 'הקובץ הועלה');
       } catch (e) {
         toast((e as Error).message, true);
       }
@@ -269,6 +278,7 @@ function openEditor(m: Mission, isNew: boolean) {
         h('small', { class: 'muted' }, 'הזמן מתחילת השידור, כמו בנגן של Kick (למשל 1:23:10 עד 1:24:30). בעצירה יופיע "צפייה בקטע מהלייב" שמנגן את ההקלטה ב-Kick מהנקודה הזאת. השידור נבחר לפי "מתי קרה" (ריק = השידור הנוכחי). אם יש גם סרטון או קישור – הם מוצגים במקום.'),
       ),
       field('או קישור לקטע', recap, 'קליפ או VOD של Kick, YouTube, או קובץ mp4 ישיר שמתנגן בתוך האתר'),
+      h('div', { class: 'upload' }, h('span', {}, `או העלאת סרטון מהמחשב/טלפון (mp4, עד ${VIDEO_MAX_MB}MB):`), uploader(recap, 'video/mp4,video/webm,video/quicktime,video/*', true)),
       field('קישור להורדה', download),
       h('div', { class: 'upload' }, h('span', {}, 'או העלאת קובץ להורדה:'), uploader(download, 'video/*,audio/*,image/*')),
     ),
