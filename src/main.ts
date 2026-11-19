@@ -1375,11 +1375,11 @@ Promise.race([firstLoad, new Promise<null>((r) => setTimeout(() => r(null), 8000
       const retry = () => {
         if (done) return;
         Promise.race([store.load(), new Promise<null>((r) => setTimeout(() => r(null), 15000))])
-          .then((real) => (real ? ((done = true), got(real)) : setTimeout(retry, 20000)))
-          .catch(() => setTimeout(retry, 20000));
+          .then((real) => (real ? ((done = true), got(real)) : setTimeout(retry, 20000 + Math.random() * 25000)))
+          .catch(() => setTimeout(retry, 20000 + Math.random() * 25000));
       };
       firstLoad.then((real) => { if (!done) { done = true; got(real); } }).catch(() => {});
-      setTimeout(retry, 20000);
+      setTimeout(retry, 20000 + Math.random() * 25000);
     }
     data = d;
     layout();
