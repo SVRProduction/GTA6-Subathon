@@ -302,6 +302,8 @@ export function createWorld(stage: HTMLElement, onSize: (w: number, h: number) =
   };
   const onWheel = (e: WheelEvent) => {
     if (!free) return;
+    // גלילה בתוך חלון שעל המפה (פאנל, כרטיס מרקר, הטלפון) – לא זום
+    if ((e.target as HTMLElement | null)?.closest?.('.panel, .pop, .story, .phone, .ed-tray, .mk__card')) return;
     e.preventDefault();
     cancelAnimationFrame(glide);
     raw = { ...free };

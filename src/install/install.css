@@ -27,3 +27,10 @@ button { font: inherit; cursor: pointer; }
 .in__note { margin: 0 0 10px; padding: 12px 14px; border-radius: 16px; background: #fff1d2; font-size: 15px; }
 .in__open { display: inline-flex; align-items: center; min-height: 48px; padding: 0 22px; border-radius: 999px; background: #f3eef6; color: var(--ink); font-weight: 700; text-decoration: none; }
 .in__foot { margin: 6px 0 0; color: var(--mute); font-size: 12px; }
+
+/* פס גלילה דק במקום הפס הלבן של Windows */
+* { scrollbar-width: thin; scrollbar-color: rgba(240, 48, 111, 0.4) transparent; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(240, 48, 111, 0.35); border-radius: 999px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-button, ::-webkit-scrollbar-corner { display: none; width: 0; height: 0; }

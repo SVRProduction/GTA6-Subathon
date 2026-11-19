@@ -870,7 +870,8 @@ function goTo(i: number) {
   if (reduce) shown = focus;
 }
 
-const inPanel = (t: EventTarget | null) => !!(t as HTMLElement | null)?.closest?.('.panel');
+// גלילה בתוך חלון (פאנל, חלון מרקר/שכבות, סטורי, הטלפון) – גוללת את החלון ולא מזיזה את המפה
+const inPanel = (t: EventTarget | null) => !!(t as HTMLElement | null)?.closest?.('.panel, .pop, .story, .phone, .ed-tray, .mk__card');
 let snapTimer = 0;
 addEventListener(
   'wheel',
