@@ -16,7 +16,7 @@ export const kindLabel = (m: Mission) => (m.is_milestone ? 'מיילסטון' : 
 
 /** וידאו שאפשר לנגן בתוך העמוד (קובץ ישיר או YouTube); קישורי Kick נפתחים בלשונית */
 export function videoEmbed(url: string): HTMLElement | null {
-  if (/\.(mp4|webm|mov)(\?|$)/i.test(url) || url.startsWith('data:video/'))
+  if (/\.(mp4|m4v|webm|mov)(\?|$)/i.test(url) || url.startsWith('data:video/'))
     return h('video', { src: url, controls: true, playsInline: true, preload: 'metadata' });
   const yt = url.match(/(?:youtube\.com\/(?:watch\?v=|live\/|shorts\/)|youtu\.be\/)([\w-]{11})/);
   if (yt) {

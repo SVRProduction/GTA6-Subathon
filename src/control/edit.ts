@@ -347,6 +347,21 @@ export function createEditor(opts: {
     const summary = h('textarea', { class: 'f-in', rows: 2, maxLength: 200, value: m.summary, placeholder: 'תקציר קצר (מופיע ליד הסיכה)' });
     const recap = h('input', { class: 'f-in', type: 'url', dir: 'ltr', value: m.recap_url ?? '', placeholder: 'https://kick.com/…/clips/…' });
     const ms = h('input', { type: 'checkbox', checked: m.is_milestone });
+    // העלאת סרטון מהמכשיר: הקישור לקובץ נכנס לשדה "קישור לקטע" ומתנגן בתוך האתר
+    const vid = h('input', { type: 'file', accept: 'video/mp4,video/webm,video/quicktime,video/*', class: 'up__file' });
+    vid.onchange = async () => {
+      const f = vid.files?.[0];
+      vid.value = '';
+      if (!f) return;
+      if (f.size > 50 * 1024 * 1024) return opts.toast('הסרטון גדול מ-50MB. קצרו אותו או הקטינו ל-720p ונסו שוב.');
+      opts.toast('מעלה סרטון… זה יכול לקחת דקה-שתיים');
+      try {
+        recap.value = await opts.store.upload(f);
+        opts.toast('הסרטון הועלה. לחצו "שמירה"');
+      } catch (err) {
+        opts.toast((err as Error).message);
+      }
+    };
     const now = h('input', { type: 'checkbox', checked: !existing });
     const where = h('span', { class: 'f-hint' }, point ? 'המיקום נבחר על המפה.' : 'מיקום אוטומטי: בהמשך המסלול.');
     const move = existing ? h('button', { type: 'button', class: 'btn btn--small' }, svg('pin', 16), 'הזזה על המפה') : null;
@@ -368,6 +383,7 @@ export function createEditor(opts: {
       h('label', { class: 'check check--ms' }, ms, h('span', {}, h('strong', {}, 'מיילסטון'), h('small', {}, 'סיכה צהובה גדולה, סטורי רשמי ופס ההתקדמות'))),
       existing ? null : h('label', { class: 'check' }, now, h('span', {}, 'זאת העצירה שאנחנו בה עכשיו')),
       h('label', { class: 'f-row' }, h('span', {}, 'קישור לקטע (לא חובה)'), recap),
+      h('label', { class: 'btn btn--small' }, svg('upload', 16), 'או העלאת סרטון (עד 50MB)', vid),
       h('div', { class: 'f-cols' }, where, move),
       h('p', { class: 'f-hint' }, 'ריקאפ מלא, תמונה, הורדה וציטוט – בעמוד הניהול.'),
       h('div', { class: 'f-actions' }, save, del),

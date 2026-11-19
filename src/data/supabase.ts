@@ -451,7 +451,9 @@ export function createSupabaseStore(url: string, key: string): Store {
       check(await sb.from('settings').upsert({ id: 1, ...s }));
     },
     async upload(file) {
-      const ext = file.name.includes('.') ? file.name.slice(file.name.lastIndexOf('.')) : '';
+      // סיומת לפי שם הקובץ, ואם אין – לפי הסוג (כדי שהאתר יזהה שזה סרטון ויתנגן בתוכו)
+      const byType: Record<string, string> = { 'video/mp4': '.mp4', 'video/webm': '.webm', 'video/quicktime': '.mov', 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp' };
+      const ext = (file.name.includes('.') ? file.name.slice(file.name.lastIndexOf('.')) : byType[file.type] ?? '').toLowerCase().replace(/[^.a-z0-9]/g, '');
       const path = `${Date.now()}-${crypto.randomUUID().slice(0, 8)}${ext}`;
       check(await sb.storage.from(STORAGE_BUCKET).upload(path, file, { contentType: file.type }));
       return sb.storage.from(STORAGE_BUCKET).getPublicUrl(path).data.publicUrl;
