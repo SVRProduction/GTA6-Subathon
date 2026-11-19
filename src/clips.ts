@@ -1,5 +1,5 @@
 // קליפים מהקטגוריה: רשת בפאנל, ניגון בתוך האתר (HLS). hls.js נטען רק כשצריך, ובספארי לא בכלל.
-import type { Clip, Data, Mission } from './data/types';
+import type { Clip, Data, LiveData, Mission } from './data/types';
 import { h } from './dom';
 import { ico } from './icons';
 
@@ -19,6 +19,18 @@ export function clipStop(c: Clip, missions: Mission[]) {
     if (m.happened_at && Date.parse(m.happened_at) <= t) best = i;
   });
   return best;
+}
+
+/** תמונה לתצוגה מקדימה של עצירה: התמונה של הקליפ הנצפה ביותר שצולם בזמן העצירה (null = אין) */
+export function stopClipThumb(i: number, missions: Mission[], live: LiveData | null): string | null {
+  if (!live || live.demoClips) return null; // בדמו הקליפים לא שייכים לעצירות
+  let best: Clip | null = null;
+  for (const c of live.clips) {
+    if (!c.thumbnail_url || !/^https:\/\//.test(c.thumbnail_url)) continue;
+    if (clipStop(c, missions) !== i) continue;
+    if (!best || (c.views ?? 0) > (best.views ?? 0)) best = c;
+  }
+  return best?.thumbnail_url ?? null;
 }
 
 let hlsMod: Promise<typeof import('hls.js')> | null = null;

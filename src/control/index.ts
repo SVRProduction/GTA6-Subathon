@@ -1,6 +1,6 @@
 // "Mission Control": כל מה שמעל המפה בגרסה 6 – סרגל שפותח חלונות קופצים (סטטיסטיקות, פיד, קליפים, עצירות, שכבות),
 // מרקרים חופשיים, הטלפון הנשלף עם הסטוריז, סקרים, ולמודים – מצב עריכה ומדריך.
-import { clipsView } from '../clips';
+import { clipsView, stopClipThumb } from '../clips';
 import { commentCount, commentsBox } from '../comments';
 import { currentIndex, kickSlug, MARKER_TYPES, pollOpen, type Clip, type Comment, type Data, type Extras, type LiveData, type Marker, type MarkerType, type Mission, type Poll, type Store } from '../data/types';
 import { fill, h, safeUrl } from '../dom';
@@ -153,7 +153,7 @@ export function createControl(o: {
   function crop(i: number, w: number, hgt: number, span: number): HTMLElement | null {
     const d = o.data();
     const m = d?.missions[i];
-    const img = safeUrl(m?.image_url);
+    const img = safeUrl(m?.image_url) ?? (d ? stopClipThumb(i, d.missions, o.live()) : null);
     if (img) return h('img', { class: 'st-img', src: img, alt: m?.title ?? '' });
     const p = o.stopPoint(i);
     const im = o.mapImage;
