@@ -171,13 +171,13 @@ function modsPanel() {
   form.onsubmit = (e) => {
     e.preventDefault();
     const n = input.value.trim();
-    if (n) run(() => store.addMod(n), `${kickName(n)} נוסף לרשימת המודים`);
+    if (n) run(() => store.addMod(n), `${kickName(n)} קיבל גישת עורך`);
   };
   return h(
     'section',
     { class: 'panel mods' },
-    h('div', { class: 'panel-head' }, h('h2', {}, `מודים (${mods.length})`)),
-    h('p', { class: 'muted' }, 'מי שברשימה מתחבר עם Kick ומקבל את כלי העריכה, באתר ובמפה. הסרה תופסת מיד. הבעלים תמיד מודים, ורק הם מנהלים את הרשימה.'),
+    h('div', { class: 'panel-head' }, h('h2', {}, `עורכים – גישת עריכה (${mods.length})`)),
+    h('p', { class: 'muted' }, 'לא צריך להיות מוד בקיק: כל מי שברשימה מתחבר עם Kick ומקבל את כלי העריכה, באתר ובמפה. הסרה תופסת מיד. רק הבעלים (odedsvr ו-zswolt) מוסיפים ומסירים.'),
     form,
     h(
       'ul',
@@ -186,10 +186,10 @@ function modsPanel() {
         h(
           'li',
           {},
-          h('div', { class: 'info' }, h('strong', { dir: 'ltr' }, m.kick_username), h('small', {}, m.owner ? 'תמיד מוד, מנהל את הרשימה' : m.last_login ? `כניסה אחרונה: ${fmtDate(m.last_login)}` : 'עוד לא התחבר')),
+          h('div', { class: 'info' }, h('strong', { dir: 'ltr' }, m.kick_username), h('small', {}, m.owner ? 'תמיד עורך, מנהל את הרשימה' : m.last_login ? `כניסה אחרונה: ${fmtDate(m.last_login)}` : 'עוד לא התחבר')),
           m.owner
             ? h('span', { class: 'mods__tag' }, 'בעלים')
-            : h('div', { class: 'ops' }, h('button', { type: 'button', class: 'danger', onclick: (e: MouseEvent) => twice(e, () => run(() => store.removeMod(m.kick_username), `${m.kick_username} הוסר`)) }, 'הסרה')),
+            : h('div', { class: 'ops' }, h('button', { type: 'button', class: 'danger', onclick: (e: MouseEvent) => twice(e, () => run(() => store.removeMod(m.kick_username), `הגישה של ${m.kick_username} הוסרה`)) }, 'הסרה')),
         ),
       ),
     ),
