@@ -13,6 +13,10 @@ const ago = (iso: string) => {
 
 /** העצירה שהייתה פעילה כשהקליפ צולם: האחרונה שקרתה לפניו */
 export function clipStop(c: Clip, missions: Mission[]) {
+  if (c.mission_id) {
+    const k = missions.findIndex((m) => m.id === c.mission_id);
+    if (k >= 0) return k;
+  }
   const t = Date.parse(c.created_at);
   let best = -1;
   missions.forEach((m, i) => {
@@ -38,7 +42,8 @@ let hlsMod: Promise<typeof import('hls.js')> | null = null;
 export function playClip(box: HTMLElement, c: Clip) {
   const v = h('video', { controls: true, playsInline: true, autoplay: true, poster: c.thumbnail_url ?? undefined }) as HTMLVideoElement;
   box.replaceChildren(v);
-  const src = c.video_url ?? '';
+  // עותק שנשמר אצלנו קודם (הקישור של Kick נעלם כשהשידור נמחק)
+  const src = c.archived_url ?? c.video_url ?? '';
   let stop = () => v.pause();
   // hls.js (MSE) קודם; ניגון מובנה רק כשאין MSE (אייפון). Chrome מדווח "maybe" על HLS מובנה גם כשלא באמת מנגן
   const native = () => {

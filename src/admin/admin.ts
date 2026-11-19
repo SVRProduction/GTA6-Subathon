@@ -212,6 +212,10 @@ function openEditor(m: Mission, isNew: boolean) {
   const chapter = h('input', { value: m.chapter ?? '', placeholder: 'למשל: פרק 2 · הביצות', maxLength: 40 });
   const quote = h('textarea', { value: m.quote ?? '', rows: 2, maxLength: 220 });
   const quoteBy = h('input', { value: m.quote_by ?? '', placeholder: 'למשל: הצ׳אט', maxLength: 40 });
+  const clipStart = h('input', { value: m.clip_start ?? '', placeholder: '1:23:10', dir: 'ltr', maxLength: 12, inputMode: 'numeric' });
+  const clipEnd = h('input', { value: m.clip_end ?? '', placeholder: '1:24:30', dir: 'ltr', maxLength: 12, inputMode: 'numeric' });
+  const draft = h('input', { type: 'checkbox', checked: m.published === false });
+  const wasDraft = m.published === false;
   const others = data.missions.some((x) => x.id === m.id) ? data.missions : [...data.missions, m];
   const picker = createPicker({
     trail: data.settings.map_image_url ? null : trailRaw,
@@ -249,6 +253,7 @@ function openEditor(m: Mission, isNew: boolean) {
       field('תקציר קצר', summary, 'מופיע בכרטיס הקטן ליד הסיכה'),
       h('div', { class: 'field' }, h('span', {}, 'איפה על המפה'), picker.el),
       h('label', { class: 'check check--ms' }, milestone, h('span', {}, h('strong', {}, 'מיילסטון'), h('small', {}, 'סיכה צהובה גדולה, סימון בפס ההתקדמות וריקאפ מלא'))),
+      h('label', { class: 'check' }, draft, h('span', {}, h('strong', {}, 'טיוטה'), h('small', {}, 'מכינים מראש; לא מופיעה לצופים עד שלוחצים "פרסום עכשיו"'))),
     ),
     h(
       'fieldset',
@@ -256,7 +261,14 @@ function openEditor(m: Mission, isNew: boolean) {
       h('legend', {}, 'ריקאפ ומדיה'),
       shotField(image),
       field('ריקאפ מלא', body, 'מה קרה ולמה זה חשוב לעלילה'),
-      field('קישור לקטע מהלייב', recap, 'קליפ או VOD של Kick, YouTube, או קובץ mp4 ישיר שמתנגן בתוך האתר'),
+      h(
+        'div',
+        { class: 'field' },
+        h('span', {}, 'קליפ מהלייב (נחתך ונשמר באתר)'),
+        h('div', { class: 'row' }, field('מדקה', clipStart), field('עד דקה', clipEnd)),
+        h('small', { class: 'muted' }, 'הזמן מתחילת השידור, כמו בנגן של Kick (למשל 1:23:10 עד 1:24:30). עד 3 דקות. אחרי השמירה הקליפ מוכן תוך כדקה ומופיע בעצירה.'),
+      ),
+      field('או קישור לקטע', recap, 'קליפ או VOD של Kick, YouTube, או קובץ mp4 ישיר שמתנגן בתוך האתר'),
       field('קישור להורדה', download),
       h('div', { class: 'upload' }, h('span', {}, 'או העלאת קובץ להורדה:'), uploader(download, 'video/*,audio/*,image/*')),
     ),
@@ -294,13 +306,20 @@ function openEditor(m: Mission, isNew: boolean) {
       quote_by: quoteBy.value.trim() || null,
       map_x: picker.get()?.x ?? null,
       map_y: picker.get()?.y ?? null,
+      clip_start: clipStart.value.trim() || null,
+      clip_end: clipEnd.value.trim() || null,
+      published: !draft.checked,
     };
+    const publishing = wasDraft && !draft.checked;
+    if (publishing) Object.assign(next, publishedNow(next));
+    const clipChanged = !!next.clip_start && !!next.clip_end && (next.clip_start !== m.clip_start || next.clip_end !== m.clip_end || isNew);
     const save = async () => {
       await store.saveMission(next);
-      // נקודה חדשה היא בדרך כלל "איפה שאנחנו עכשיו" – חוסך לחיצה באמצע לייב
-      if (isNew) await store.saveSettings({ ...data.settings, current_mission_id: next.id });
+      // נקודה חדשה (או טיוטה שפורסמה) היא בדרך כלל "איפה שאנחנו עכשיו" – חוסך לחיצה באמצע לייב
+      if ((isNew && !draft.checked) || publishing) await store.saveSettings({ ...data.settings, current_mission_id: next.id });
     };
-    if (await run(save, 'נשמר – הצופים כבר רואים את זה')) editor.close();
+    const msg = draft.checked ? 'נשמר כטיוטה – הצופים לא רואים אותה' : clipChanged ? 'נשמר. הקליפ נחתך עכשיו ויופיע בעצירה תוך כדקה' : 'נשמר – הצופים כבר רואים את זה';
+    if (await run(save, msg)) editor.close();
   };
   // הדבקת תמונה בכל מקום בעורך (כשלא מקלידים בשדה טקסט) נכנסת כתמונה מהקטע
   form.addEventListener('paste', (e) => {
@@ -385,7 +404,65 @@ function nowCard() {
       m ? h('h2', {}, h('span', { class: `num ${m.is_milestone ? 'num--ms' : ''}` }, String(i + 1)), m.title || '(ללא שם)') : h('h2', {}, 'העצירה הראשונה מחכה'),
       m ? h('p', { class: 'muted' }, [m.chapter, m.stream_day ? `יום ${m.stream_day}` : '', fmtDate(m.happened_at)].filter(Boolean).join('  |  ')) : null,
     ),
-    h('div', { class: 'now-card__actions' }, add, m ? h('button', { class: 'btn', type: 'button', onclick: () => openEditor(m, false) }, 'עריכת הנוכחית') : null),
+    h(
+      'div',
+      { class: 'now-card__actions' },
+      add,
+      m ? h('button', { class: 'btn', type: 'button', onclick: () => openEditor(m, false) }, 'עריכת הנוכחית') : null,
+      m && !m.finished_at
+        ? h('button', { class: 'btn', type: 'button', title: 'המשימה נגמרה, עוד לא עוברים לבאה (פטרולים, הסתובבות)', onclick: () => run(() => store.saveMission({ ...m, finished_at: new Date().toISOString() }), `"${m.title}" הושלמה ✓ – עודד מסתובב חופשי`) }, '✓ סיום משימה')
+        : m
+          ? h('span', { class: 'now-card__done' }, '✓ הושלמה · מסתובבים חופשי')
+          : null,
+    ),
+  );
+}
+
+/** טיוטה שמתפרסמת עכשיו: בסוף המסלול, עם השעה הנוכחית */
+function publishedNow(m: Mission): Partial<Mission> {
+  const nextOrder = data.missions.length ? Math.max(...data.missions.map((x) => x.order_index)) + 1 : 0;
+  return { published: true, happened_at: new Date().toISOString(), order_index: nextOrder, finished_at: null };
+}
+
+/** מיילסטונים ועצירות שהוכנו מראש: מפרסמים ברגע שעודד מגיע */
+function draftsPanel() {
+  const drafts = data.drafts ?? [];
+  const add = h('button', { class: 'btn', type: 'button' }, '+ טיוטה חדשה');
+  add.onclick = () => openEditor({ ...newMission(0), is_milestone: true, published: false, happened_at: null }, true);
+  return h(
+    'section',
+    { class: 'panel drafts' },
+    h('div', { class: 'panel-head' }, h('h2', {}, `טיוטות (${drafts.length})`), add),
+    h('p', { class: 'muted' }, 'מכינים מראש (שם, תמונה, מיקום וריקאפ). הצופים לא רואים טיוטה. "פרסום עכשיו" מוסיף אותה לסוף המסלול ברגע זה.'),
+    drafts.length
+      ? h(
+          'ul',
+          { class: 'mods__list' },
+          ...drafts.map((d) =>
+            h(
+              'li',
+              {},
+              h('div', { class: 'info' }, h('strong', {}, `${d.is_milestone ? '🏆 ' : ''}${d.title || '(ללא שם)'}`), h('small', {}, d.summary || 'טיוטה')),
+              h(
+                'div',
+                { class: 'ops' },
+                h('button', { type: 'button', onclick: () => openEditor(d, false) }, 'עריכה'),
+                h('button', {
+                  type: 'button',
+                  class: 'primary',
+                  onclick: () =>
+                    run(async () => {
+                      const next = { ...d, ...publishedNow(d) };
+                      await store.saveMission(next);
+                      await store.saveSettings({ ...data.settings, current_mission_id: next.id });
+                    }, `"${d.title}" פורסם – עכשיו הוא על המפה`),
+                }, 'פרסום עכשיו'),
+                h('button', { type: 'button', class: 'danger', onclick: (e: MouseEvent) => twice(e, () => run(() => store.deleteMission(d.id), 'הטיוטה נמחקה')) }, 'מחיקה'),
+              ),
+            ),
+          ),
+        )
+      : h('p', { class: 'empty' }, 'אין טיוטות. אפשר להכין מיילסטונים מראש ולפרסם כשמגיעים.'),
   );
 }
 
@@ -578,6 +655,7 @@ function render() {
       ),
       missions.length ? list : h('p', { class: 'empty' }, 'עדיין אין עצירות. מוסיפים את המשימה הראשונה כשהלייב מתחיל.'),
     ),
+    draftsPanel(),
     storiesPanel({ store, ex, data, run, twice }),
     pollsPanel({ store, ex, data, run, twice }),
     markersPanel({ store, ex, data, run, twice }),

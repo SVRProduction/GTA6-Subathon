@@ -469,3 +469,7 @@ kbd { display: inline-grid; place-items: center; min-width: 26px; height: 24px; 
 ::-webkit-scrollbar-thumb { background: rgba(246, 200, 30, 0.38); border-radius: 999px; border: 2px solid transparent; background-clip: padding-box; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(246, 200, 30, 0.7); background-clip: padding-box; }
 ::-webkit-scrollbar-button, ::-webkit-scrollbar-corner { display: none; width: 0; height: 0; background: transparent; }
+
+/* ── משימה שהושלמה / עודד מסתובב חופשי ── */
+.pin--done .pin__kind::after { content: ' · ✓ הושלמה'; color: #7fe3a0; }
+.player.is-roaming::after { content: 'מסתובב חופשי'; position: absolute; left: 0; top: 30px; translate: -50% 0; white-space: nowrap; padding: 3px 9px; border-radius: 999px; background: rgba(8, 12, 22, 0.88); color: var(--m-gold); font: 600 12px/1.2 var(--m-body); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45); pointer-events: none; }

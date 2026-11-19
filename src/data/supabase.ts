@@ -60,8 +60,11 @@ export function createSupabaseStore(url: string, key: string): Store {
     check(m);
     check(s);
     const { id: _id, ...settings } = (s.data ?? {}) as Partial<Settings> & { id?: number };
+    const all = (m.data ?? []) as Mission[];
     return {
-      missions: (m.data ?? []) as Mission[],
+      // טיוטות לא נכנסות למפה (גם לעורכים); הן ברשימה נפרדת בדף הניהול
+      missions: all.filter((x) => x.published !== false),
+      drafts: all.filter((x) => x.published === false),
       settings: { ...DEFAULT_SETTINGS, ...settings },
     };
   }
@@ -295,7 +298,12 @@ export function createSupabaseStore(url: string, key: string): Store {
       };
     },
     async saveMission(m) {
-      check(await sb.from('missions').upsert(m));
+      const r = await sb.from('missions').upsert(m);
+      // מסד שעוד לא עודכן (בלי העמודות של טיוטות/סיום/קליפ) – שומרים בלי השדות החדשים, כדי שהעריכה בלייב לא תיתקע
+      if (r.error && /published|finished_at|clip_start|clip_end|column/i.test(r.error.message)) {
+        const { published: _p, finished_at: _f, clip_start: _a, clip_end: _b, ...old } = m;
+        check(await sb.from('missions').upsert(old));
+      } else check(r);
     },
     async deleteMission(id) {
       check(await sb.from('missions').delete().eq('id', id));
