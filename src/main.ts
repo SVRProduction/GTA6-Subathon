@@ -9,7 +9,7 @@ import { createWorld } from './journey/world';
 import { createWater, type Water } from './journey/water';
 import { createLife, type Life } from './journey/life';
 import { createLive, fmtHours } from './live';
-import { clipCard, clipsView, clipStop, playClip } from './clips';
+import { clipCard, clipsView, clipStop, playClip, playRange, rangeClip } from './clips';
 import { commentCount, commentsBox, initComments } from './comments';
 import { loginError } from './auth';
 import { createMissionHud, legend } from './mission';
@@ -274,7 +274,20 @@ let liveData: LiveData | null = null;
 const mission = createMissionHud(stage, { reduce });
 /** קליפים לפי עצירה (העצירה שהייתה פעילה כשצולמו) */
 let clipsByStop = new Map<number, Clip[]>();
+// מונים קבועים על המפה (כל הסאבתון): מוות, מעצרים, כישלונות
+const mapCount = h('div', { class: 'mapcount', ariaLabel: 'מונים', hidden: true });
+stage.append(mapCount);
+function paintMapCount(l: LiveData) {
+  const items: Array<[CounterName, string, string]> = [
+    ['deaths', '💀', 'מוות'],
+    ['arrests', '🚓', 'מעצרים'],
+    ['fails', '❌', 'כישלונות'],
+  ];
+  mapCount.replaceChildren(...items.map(([k, e, label]) => h('span', { class: 'mapcount__i', title: label }, h('i', { ariaHidden: 'true' }, e), h('b', {}, countOf(l, k).toLocaleString('he-IL')), h('small', {}, label))));
+  mapCount.hidden = embed;
+}
 function onLive(l: LiveData) {
+  paintMapCount(l);
   liveData = l;
   liveUi.setLive(l);
   mission.setLive(l);
@@ -291,7 +304,7 @@ function onLive(l: LiveData) {
   }
   if (active === -3) openClips(true);
   // פאנל של עצירה שכבר פתוח: מוסיפים את הנתונים והקליפים, בלי לקפוץ לראש הפאנל ובלי לעצור קליפ שמתנגן
-  else if (active >= 0 && !panelBody.querySelector('.is-playing, iframe') && ![...panelBody.querySelectorAll('textarea')].some((t) => t.value.trim())) {
+  else if (active >= 0 && !panelBody.querySelector('.is-playing, iframe, .stop__range:not([hidden])') && ![...panelBody.querySelectorAll('textarea')].some((t) => t.value.trim())) {
     const keep = panelBody.scrollTop;
     openPanel(active, true, true);
     panelBody.scrollTop = keep;
@@ -732,6 +745,18 @@ function openPanel(i: number, auto = false, refresh = false) {
   }
   active = i;
   const [media, ...rest] = stopBody(m, i, toast, { embed: true, snapshot: mapSnapshot(i) });
+  // "צפה בקטע": הקטע שנבחר בכרטיס (מדקה–עד דקה) – כל הטווח מההקלטה בקיק
+  const range = rangeClip(m.id, liveData);
+  const watchBox = h('div', { class: 'stop__media stop__range', hidden: true });
+  const watchBtn = range
+    ? h('button', { type: 'button', class: 'btn btn--primary stop__watch' }, ico.play(), range.vod_from != null && range.vod_to != null ? `צפה בקטע (${Math.round((range.vod_to - range.vod_from) / 60)} דק')` : 'צפה בקטע')
+    : null;
+  if (watchBtn && range)
+    watchBtn.onclick = () => {
+      watchBox.hidden = false;
+      watchBtn.remove();
+      playRange(watchBox, range);
+    };
   const clips = stopClips(i);
   const nClips = clipsByStop.get(i)?.length ?? 0;
   const nTalk = commentCount('stop', m.id);
@@ -754,7 +779,7 @@ function openPanel(i: number, auto = false, refresh = false) {
         : null,
     ),
     untilHere(i),
-    section('msec--story', null, media, m.body && m.summary ? h('p', { class: 'stop__teaser' }, m.summary) : null, ...rest, i === cur && kickChannel ? livePlayer(kickChannel) : null),
+    section('msec--story', null, media, watchBtn, watchBox, m.body && m.summary ? h('p', { class: 'stop__teaser' }, m.summary) : null, ...rest, i === cur && kickChannel ? livePlayer(kickChannel) : null),
     section('msec--clips', nClips ? `קליפים מהרגע הזה (${nClips})` : 'קליפים מהרגע הזה', clips ?? h('p', { class: 'mempty' }, 'עוד אין קליפים מהקטע הזה. קליפ שנעשה בלייב בזמן המשימה יופיע כאן לבד.')),
     section('msec--talk', nTalk ? `תגובות (${nTalk})` : 'תגובות', commentsBox(store, 'stop', m.id, { toast, title: false })),
   );

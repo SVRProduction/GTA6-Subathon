@@ -91,6 +91,13 @@ export interface Clip {
   source?: 'kick' | 'own';
   /** עותק שנשמר אצלנו (כשהקליפ של Kick יימחק) */
   archived_url?: string | null;
+  /** range = הקטע מכרטיס העצירה; moment = מוות/מעצר/כישלון; archive = עותק של קליפ Kick */
+  kind?: 'range' | 'moment' | 'archive' | null;
+  category?: 'death' | 'arrest' | 'fail' | null;
+  /** הקטע המלא בהקלטה בקיק (לניגון "צפה בקטע"), בשניות מתחילת השידור */
+  vod_url?: string | null;
+  vod_from?: number | null;
+  vod_to?: number | null;
 }
 
 /** תגובה של צופה (מחובר עם Kick) על עצירה או על קליפ */
