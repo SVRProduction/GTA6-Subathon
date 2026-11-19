@@ -163,13 +163,20 @@ export function createEditor(opts: {
     e.stopPropagation();
     const x0 = e.clientX;
     const y0 = e.clientY;
+    // תופסים את המגן, אבל המיקום של המרקר הוא העוקץ שמתחתיו: שומרים את ההפרש, כדי שהמרקר לא יקפוץ ויישאר מתחת לאצבע
+    const { w: W0, h: H0 } = opts.world.size();
+    const r0 = opts.stage.getBoundingClientRect();
+    const tip = opts.world.project({ x: m.x * W0, y: m.y * H0 });
+    const offX = r0.left + tip.x - x0;
+    const offY = r0.top + tip.y - y0;
+    const at = (ev: PointerEvent) => toMap(ev.clientX + offX, ev.clientY + offY);
     let moved = false;
     el.setPointerCapture(e.pointerId);
     const move = (ev: PointerEvent) => {
       if (!moved && Math.hypot(ev.clientX - x0, ev.clientY - y0) < 5) return;
       moved = true;
       el.classList.add('is-drag');
-      opts.layer.setDrag(m.id, toMap(ev.clientX, ev.clientY));
+      opts.layer.setDrag(m.id, at(ev));
     };
     const up = async (ev: PointerEvent) => {
       el.removeEventListener('pointermove', move);
@@ -178,7 +185,7 @@ export function createEditor(opts: {
       el.classList.remove('is-drag');
       if (!moved) return;
       el.dataset.dragged = '1';
-      const p = toMap(ev.clientX, ev.clientY);
+      const p = at(ev);
       try {
         await opts.store.saveMarker({ ...m, ...p });
         opts.toast('המרקר הוזז');
