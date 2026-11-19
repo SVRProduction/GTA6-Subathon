@@ -175,7 +175,7 @@ function rebuild() {
       'button',
       {
         type: 'button',
-        class: `pin pin--${state} ${m.is_milestone ? 'pin--ms' : 'pin--dot'} ${clipsByStop.has(i) ? 'pin--clip' : ''}`,
+        class: `pin pin--${state} ${m.is_milestone ? 'pin--ms' : 'pin--dot'} ${clipsByStop.has(i) ? 'pin--clip' : ''} ${m.finished_at ? 'pin--done' : ''}`,
         ariaLabel: `${kindLabel(m)} ${i + 1}: ${m.title}`,
         onclick: () => {
           // מצב עריכה (מודים): לחיצה על עצירה פותחת ישר את טופס העריכה – שמירה, הזזה ומחיקה
@@ -1195,6 +1195,9 @@ function frame(force = false) {
       me.classList.toggle('is-asleep', !onAir);
     }
     me.classList.toggle('is-driving', Math.abs(want - playerS) > 2);
+    // המשימה הנוכחית הושלמה ועוד אין חדשה: עודד מסתובב חופשי
+    const roaming = !!data.missions[cur]?.finished_at;
+    if (me.classList.contains('is-roaming') !== roaming) me.classList.toggle('is-roaming', roaming);
   }
   // קו מקווקו מהדמות אל מיקום הסקר הפתוח ("לאן נוסעים?")
   const pa = control.pollAt();

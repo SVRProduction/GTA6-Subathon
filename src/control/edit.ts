@@ -52,7 +52,21 @@ export function createEditor(opts: {
   }
   const done = h('button', { type: 'button', class: 'ed-done' }, svg('check', 18), 'סיום');
   done.onclick = () => setOn(false);
-  tray.append(h('div', { class: 'ed-tools' }, toolBtn('stop'), h('span', { class: 'ed-sep', ariaHidden: 'true' }), ...PALETTE.map(toolBtn)), hint, done);
+  // ✓ סיום משימה: המשימה הנוכחית נגמרה, בלי לעבור לבאה (פטרולים, הסתובבות)
+  const finish = h('button', { type: 'button', class: 'ed-done ed-finish', title: 'המשימה הנוכחית הושלמה – עודד מסתובב חופשי עד העצירה הבאה' }, '✓ סיום משימה');
+  finish.onclick = async () => {
+    const d = opts.data();
+    const m = d ? d.missions[currentIndex(d)] : null;
+    if (!m) return opts.toast('אין משימה נוכחית');
+    if (m.finished_at) return opts.toast('המשימה כבר סומנה כהושלמה');
+    try {
+      await opts.store.saveMission({ ...m, finished_at: new Date().toISOString() });
+      opts.toast(`"${m.title}" הושלמה ✓`);
+    } catch (err) {
+      opts.toast((err as Error).message);
+    }
+  };
+  tray.append(h('div', { class: 'ed-tools' }, toolBtn('stop'), h('span', { class: 'ed-sep', ariaHidden: 'true' }), ...PALETTE.map(toolBtn)), hint, finish, done);
 
   function setHint() {
     hint.textContent = picking

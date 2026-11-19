@@ -162,7 +162,7 @@ select.f-in { appearance: none; background-image: linear-gradient(45deg, transpa
 /* ═══ מגש העריכה (למודים) ═══ */
 .ed-tray {
   position: absolute; z-index: 7; left: 50%; bottom: calc(max(18px, var(--safe-b)) + 64px); translate: -50% 0; width: min(880px, calc(100% - 36px));
-  display: grid; grid-template-columns: 1fr auto; grid-template-areas: 'tools done' 'hint hint'; gap: 6px 10px; padding: 10px;
+  display: grid; grid-template-columns: 1fr auto auto; grid-template-areas: 'tools finish done' 'hint hint hint'; gap: 6px 10px; padding: 10px;
   background: var(--m-glass-2); -webkit-backdrop-filter: var(--m-blur); backdrop-filter: var(--m-blur);
   border: 1px solid rgba(246, 200, 30, 0.45); border-radius: 16px; box-shadow: var(--m-shadow), 0 0 0 4px rgba(246, 200, 30, 0.08);
 }
@@ -530,7 +530,7 @@ button.pc__opt:active { transform: scale(0.985); }
   .poll-chip { bottom: calc(86px + var(--safe-b)); grid-template-columns: auto 1fr auto; }
   .poll-chip__k { display: none; }
   .opening { bottom: calc(92px + var(--safe-b)); }
-  .ed-tray { bottom: calc(74px + var(--safe-b)); width: calc(100% - 16px); grid-template-columns: 1fr; grid-template-areas: 'tools' 'hint' 'done'; }
+  .ed-tray { bottom: calc(74px + var(--safe-b)); width: calc(100% - 16px); grid-template-columns: 1fr 1fr; grid-template-areas: 'tools tools' 'hint hint' 'finish done'; }
   .ed-done { justify-self: stretch; justify-content: center; }
   .panel { bottom: 0; }
   /* חלון קופץ = גיליון מלמטה */
@@ -670,3 +670,5 @@ button.pc__opt:active { transform: scale(0.985); }
 .is-freemap.is-free { cursor: default; }
 .here-fab { position: absolute; z-index: 7; right: 12px; bottom: calc(150px + var(--safe-b, 0px)); display: grid; place-items: center; width: 48px; height: 48px; padding: 0; border-radius: 50%; border: 1px solid var(--m-edge); background: rgba(8, 12, 22, 0.9); font-size: 22px; box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45); cursor: pointer; }
 .journey__stage:has(.panel.is-menu[data-open]) .here-fab { display: none; }
+
+.ed-finish { grid-area: finish; background: rgba(127, 227, 160, 0.16); color: #7fe3a0; box-shadow: inset 0 0 0 1px rgba(127, 227, 160, 0.45); }

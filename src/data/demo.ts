@@ -50,6 +50,10 @@ function seed(): Data {
   };
 }
 
+/** טיוטות לא נכנסות למפה; הן ברשימה נפרדת */
+function splitDrafts(d: Data): Data {
+  return { ...d, missions: d.missions.filter((x) => x.published !== false), drafts: d.missions.filter((x) => x.published === false) };
+}
 function read(): Data {
   try {
     const raw = localStorage.getItem(KEY);
@@ -251,7 +255,7 @@ export function createDemoStore(): Store {
   const channel = 'BroadcastChannel' in window ? new BroadcastChannel(KEY) : null;
   const emit = () => {
     const d = read();
-    listeners.forEach((l) => l(d));
+    listeners.forEach((l) => l(splitDrafts(d)));
   };
   channel?.addEventListener('message', (e) => e.data !== 'live' && e.data !== 'comments' && e.data !== 'extras' && emit());
 
@@ -493,7 +497,7 @@ export function createDemoStore(): Store {
       emitLive();
     },
     async load() {
-      return read();
+      return splitDrafts(read());
     },
     subscribe(cb) {
       listeners.add(cb);

@@ -21,6 +21,13 @@ export interface Mission {
   chapter: string | null;
   quote: string | null;
   quote_by: string | null;
+  /** false = טיוטה (רק עורכים רואים) */
+  published?: boolean;
+  /** מתי המשימה סומנה "הושלמה" (null = עדיין בדרך) */
+  finished_at?: string | null;
+  /** קליפ מהלייב: דקת התחלה וסיום מתחילת השידור ("1:23:10") – השרת חותך ושומר */
+  clip_start?: string | null;
+  clip_end?: string | null;
 }
 
 export interface Settings {
@@ -79,6 +86,11 @@ export interface Clip {
   views: number;
   creator: string | null;
   created_at: string;
+  /** קליפ שנחתך אצלנו לעצירה מסוימת */
+  mission_id?: string | null;
+  source?: 'kick' | 'own';
+  /** עותק שנשמר אצלנו (כשהקליפ של Kick יימחק) */
+  archived_url?: string | null;
 }
 
 /** תגובה של צופה (מחובר עם Kick) על עצירה או על קליפ */
@@ -191,6 +203,8 @@ export interface PollDraft {
 export interface Data {
   missions: Mission[];
   settings: Settings;
+  /** טיוטות (לא מפורסמות) – רק לעורכים, לא על המפה */
+  drafts?: Mission[];
 }
 
 export interface Store {
