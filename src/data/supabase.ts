@@ -41,6 +41,31 @@ export function createSupabaseStore(url: string, key: string): Store {
     refreshing.catch(() => {});
   }
   setInterval(keepFresh, 5 * 60_000);
+
+  // Realtime רק לעורכים ולשכבת ה-OBS. צופים בודקים מדי פעם, בזמנים מפוזרים:
+  // אלפי צופים עם Realtime הפילו את השרת (כל שינוי = בקשה מכל צופה באותו רגע)
+  const realtime = () => !!getModSession() || /overlay/.test(location.pathname);
+  function every(ms: number, f: () => void) {
+    let t: number | undefined;
+    const tick = () => {
+      t = window.setTimeout(() => {
+        if (document.visibilityState !== 'hidden') f();
+        tick();
+      }, ms * (0.75 + Math.random() * 0.5));
+    };
+    tick();
+    // חוזרים ללשונית אחרי זמן: רענון אחד (מפוזר)
+    let hiddenAt = 0;
+    const vis = () => {
+      if (document.visibilityState === 'hidden') hiddenAt = Date.now();
+      else if (hiddenAt && Date.now() - hiddenAt > ms) window.setTimeout(f, Math.random() * 5000);
+    };
+    document.addEventListener('visibilitychange', vis);
+    return () => {
+      clearTimeout(t);
+      document.removeEventListener('visibilitychange', vis);
+    };
+  }
   keepFresh();
 
   const check = <T extends { error: { message: string } | null }>(r: T): T => {
@@ -52,7 +77,49 @@ export function createSupabaseStore(url: string, key: string): Store {
     return r;
   };
 
+  // ── מטמון משותף לצופים (טבלה site_cache, מתרעננת בשרת כל 10 שניות) ──
+  // שורה אחת במקום ~15 שאילתות לכל צופה. עורכים ושכבת ה-OBS קוראים ישירות מהטבלאות.
+  // אם הטבלה עוד לא קיימת (לא הורץ update-site-cache.sql) – חוזרים לשאילתות הרגילות.
+  type LiveRow = {
+    status: LiveStatus | null;
+    segments: Segment[];
+    counters: Array<{ counter: CounterEvent['counter']; mission_id: string | null; n: number; last_at: string }>;
+    recent: CounterEvent[];
+    polls: Array<Omit<Poll, 'votes'>>;
+    results: Array<{ poll_id: string; option: number; n: number }>;
+    likes: Array<{ target_type: string; target_id: string; n: number }>;
+  };
+  type DataRow = { settings: (Partial<Settings> & { id?: number }) | null; missions: Mission[]; markers: Marker[]; stories: Story[] };
+  let noCache = false;
+  const memo = new Map<string, { at: number; p: Promise<unknown> }>();
+  function cached<T>(id: 'live' | 'data' | 'clips' | 'comments'): Promise<T | null> {
+    if (noCache || realtime()) return Promise.resolve(null);
+    const hit = memo.get(id);
+    if (hit && Date.now() - hit.at < 5000) return hit.p as Promise<T | null>;
+    const p = Promise.resolve(sb.from('site_cache').select('data').eq('id', id).maybeSingle()).then(({ data, error }) => {
+      if (error) {
+        if (error.code === 'PGRST205' || error.code === '42P01' || /site_cache/.test(error.message)) {
+          noCache = true;
+          return null;
+        }
+        memo.delete(id);
+        throw new Error(error.message);
+      }
+      if (!data) return null; // המטמון עוד לא התמלא (הדקה הראשונה) – הפעם מהטבלאות
+      return (data as { data: T }).data;
+    });
+    memo.set(id, { at: Date.now(), p });
+    return p;
+  }
+  const pollsWithVotes = (polls: Array<Omit<Poll, 'votes'>>, results: LiveRow['results']) =>
+    polls.map((x) => ({ ...x, votes: x.options.map((_, k) => results.find((v) => v.poll_id === x.id && v.option === k)?.n ?? 0) }));
+
   async function load(): Promise<Data> {
+    const c = await cached<DataRow>('data');
+    if (c) {
+      const { id: _i, ...st } = c.settings ?? {};
+      return { missions: c.missions ?? [], drafts: [], settings: { ...DEFAULT_SETTINGS, ...st } };
+    }
     const [m, s] = await Promise.all([
       sb.from('missions').select('*').order('order_index'),
       sb.from('settings').select('*').eq('id', 1).maybeSingle(),
@@ -73,18 +140,30 @@ export function createSupabaseStore(url: string, key: string): Store {
   const live: LiveData = { status: null, segments: [], counters: [], clips: [] };
   const loaders: Record<string, () => Promise<void>> = {
     live_status: async () => {
+      const c = await cached<LiveRow>('live');
+      if (c) return void (live.status = c.status);
       live.status = ((await sb.from('live_status').select('*').eq('id', 1).maybeSingle()).data as LiveStatus | null) ?? null;
     },
     play_segments: async () => {
+      const c = await cached<LiveRow>('live');
+      if (c) return void (live.segments = c.segments ?? []);
       live.segments = ((await sb.from('play_segments').select('started_at, ended_at').order('started_at').limit(1000)).data ?? []) as Segment[];
     },
     counter_events: async () => {
+      const c = await cached<LiveRow>('live');
+      if (c) {
+        live.counters = (c.counters ?? []).map((r) => ({ counter: r.counter, mission_id: r.mission_id, delta: r.n, created_at: r.last_at }));
+        live.recent = c.recent ?? [];
+        return;
+      }
       const rows = ((await sb.from('counter_totals').select('counter, mission_id, n, last_at').limit(1000)).data ?? []) as Array<{ counter: CounterEvent['counter']; mission_id: string | null; n: number; last_at: string }>;
       live.counters = rows.map((r) => ({ counter: r.counter, mission_id: r.mission_id, delta: r.n, created_at: r.last_at }));
       // האירועים האחרונים עצמם (עם זמן), לפיד הפעילות
       live.recent = ((await sb.from('counter_events').select('counter, delta, mission_id, created_at').order('id', { ascending: false }).limit(80)).data ?? []) as CounterEvent[];
     },
     clips: async () => {
+      const c = await cached<Clip[]>('clips');
+      if (c) return void (live.clips = c);
       live.clips = ((await sb.from('clips').select('*').order('created_at', { ascending: false }).limit(500)).data ?? []) as Clip[];
     },
   };
@@ -95,6 +174,10 @@ export function createSupabaseStore(url: string, key: string): Store {
 
   const fn = (name: string) => `${url}/functions/v1/${name}`;
   async function loadComments(includeHidden = false): Promise<Comment[]> {
+    if (!includeHidden) {
+      const c = await cached<Comment[]>('comments');
+      if (c) return c;
+    }
     let q = sb.from('comments').select('*').order('created_at', { ascending: true }).limit(2000);
     if (!includeHidden) q = q.eq('hidden', false);
     return ((await q).data ?? []) as Comment[];
@@ -102,6 +185,10 @@ export function createSupabaseStore(url: string, key: string): Store {
 
   // ── מרקרים / סטוריז / סקרים ──
   async function loadExtras(mod = false): Promise<Extras> {
+    if (!mod) {
+      const [d, l] = await Promise.all([cached<DataRow>('data'), cached<LiveRow>('live')]);
+      if (d && l) return { markers: d.markers ?? [], stories: d.stories ?? [], polls: pollsWithVotes(l.polls ?? [], l.results ?? []).reverse() };
+    }
     const now = new Date().toISOString();
     let stories = sb.from('stories').select('*').order('created_at', { ascending: false }).limit(300);
     // צופים: רק מאושרים ובתוקף (זה גם מה שה-RLS מאפשר להם); מודים רואים גם את התור
@@ -161,17 +248,25 @@ export function createSupabaseStore(url: string, key: string): Store {
       };
       // הקולות עצמם פרטיים (אין Realtime עליהם לצופים), אז בזמן סקר פתוח מרעננים את התוצאות כל ~3 שניות
       let hasOpen = false;
-      const fast = window.setInterval(() => hasOpen && document.visibilityState !== 'hidden' && refresh(), 3000);
-      const ch = sb.channel(`extras-${mod ? 'mod' : 'pub'}`);
-      for (const table of ['markers', 'stories', 'polls', 'poll_votes']) ch.on('postgres_changes', { event: '*', schema: 'public', table }, refresh);
-      ch.subscribe();
-      const poll = window.setInterval(refresh, 60_000);
+      const rt = mod || realtime();
+      // סקר פתוח: עורכים כל 3 שניות, צופים כל ~30
+      const fast = rt ? window.setInterval(() => hasOpen && document.visibilityState !== 'hidden' && refresh(), 3000) : undefined;
+      const stopFast = rt ? () => {} : every(30_000, () => hasOpen && refresh());
+      const ch = rt ? sb.channel(`extras-${mod ? 'mod' : 'pub'}`) : null;
+      if (ch) {
+        for (const table of ['markers', 'stories', 'polls', 'poll_votes']) ch.on('postgres_changes', { event: '*', schema: 'public', table }, refresh);
+        ch.subscribe();
+      }
+      const poll = rt ? window.setInterval(refresh, 60_000) : undefined;
+      const stopSlow = rt ? () => {} : every(120_000, refresh);
       loadExtras(mod).then((e) => (hasOpen = e.polls.some((p) => p.status === 'open'))).catch(() => {});
       return () => {
         clearTimeout(timer);
         clearInterval(poll);
         clearInterval(fast);
-        sb.removeChannel(ch);
+        stopFast();
+        stopSlow();
+        if (ch) sb.removeChannel(ch);
       };
     },
     async saveMarker(m) {
@@ -187,6 +282,12 @@ export function createSupabaseStore(url: string, key: string): Store {
       await viewerCall(viewer, 'like', { story_id: id });
     },
     async loadLikes() {
+      const c = await cached<LiveRow>('live').catch(() => null);
+      if (c) {
+        const out: Record<string, number> = {};
+        (c.likes ?? []).forEach((r) => (out[`${r.target_type}:${r.target_id}`] = r.n));
+        return out;
+      }
       const { data, error } = await sb.from('like_totals').select('target_type, target_id, n');
       if (error) return {}; // לפני שהורץ עדכון הלייקים
       const out: Record<string, number> = {};
@@ -227,6 +328,13 @@ export function createSupabaseStore(url: string, key: string): Store {
         clearTimeout(timer);
         timer = window.setTimeout(() => loadComments(includeHidden).then(cb).catch(console.error), 150 + Math.random() * 600);
       };
+      if (!includeHidden && !realtime()) {
+        const stop = every(180_000, refresh);
+        return () => {
+          clearTimeout(timer);
+          stop();
+        };
+      }
       const ch = sb.channel(`comments-${includeHidden ? 'all' : 'pub'}`).on('postgres_changes', { event: '*', schema: 'public', table: 'comments' }, refresh).subscribe();
       return () => {
         clearTimeout(timer);
@@ -263,6 +371,22 @@ export function createSupabaseStore(url: string, key: string): Store {
           loaders[table]().then(() => cb({ ...live })).catch(console.error);
         }, 150 + Math.random() * (table === 'counter_events' ? 900 : 4000)));
       };
+      if (!realtime()) {
+        // צופים: סטטוס ומונים כל ~45 שניות, זמני משחק כל ~3 דקות
+        const a = every(45_000, () => {
+          refresh('live_status');
+          refresh('counter_events');
+        });
+        const b = every(180_000, () => {
+          refresh('play_segments');
+          refresh('clips');
+        });
+        return () => {
+          timers.forEach((t) => clearTimeout(t));
+          a();
+          b();
+        };
+      }
       const ch = sb.channel('live');
       for (const table of Object.keys(loaders)) ch.on('postgres_changes', { event: '*', schema: 'public', table }, () => refresh(table));
       ch.subscribe();
@@ -287,6 +411,13 @@ export function createSupabaseStore(url: string, key: string): Store {
         clearTimeout(timer);
         timer = window.setTimeout(() => load().then(cb).catch(console.error), 250);
       };
+      if (!realtime()) {
+        const stop = every(90_000, refresh);
+        return () => {
+          clearTimeout(timer);
+          stop();
+        };
+      }
       const ch = sb
         .channel('river')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'missions' }, refresh)
@@ -320,7 +451,9 @@ export function createSupabaseStore(url: string, key: string): Store {
       check(await sb.from('settings').upsert({ id: 1, ...s }));
     },
     async upload(file) {
-      const ext = file.name.includes('.') ? file.name.slice(file.name.lastIndexOf('.')) : '';
+      // סיומת לפי שם הקובץ, ואם אין – לפי הסוג (כדי שהאתר יזהה שזה סרטון ויתנגן בתוכו)
+      const byType: Record<string, string> = { 'video/mp4': '.mp4', 'video/webm': '.webm', 'video/quicktime': '.mov', 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp' };
+      const ext = (file.name.includes('.') ? file.name.slice(file.name.lastIndexOf('.')) : byType[file.type] ?? '').toLowerCase().replace(/[^.a-z0-9]/g, '');
       const path = `${Date.now()}-${crypto.randomUUID().slice(0, 8)}${ext}`;
       check(await sb.storage.from(STORAGE_BUCKET).upload(path, file, { contentType: file.type }));
       return sb.storage.from(STORAGE_BUCKET).getPublicUrl(path).data.publicUrl;

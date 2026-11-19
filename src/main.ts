@@ -1,5 +1,5 @@
 import { createStore } from './data/store';
-import { currentIndex, type Data, type Mission } from './data/types';
+import { currentIndex, DEFAULT_SETTINGS, type Data, type Mission } from './data/types';
 import { fill, h, safeUrl } from './dom';
 import { ico } from './icons';
 import { kindLabel, metaText, stopBody, stopNo } from './journey/content';
@@ -9,7 +9,7 @@ import { createWorld } from './journey/world';
 import { createWater, type Water } from './journey/water';
 import { createLife, type Life } from './journey/life';
 import { createLive, fmtHours } from './live';
-import { clipCard, clipsView, clipStop, playClip, playRange, rangeClip } from './clips';
+import { clipCard, clipsView, clipStop, playClip } from './clips';
 import { commentCount, commentsBox, initComments } from './comments';
 import { loginError } from './auth';
 import { createMissionHud, legend } from './mission';
@@ -304,7 +304,7 @@ function onLive(l: LiveData) {
   }
   if (active === -3) openClips(true);
   // פאנל של עצירה שכבר פתוח: מוסיפים את הנתונים והקליפים, בלי לקפוץ לראש הפאנל ובלי לעצור קליפ שמתנגן
-  else if (active >= 0 && !panelBody.querySelector('.is-playing, iframe, .stop__range:not([hidden])') && ![...panelBody.querySelectorAll('textarea')].some((t) => t.value.trim())) {
+  else if (active >= 0 && !panelBody.querySelector('.is-playing, iframe') && ![...panelBody.querySelectorAll('textarea')].some((t) => t.value.trim())) {
     const keep = panelBody.scrollTop;
     openPanel(active, true, true);
     panelBody.scrollTop = keep;
@@ -415,7 +415,7 @@ function renderLog() {
             'div',
             { class: 'log__detail' },
             m.summary ? h('p', { class: 'stop__body' }, m.summary) : null,
-            ...stopBody(m, i, toast, { embed: false }),
+            ...stopBody(m, i, toast, { embed: false, channel: kickSlug(data.settings.kick_channel) }),
             flat ? null : h('button', { class: 'btn btn--quiet', type: 'button', onclick: () => { goTo(i); openPanel(i); } }, ico.pin(), 'הצגה על המפה'),
           ),
         ),
@@ -744,19 +744,7 @@ function openPanel(i: number, auto = false, refresh = false) {
     panel.classList.toggle('is-menu', !auto);
   }
   active = i;
-  const [media, ...rest] = stopBody(m, i, toast, { embed: true, snapshot: mapSnapshot(i) });
-  // "צפה בקטע": הקטע שנבחר בכרטיס (מדקה–עד דקה) – כל הטווח מההקלטה בקיק
-  const range = rangeClip(m.id, liveData);
-  const watchBox = h('div', { class: 'stop__media stop__range', hidden: true });
-  const watchBtn = range
-    ? h('button', { type: 'button', class: 'btn btn--primary stop__watch' }, ico.play(), range.vod_from != null && range.vod_to != null ? `צפה בקטע (${Math.round((range.vod_to - range.vod_from) / 60)} דק')` : 'צפה בקטע')
-    : null;
-  if (watchBtn && range)
-    watchBtn.onclick = () => {
-      watchBox.hidden = false;
-      watchBtn.remove();
-      playRange(watchBox, range);
-    };
+  const [media, ...rest] = stopBody(m, i, toast, { embed: true, snapshot: mapSnapshot(i), channel: kickSlug(data.settings.kick_channel) });
   const clips = stopClips(i);
   const nClips = clipsByStop.get(i)?.length ?? 0;
   const nTalk = commentCount('stop', m.id);
@@ -779,7 +767,7 @@ function openPanel(i: number, auto = false, refresh = false) {
         : null,
     ),
     untilHere(i),
-    section('msec--story', null, media, watchBtn, watchBox, m.body && m.summary ? h('p', { class: 'stop__teaser' }, m.summary) : null, ...rest, i === cur && kickChannel ? livePlayer(kickChannel) : null),
+    section('msec--story', null, media, m.body && m.summary ? h('p', { class: 'stop__teaser' }, m.summary) : null, ...rest, i === cur && kickChannel ? livePlayer(kickChannel) : null),
     section('msec--clips', nClips ? `קליפים מהרגע הזה (${nClips})` : 'קליפים מהרגע הזה', clips ?? h('p', { class: 'mempty' }, 'עוד אין קליפים מהקטע הזה. קליפ שנעשה בלייב בזמן המשימה יופיע כאן לבד.')),
     section('msec--talk', nTalk ? `תגובות (${nTalk})` : 'תגובות', commentsBox(store, 'stop', m.id, { toast, title: false })),
   );
@@ -1385,9 +1373,27 @@ function setMap() {
   locImg.src = custom ? url : `${import.meta.env.BASE_URL}map-thumb.webp`;
 }
 
-store
-  .load()
+let lateApply: ((d: Data) => void) | null = null;
+let pendingReal: Data | null = null;
+// השרת לא עונה תוך 8 שניות: מציירים את המפה בלי נקודות, והנתונים נכנסים לבד כשהשרת חוזר
+const firstLoad = store.load();
+Promise.race([firstLoad, new Promise<null>((r) => setTimeout(() => r(null), 8000))])
   .then((d) => {
+    if (!d) {
+      toast('השרת איטי כרגע. המפה תתעדכן לבד כשהוא יחזור');
+      d = { missions: [], settings: { ...DEFAULT_SETTINGS } };
+      const got = (real: Data) => (lateApply ? lateApply(real) : (pendingReal = real));
+      // אם הטעינה הראשונה נכשלה או נתקעה – מנסים שוב כל 20 שניות עד שמצליח
+      let done = false;
+      const retry = () => {
+        if (done) return;
+        Promise.race([store.load(), new Promise<null>((r) => setTimeout(() => r(null), 15000))])
+          .then((real) => (real ? ((done = true), got(real)) : setTimeout(retry, 20000 + Math.random() * 25000)))
+          .catch(() => setTimeout(retry, 20000 + Math.random() * 25000));
+      };
+      firstLoad.then((real) => { if (!done) { done = true; got(real); } }).catch(() => {});
+      setTimeout(retry, 20000 + Math.random() * 25000);
+    }
     data = d;
     layout();
     renderHud();
@@ -1417,6 +1423,16 @@ store
     control.setData(data);
     store.loadLive().then(onLive).catch(console.error);
     store.subscribeLive(onLive);
+    const applyLate = (next: Data) => {
+      data = next;
+      setMap();
+      rebuild();
+      renderHud();
+      renderLog();
+      control.setData(next);
+    };
+    lateApply = applyLate;
+    if (pendingReal) applyLate(pendingReal);
     store.subscribe((next) => {
       const known = new Set(data.missions.map((x) => x.id));
       const added = next.missions.filter((x: Mission) => !known.has(x.id));

@@ -3,12 +3,13 @@
 import { initPush } from './push';
 import { ChartColumnBig, Clapperboard, ExternalLink, Heart, House, Map as MapIco, MapPin, MessageCircle, Play, Share2, Volume2, VolumeX, X, createElement, type IconNode } from 'lucide';
 import { getViewer, login, loginError, onViewer } from '../auth';
-import { playClip, playRange, rangeClip, stopClipThumb } from '../clips';
+import { playClip, stopClipThumb } from '../clips';
 import { commentCount, commentsBox, initComments } from '../comments';
 import { createStore } from '../data/store';
 import { COUNTERS, countOf, currentIndex, kickSlug, playMs, statusFresh, type Clip, type Data, type LikeTarget, type LiveData, type Mission } from '../data/types';
 import { fill, h, safeUrl } from '../dom';
 import { videoEmbed } from '../journey/content';
+import { hasVodRange, playVodRange } from '../kickVod';
 import { makeTrail, placeAll, type Pt } from '../journey/route';
 import { fmtPlay } from '../live';
 
@@ -425,12 +426,7 @@ function renderSlide() {
   const actions = h(
     'div',
     { className: 'st-actions' },
-    (() => {
-      // הקטע שנבחר בכרטיס העצירה (מדקה–עד דקה) קודם; אחרת קישור חיצוני
-      const rc = rangeClip(m.id, live);
-      if (rc) return h('button', { className: 'pill pill--solid', type: 'button', onclick: () => watchRange(m, rc) }, ico(Play, 18), 'צפה בקטע');
-      return url ? h('button', { className: 'pill pill--solid', type: 'button', onclick: () => watch(m) }, ico(Play, 18), 'לצפייה בקטע') : null;
-    })(),
+    url || hasVodRange(m) ? h('button', { className: 'pill pill--solid', type: 'button', onclick: () => watch(m) }, ico(Play, 18), 'לצפייה בקטע') : null,
     likeBtn('stop', m.id, 'pill', 18),
     h('button', { className: 'pill', type: 'button', onclick: () => openComments('stop', m.id, m.title) }, ico(MessageCircle, 18), nC ? `${nC}` : 'תגובות'),
     h('button', { className: 'pill pill--icon', type: 'button', ariaLabel: 'במפה', onclick: () => { closeStory(); location.hash = `#m-${i + 1}`; } }, ico(MapPin, 18)),
@@ -565,14 +561,16 @@ function openSheet(title: string, body: HTMLElement, opts: { tall?: boolean } = 
 function openComments(type: 'stop' | 'clip', id: string, title: string) {
   openSheet(title ? `תגובות: ${title}` : 'תגובות', commentsBox(store, type, id, { toast, title: false }), { tall: true });
 }
-function watchRange(m: Mission, c: Clip) {
-  const box = h('div', { className: 'player' });
-  openSheet(m.title, box);
-  playRange(box, c);
-}
 function watch(m: Mission) {
   const url = safeUrl(m.recap_url);
-  if (!url) return;
+  if (!url) {
+    // דקות מהלייב: ההקלטה ב-Kick מהנקודה הזאת
+    if (!hasVodRange(m) || !data) return;
+    const box = h('div', { className: 'player' });
+    openSheet(m.title, box);
+    playVodRange(box, m, kickSlug(data.settings.kick_channel), toast);
+    return;
+  }
   const embed = videoEmbed(url);
   if (!embed) {
     window.open(url, '_blank', 'noopener');
@@ -933,7 +931,7 @@ if (loginError) setTimeout(() => toast('ההתחברות עם Kick לא הצלי
 
 // לייקים: בהתחלה ואז כל דקה (הסידור מתעדכן בבנייה הבאה של הבית)
 refreshLikes().then(() => story.hidden && renderHome());
-setInterval(() => void refreshLikes(), 60_000);
+setInterval(() => document.visibilityState !== 'hidden' && void refreshLikes(), 150_000 + Math.random() * 60_000);
 
 // זמן המשחק מתקתק
 setInterval(() => {

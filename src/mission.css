@@ -488,3 +488,7 @@ kbd { display: inline-grid; place-items: center; min-width: 26px; height: 24px; 
   .mapcount__i b { font-size: 18px; }
   .mapcount__i small { display: none; }
 }
+/* קטע מהקלטת הלייב ב-Kick */
+.vod-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 2px 0; font-size: 13px; opacity: 0.85; }
+.vod-note { margin: 0; }
+.stop__vod video { background: #000; object-fit: contain; }
