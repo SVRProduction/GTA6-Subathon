@@ -5,7 +5,7 @@ import { commentCount, commentsBox } from '../comments';
 import { currentIndex, kickSlug, MARKER_TYPES, pollOpen, type Clip, type Comment, type Data, type Extras, type LiveData, type Marker, type MarkerType, type Mission, type Poll, type Store } from '../data/types';
 import { fill, h, safeUrl } from '../dom';
 import type { World } from '../journey/world';
-import { kindLabel, metaText } from '../journey/content';
+import { kindLabel, metaText, videoEmbed } from '../journey/content';
 import { getViewer, onViewer } from '../auth';
 import { onModChange } from '../data/modSession';
 import { createEditor } from './edit';
@@ -398,7 +398,11 @@ export function createControl(o: {
     const d = o.data();
     const i = m.mission_id && d ? d.missions.findIndex((x) => x.id === m.mission_id) : -1;
     const img = safeUrl(m.image_url);
+    // קליפ: מתנגן בתוך החלון (mp4/YouTube); קישור של Kick נפתח בלשונית
+    const vid = safeUrl(m.video_url);
+    const embed = vid ? videoEmbed(vid) : null;
     const actions = h('div', { class: 'mkp__actions' });
+    if (vid && !embed) actions.append(h('a', { class: 'btn btn--small btn--primary', href: vid, target: '_blank', rel: 'noopener' }, svg('play', 16), 'צפייה בקליפ'));
     if (i >= 0) {
       const b = h('button', { type: 'button', class: 'btn btn--small' }, svg('stops', 16), `עצירה ${i + 1}: ${d!.missions[i].title}`);
       b.onclick = () => (closePopup(), o.openStop(i));
@@ -419,7 +423,7 @@ export function createControl(o: {
       size: 's',
       hash: `#marker-${m.id}`,
       body: [
-        h('div', { class: `mkp__hero mk--${m.type}` }, img ? h('img', { src: img, alt: m.title }) : h('span', { class: 'mkp__badge' }, m.type === 'custom' && m.emoji ? h('span', { class: 'mk__emoji' }, m.emoji) : markerIcon(m.type, 40))),
+        embed ? h('div', { class: 'mkp__hero mkp__hero--video' }, embed) : h('div', { class: `mkp__hero mk--${m.type}` }, img ? h('img', { src: img, alt: m.title }) : h('span', { class: 'mkp__badge' }, m.type === 'custom' && m.emoji ? h('span', { class: 'mk__emoji' }, m.emoji) : markerIcon(m.type, 40))),
         h('p', { class: 'mkp__meta' }, ago(Date.now() - Date.parse(m.created_at))),
         m.body ? h('p', { class: 'mkp__body' }, m.body) : null,
         actions,
