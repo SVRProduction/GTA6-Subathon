@@ -677,3 +677,5 @@ button.pc__opt:active { transform: scale(0.985); }
 /* קליפ במרקר */
 .mkp__hero--video { aspect-ratio: 16 / 9; background: #000; }
 .mkp__hero--video video, .mkp__hero--video iframe { width: 100%; height: 100%; border: 0; object-fit: contain; }
+.mkp__hero--video img { width: 100%; height: 100%; object-fit: cover; }
+.ed-emoji--auto { font-size: 12px; font-weight: 600; }

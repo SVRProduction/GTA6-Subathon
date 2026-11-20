@@ -1,6 +1,6 @@
 // "Mission Control": כל מה שמעל המפה בגרסה 6 – סרגל שפותח חלונות קופצים (סטטיסטיקות, פיד, קליפים, עצירות, שכבות),
 // מרקרים חופשיים, הטלפון הנשלף עם הסטוריז, סקרים, ולמודים – מצב עריכה ומדריך.
-import { clipsView, stopClipThumb } from '../clips';
+import { clipsView, playClip, stopClipThumb } from '../clips';
 import { commentCount, commentsBox } from '../comments';
 import { currentIndex, kickSlug, MARKER_TYPES, pollOpen, type Clip, type Comment, type Data, type Extras, type LiveData, type Marker, type MarkerType, type Mission, type Poll, type Store } from '../data/types';
 import { fill, h, safeUrl } from '../dom';
@@ -14,6 +14,7 @@ import { createTicker } from './ticker';
 import { guideSeen, openGuide } from './guide';
 import { markerIcon, svg } from './icons';
 import { createMarkerLayer } from './markers';
+import { kickClipId, markerEmoji } from './markerFace';
 import { createPhone } from './phone';
 import { countdown, pollCard, pollForm } from './polls';
 import { closePopup, openPopup, popupKey, refreshPopup } from './popup';
@@ -401,8 +402,21 @@ export function createControl(o: {
     // קליפ: מתנגן בתוך החלון (mp4/YouTube); קישור של Kick נפתח בלשונית
     const vid = safeUrl(m.video_url);
     const embed = vid ? videoEmbed(vid) : null;
+    // קליפ של Kick: מתנגן בתוך החלון במקום התמונה (הקישור לקובץ נמשך מ-Kick)
+    const clipId = !embed ? kickClipId(vid) : null;
+    const kickBox = clipId ? h('div', { class: 'mkp__hero mkp__hero--video' }, img ? h('img', { src: img, alt: m.title }) : null) : null;
+    if (clipId && kickBox)
+      fetch(`https://kick.com/api/v2/clips/${clipId}`)
+        .then((r) => (r.ok ? r.json() : Promise.reject()))
+        .then((j) => {
+          const c = j.clip ?? j;
+          const src = c.video_url ?? c.clip_url;
+          if (!src || !kickBox.isConnected) return;
+          playClip(kickBox, { id: clipId, title: m.title, video_url: src, thumbnail_url: c.thumbnail_url ?? img, duration: c.duration ?? null, views: 0, creator: null, created_at: m.created_at } as Clip);
+        })
+        .catch(() => {});
     const actions = h('div', { class: 'mkp__actions' });
-    if (vid && !embed) actions.append(h('a', { class: 'btn btn--small btn--primary', href: vid, target: '_blank', rel: 'noopener' }, svg('play', 16), 'צפייה בקליפ'));
+    if (vid && !embed && !clipId) actions.append(h('a', { class: 'btn btn--small btn--primary', href: vid, target: '_blank', rel: 'noopener' }, svg('play', 16), 'צפייה בקליפ'));
     if (i >= 0) {
       const b = h('button', { type: 'button', class: 'btn btn--small' }, svg('stops', 16), `עצירה ${i + 1}: ${d!.missions[i].title}`);
       b.onclick = () => (closePopup(), o.openStop(i));
@@ -423,7 +437,7 @@ export function createControl(o: {
       size: 's',
       hash: `#marker-${m.id}`,
       body: [
-        embed ? h('div', { class: 'mkp__hero mkp__hero--video' }, embed) : h('div', { class: `mkp__hero mk--${m.type}` }, img ? h('img', { src: img, alt: m.title }) : h('span', { class: 'mkp__badge' }, m.type === 'custom' && m.emoji ? h('span', { class: 'mk__emoji' }, m.emoji) : markerIcon(m.type, 40))),
+        kickBox ?? (embed ? h('div', { class: 'mkp__hero mkp__hero--video' }, embed) : h('div', { class: `mkp__hero mk--${m.type}` }, img ? h('img', { src: img, alt: m.title }) : h('span', { class: 'mkp__badge' }, markerEmoji(m) ? h('span', { class: 'mk__emoji' }, markerEmoji(m)!) : markerIcon(m.type, 40)))),
         h('p', { class: 'mkp__meta' }, ago(Date.now() - Date.parse(m.created_at))),
         m.body ? h('p', { class: 'mkp__body' }, m.body) : null,
         actions,
