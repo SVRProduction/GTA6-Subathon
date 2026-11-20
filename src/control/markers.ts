@@ -4,6 +4,7 @@ import { MARKER_TYPES, pollOpen, type Marker, type MarkerType, type Poll } from 
 import { h } from '../dom';
 import type { World } from '../journey/world';
 import { markerIcon, svg } from './icons';
+import { markerEmoji } from './markerFace';
 
 const HIDE_KEY = 'mk-hidden';
 
@@ -24,7 +25,8 @@ export function createMarkerLayer(opts: { stage: HTMLElement; world: World; onOp
   const drag = new Map<string, { x: number; y: number }>();
 
   function pinFor(m: Marker) {
-    const face = m.type === 'custom' && m.emoji ? h('span', { class: 'mk__emoji', ariaHidden: 'true' }, m.emoji) : markerIcon(m.type);
+    const em = markerEmoji(m);
+    const face = em ? h('span', { class: 'mk__emoji', ariaHidden: 'true' }, em) : markerIcon(m.type);
     const label = m.title || MARKER_TYPES[m.type].label;
     const b = h(
       'button',
@@ -51,7 +53,7 @@ export function createMarkerLayer(opts: { stage: HTMLElement; world: World; onOp
     for (const [id, el] of els) if (!keep.has(id)) (el.remove(), els.delete(id));
     for (const m of next) {
       const old = els.get(m.id);
-      const sig = JSON.stringify([m.type, m.title, m.emoji, m.image_url, m.video_url]);
+      const sig = JSON.stringify([m.type, m.title, m.body, m.emoji, m.image_url, m.video_url]);
       if (old && old.dataset.sig === sig) continue;
       const el = pinFor(m);
       el.dataset.sig = sig;

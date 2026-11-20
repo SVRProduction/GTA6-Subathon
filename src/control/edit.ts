@@ -9,7 +9,7 @@ import { closePopup, openPopup } from './popup';
 
 type Tool = MarkerType | 'stop' | null;
 const PALETTE: MarkerType[] = ['death', 'car', 'weapon', 'property', 'heist', 'chase', 'moment', 'custom'];
-const EMOJIS = ['🛥️', '🚁', '🏍️', '✈️', '🎯', '🔥', '👑', '🐊', '💎', '🎉', '🍔', '⚡'];
+const EMOJIS = ['👊', '💥', '🚔', '🐊', '🦈', '🦸', '💐', '💎', '💈', '👗', '🛍️', '🐾', '🎉', '🍔', '🏖️', '🛥️', '🚁', '🏍️', '✈️', '🎯', '🔥', '👑', '🤡', '⚡'];
 
 /** מקטין תמונה לפני העלאה (מרקר / עצירה) */
 async function shrink(file: File, max = 900): Promise<File> {
@@ -255,8 +255,12 @@ export function createEditor(opts: {
           return b;
         }),
       );
-      emojiRow.hidden = type !== 'custom';
+      // "רגע": אפשר לבחור אייקון; "אוטומטי" = לפי הכותרת (או מצלמה)
+      emojiRow.hidden = type !== 'custom' && type !== 'moment';
+      const auto = h('button', { type: 'button', class: 'ed-emoji ed-emoji--auto', role: 'radio', ariaChecked: String(!emoji), title: 'לפי הכותרת' }, 'אוטו');
+      auto.onclick = () => ((emoji = null), syncTypes());
       emojiRow.replaceChildren(
+        ...(type === 'moment' ? [auto] : []),
         ...EMOJIS.map((em) => {
           const b = h('button', { type: 'button', class: 'ed-emoji', role: 'radio', ariaChecked: String(em === emoji) }, em);
           b.onclick = () => ((emoji = em), syncTypes());
@@ -332,7 +336,7 @@ export function createEditor(opts: {
         y: init.y,
         title: title.value.trim(),
         body: body.value.trim(),
-        emoji: type === 'custom' ? emoji : null,
+        emoji: type === 'custom' || type === 'moment' ? emoji : null,
         image_url: image,
         video_url: clip.value.trim() || null,
         mission_id: init.mission_id ?? cur?.id ?? null,
