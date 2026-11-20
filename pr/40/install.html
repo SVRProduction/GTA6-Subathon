@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>להתקין את הסאבתון כאפליקציה</title>
+    <meta name="description" content="איך מוסיפים את הסאבתון של עודד למסך הבית, בשלושה צעדים." />
+    <meta name="theme-color" content="#fff7ef" />
+    <link rel="manifest" href="./phone.webmanifest" />
+    <link rel="icon" href="./icons/oded-96.png" />
+    <link rel="apple-touch-icon" href="./icons/oded-apple-180.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="הסאבתון" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+    <script type="module" crossorigin src="./assets/install-rHeOtfZL.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/modulepreload-polyfill-P2Xu9kJm.js">
+    <link rel="stylesheet" crossorigin href="./assets/install-DuUKnh8D.css">
+  </head>
+  <body>
+    <main class="in">
+      <a class="in__back" href="./phone.html">→ חזרה לטלפון</a>
+      <img class="in__icon" src="./icons/oded-192.png" alt="" width="84" height="84" />
+      <h1 class="in__title">הסאבתון של עודד, במסך הבית</h1>
+      <p class="in__sub">בלי חנות אפליקציות ובלי הורדות. לוקח 10 שניות, ונפתח כמו אפליקציה רגילה.</p>
+
+      <button class="in__now" type="button" data-now hidden>להתקין עכשיו</button>
+      <p class="in__done" data-done hidden>✓ כבר מותקן. מחפשים את "הסאבתון" במסך הבית.</p>
+
+      <nav class="in__tabs" aria-label="איזה מכשיר יש לך?">
+        <button type="button" data-os="ios">אייפון</button>
+        <button type="button" data-os="android">אנדרואיד</button>
+        <button type="button" data-os="desktop">מחשב</button>
+      </nav>
+
+      <section class="in__steps" data-steps="ios">
+        <p class="in__note" data-ios-other hidden>⚠️ באייפון זה עובד רק מ-<b>Safari</b>. מעתיקים את הכתובת ופותחים אותה ב-Safari.</p>
+        <ol>
+          <li><span class="in__n">1</span><div><b>לוחצים על כפתור השיתוף</b><small>הריבוע עם החץ למעלה, בתחתית המסך (או למעלה באייפד).</small></div><span class="in__ico" aria-hidden="true">⬆️</span></li>
+          <li><span class="in__n">2</span><div><b>בוחרים "הוספה למסך הבית"</b><small>אם לא רואים, גוללים קצת למטה ברשימה.</small></div><span class="in__ico" aria-hidden="true">➕</span></li>
+          <li><span class="in__n">3</span><div><b>לוחצים "הוספה"</b><small>האייקון של הסאבתון מופיע במסך הבית. זהו.</small></div><span class="in__ico" aria-hidden="true">✅</span></li>
+          <li><span class="in__n">4</span><div><b>רוצים התראות? פותחים מהמסך הבית ולוחצים 🔔</b><small>באייפון התראות על סטורי חדש ומשימה שנגמרה עובדות רק מהאפליקציה המותקנת (iOS 16.4 ומעלה).</small></div><span class="in__ico" aria-hidden="true">🔔</span></li>
+        </ol>
+      </section>
+
+      <section class="in__steps" data-steps="android" hidden>
+        <ol>
+          <li><span class="in__n">1</span><div><b>פותחים ב-Chrome</b><small>אם יש למעלה כפתור "להתקין עכשיו", פשוט לוחצים עליו וזהו.</small></div><span class="in__ico" aria-hidden="true">🌐</span></li>
+          <li><span class="in__n">2</span><div><b>לוחצים על ⋮ למעלה</b><small>שלוש הנקודות בפינה של הדפדפן.</small></div><span class="in__ico" aria-hidden="true">⋮</span></li>
+          <li><span class="in__n">3</span><div><b>"התקנת אפליקציה" או "הוספה למסך הבית"</b><small>מאשרים, והסאבתון מופיע עם כל האפליקציות.</small></div><span class="in__ico" aria-hidden="true">✅</span></li>
+        </ol>
+      </section>
+
+      <section class="in__steps" data-steps="desktop" hidden>
+        <ol>
+          <li><span class="in__n">1</span><div><b>פותחים ב-Chrome או ב-Edge</b><small>אם יש למעלה כפתור "להתקין עכשיו", לוחצים עליו.</small></div><span class="in__ico" aria-hidden="true">💻</span></li>
+          <li><span class="in__n">2</span><div><b>לוחצים על סמל ההתקנה בשורת הכתובת</b><small>מסך קטן עם חץ, בצד של הכתובת.</small></div><span class="in__ico" aria-hidden="true">⤓</span></li>
+          <li><span class="in__n">3</span><div><b>"התקנה"</b><small>הסאבתון נפתח בחלון משלו, ויש לו קיצור דרך.</small></div><span class="in__ico" aria-hidden="true">✅</span></li>
+        </ol>
+      </section>
+
+      <a class="in__open" href="./phone.html">לפתוח את הטלפון</a>
+      <p class="in__foot">אתר מעריצים לא רשמי. אינו קשור ל-Rockstar Games.</p>
+    </main>
+  </body>
+</html>
