@@ -147,11 +147,12 @@ async function loadChannelClips(slug: string) {
   }
 }
 const isPick = (c: Clip) => channelClips.some((x) => x.id === c.id);
-/** כל הקליפים בפיד: מהלייב (GTA 6), נבחרים מהערוץ, ואז הטריילרים של Rockstar – לפי לייקים וטריות */
+/** כל הקליפים בפיד: מהלייב (GTA 6) מהחדש לישן, אחריהם הנבחרים מהערוץ, והטריילרים של Rockstar משולבים ביניהם */
 function allClips(): Clip[] {
-  const lv = (live?.clips ?? []).map((c, k) => ({ c, s: score('clip', c.id, c.created_at) + 1 - k * 0.01 }));
+  const t = (c: Clip) => Date.parse(c.created_at) || 0;
+  const lv = (live?.clips ?? []).map((c) => ({ c, s: t(c) }));
   const seen = new Set(lv.map((x) => x.c.id));
-  const ch = channelClips.filter((c) => !seen.has(c.id)).map((c, k) => ({ c, s: likesOf('clip', c.id) - 0.2 - k * 0.01 }));
+  const ch = channelClips.filter((c) => !seen.has(c.id)).map((c) => ({ c, s: t(c) }));
   const yt = GTA_CLIPS.map((c, k) => ({ c, s: likesOf('clip', c.id) - 0.5 - k * 0.01 }));
   // הטריילרים של GTA משולבים בתוך הפיד: אחרי הקליפ הראשון ואז אחד כל 3 קליפים (בסוף הרשימה הם נקברו מתחת לקליפים מהלייב)
   const base = [...lv.sort((a, b) => b.s - a.s), ...ch.sort((a, b) => b.s - a.s)];
