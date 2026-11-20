@@ -492,3 +492,18 @@ kbd { display: inline-grid; place-items: center; min-width: 26px; height: 24px; 
 .vod-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 2px 0; font-size: 13px; opacity: 0.85; }
 .vod-note { margin: 0; }
 .stop__vod video { background: #000; object-fit: contain; }
+
+/* מונים: בצד שמאל למעלה, גדולים. במחשב: שורה מתחת לשעון (ורשימת הפרקים יורדת מתחתם); בטלפון: בפינה */
+.mapcount { left: 18px; right: auto; translate: none; top: calc(max(18px, env(safe-area-inset-top)) + 204px); width: 210px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.mapcount[hidden] { display: none; }
+.mapcount__i { flex-direction: column; align-items: center; gap: 4px; padding: 10px 4px 9px; border-radius: 12px; }
+.mapcount__i i { font-size: 22px; line-height: 1; }
+.mapcount__i b { font-size: 34px; }
+.mapcount__i small { font-size: 12px; }
+@media (max-width: 760px), (pointer: coarse) {
+  .mapcount { left: 12px; top: calc(max(12px, env(safe-area-inset-top)) + 4px); width: auto; display: flex; gap: 6px; z-index: 2; }
+  .mapcount__i { flex-direction: row; gap: 6px; padding: 8px 12px; border-radius: 12px; }
+  .mapcount__i i { font-size: 20px; }
+  .mapcount__i b { font-size: 28px; }
+  .mapcount__i small { display: none; }
+}

@@ -27,7 +27,8 @@
 .mh.is-running .mh__sub { color: var(--m-txt-2); }
 @keyframes livepulse { to { box-shadow: 0 0 0 8px rgba(255, 95, 143, 0); } }
 /* הפרקים יורדים מתחת לשעון */
-.rail { top: calc(max(18px, var(--safe-t)) + 214px); translate: none; }
+/* מתחת לשעון ולמונים (מוות/מעצרים/כישלונות) */
+.rail { top: calc(max(18px, var(--safe-t)) + 312px); translate: none; }
 
 /* ═══ סרגל עליון ═══ */
 .tb {
