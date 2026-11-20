@@ -270,7 +270,15 @@ export function createSupabaseStore(url: string, key: string): Store {
       };
     },
     async saveMarker(m) {
-      check(await sb.from('markers').upsert(m));
+      const r = await sb.from('markers').upsert(m);
+      // לפני שהורץ update-marker-clip.sql אין עמודת video_url: שומרים בלי הקליפ
+      if (r.error && /video_url/.test(r.error.message)) {
+        const { video_url: _v, ...old } = m;
+        check(await sb.from('markers').upsert(old));
+        if (m.video_url) throw new Error('המרקר נשמר בלי הקליפ: צריך להריץ את update-marker-clip.sql בשרת');
+        return;
+      }
+      check(r);
     },
     async deleteMarker(id) {
       check(await sb.from('markers').delete().eq('id', id));

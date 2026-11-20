@@ -219,6 +219,22 @@ export function createEditor(opts: {
     const isNew = !init.id;
     let type: MarkerType = init.type;
     let image = init.image_url ?? null;
+    // קליפ למרקר: קישור, או העלאת סרטון מהמכשיר (עד 50MB)
+    const clip = h('input', { class: 'f-in', type: 'url', dir: 'ltr', value: init.video_url ?? '', placeholder: 'https://kick.com/…/clips/…' });
+    const clipFile = h('input', { type: 'file', accept: 'video/mp4,video/webm,video/quicktime,video/*', class: 'up__file' });
+    clipFile.onchange = async () => {
+      const f = clipFile.files?.[0];
+      clipFile.value = '';
+      if (!f) return;
+      if (f.size > 50 * 1024 * 1024) return opts.toast('הסרטון גדול מ-50MB. קצרו אותו או הקטינו ל-720p ונסו שוב.');
+      opts.toast('מעלה סרטון… זה יכול לקחת דקה-שתיים');
+      try {
+        clip.value = await opts.store.upload(f);
+        opts.toast('הסרטון הועלה. לחצו "שמירה"');
+      } catch (err) {
+        opts.toast((err as Error).message);
+      }
+    };
     let emoji = init.emoji ?? (type === 'custom' ? EMOJIS[0] : null);
     const title = h('input', { class: 'f-in', maxLength: 80, value: init.title ?? '', placeholder: MARKER_TYPES[type].hint });
     const body = h('textarea', { class: 'f-in', rows: 3, maxLength: 600, value: init.body ?? '', placeholder: 'מה קרה כאן? (לא חובה)' });
@@ -279,6 +295,8 @@ export function createEditor(opts: {
       h('label', { class: 'f-row' }, h('span', {}, 'כותרת'), title),
       h('label', { class: 'f-row' }, h('span', {}, 'תיאור'), body),
       h('div', { class: 'f-row' }, h('span', {}, 'תמונה'), imgBox),
+      h('label', { class: 'f-row' }, h('span', {}, 'קליפ (לא חובה)'), clip),
+      h('label', { class: 'btn btn--small' }, svg('upload', 16), 'או העלאת סרטון (עד 50MB)', clipFile),
       type === 'death' && isNew ? h('p', { class: 'f-hint' }, 'מרקר מוות מעלה גם את מונה המיתות ב-1.') : null,
       h('div', { class: 'f-actions' }, save, del),
     );
@@ -316,6 +334,7 @@ export function createEditor(opts: {
         body: body.value.trim(),
         emoji: type === 'custom' ? emoji : null,
         image_url: image,
+        video_url: clip.value.trim() || null,
         mission_id: init.mission_id ?? cur?.id ?? null,
         created_at: init.created_at ?? new Date().toISOString(),
       };

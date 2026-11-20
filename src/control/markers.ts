@@ -29,7 +29,7 @@ export function createMarkerLayer(opts: { stage: HTMLElement; world: World; onOp
     const b = h(
       'button',
       { type: 'button', class: `mk mk--${m.type}`, ariaLabel: `${MARKER_TYPES[m.type].label}: ${label}` },
-      h('span', { class: 'mk__shield' }, face, m.image_url ? h('i', { class: 'mk__has-img', ariaHidden: 'true' }) : null),
+      h('span', { class: 'mk__shield' }, face, m.image_url || m.video_url ? h('i', { class: 'mk__has-img', ariaHidden: 'true' }) : null),
       h('span', { class: 'mk__tip', ariaHidden: 'true' }),
       h('span', { class: 'mk__card' }, h('span', { class: 'mk__kind' }, MARKER_TYPES[m.type].label), h('span', { class: 'mk__title' }, label)),
     );
@@ -51,7 +51,7 @@ export function createMarkerLayer(opts: { stage: HTMLElement; world: World; onOp
     for (const [id, el] of els) if (!keep.has(id)) (el.remove(), els.delete(id));
     for (const m of next) {
       const old = els.get(m.id);
-      const sig = JSON.stringify([m.type, m.title, m.emoji, m.image_url]);
+      const sig = JSON.stringify([m.type, m.title, m.emoji, m.image_url, m.video_url]);
       if (old && old.dataset.sig === sig) continue;
       const el = pinFor(m);
       el.dataset.sig = sig;

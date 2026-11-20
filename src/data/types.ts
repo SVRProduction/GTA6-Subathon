@@ -151,6 +151,8 @@ export interface Marker {
   emoji: string | null;
   /** תמונה (רכב חדש, נשק…) – אופציונלי לכל סוג */
   image_url: string | null;
+  /** קליפ למרקר: קישור (Kick / YouTube / mp4) או סרטון שהועלה */
+  video_url?: string | null;
   /** העצירה במסלול שהמרקר שייך אליה (בדרך כלל הנוכחית כשנוצר) */
   mission_id: string | null;
   created_at: string;
